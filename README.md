@@ -6,6 +6,10 @@ Track-by-track harmonic and melodic analysis of the Final Fantasy 1 (NES) soundt
 
 **The goal is learning composition, not producing documents.** Analyses are built through conversation: Josh listens (Logic, guitar, piano), makes observations, and the doc grows from that dialogue. `reference/` holds material kept aside so it doesn't spoil the discovery process.
 
+Cross-song references:
+- [chord-charts.md](chord-charts.md) — bar-by-bar chord grids for every analyzed song, plus recurring templates shared across songs
+- [supplemental-learning.md](supplemental-learning.md) — theory practice plan around the analyses
+
 Each song gets:
 - A MIDI transcription (`<song>.mid`) as the source of truth
 - An analysis doc (`<song>.md`): chord progression with Roman numerals, note-by-note melody analysis, arpeggio and bass track breakdowns, form summary
