@@ -16,7 +16,7 @@ Each song gets:
 | Cornelia Castle | [cornelia-castle.mid](cornelia-castle.mid) | [cornelia-castle.md](cornelia-castle.md) | ✅ Done |
 | Prelude | — | — | Planned |
 | Opening Theme | — | — | Planned |
-| Cornelia (Town) | — | — | Planned |
+| Town | — | — | Planned |
 | Matoya's Cave | — | — | Planned |
 | Chaos Shrine (Temple of Fiends) | — | — | Planned |
 | Main Theme (Overworld) | — | — | Planned |
