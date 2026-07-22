@@ -19,7 +19,7 @@ Each song gets:
 | Town | — | — | Planned |
 | Matoya's Cave | — | — | Planned |
 | Chaos Shrine (Temple of Fiends) | — | — | Planned |
-| Main Theme (Overworld) | — | — | Planned |
+| Main Theme (Overworld) | — | — | 🔜 Next |
 | Battle Theme | — | — | Planned |
 
 ## Key findings so far (Cornelia Castle)
