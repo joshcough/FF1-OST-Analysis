@@ -1,4 +1,6 @@
-# Main Theme / Overworld (FF1) — Harmonic & Melodic Analysis
+# Main Theme / Overworld (FF1) — Claude's Reference Draft
+
+> **Note:** Claude wrote this solo before we established the real process. The actual analysis (`overworld.md`, top level) gets built through Josh's own listening and our conversation. Consult this afterward to check for anything we missed.
 
 Key: G major · 4/4 · ~130 BPM · One looping section (16 bars per pass)
 Tracks (unnamed in this MIDI): MELODY (tr1), COUNTER (tr2 — parallel-sixths countermelody in the A section, arpeggios in the B section), BASS (tr3). No chord reference track in this transcription; harmony derived from the three voices.

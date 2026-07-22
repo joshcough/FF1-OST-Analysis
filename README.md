@@ -4,6 +4,8 @@ Track-by-track harmonic and melodic analysis of the Final Fantasy 1 (NES) soundt
 
 ## Method
 
+**The goal is learning composition, not producing documents.** Analyses are built through conversation: Josh listens (Logic, guitar, piano), makes observations, and the doc grows from that dialogue. `reference/` holds material kept aside so it doesn't spoil the discovery process.
+
 Each song gets:
 - A MIDI transcription (`<song>.mid`) as the source of truth
 - An analysis doc (`<song>.md`): chord progression with Roman numerals, note-by-note melody analysis, arpeggio and bass track breakdowns, form summary
@@ -19,7 +21,7 @@ Each song gets:
 | Town | — | — | Planned |
 | Matoya's Cave | — | — | Planned |
 | Chaos Shrine (Temple of Fiends) | — | — | Planned |
-| Main Theme (Overworld) | [midi/ff1overworld.mid](midi/ff1overworld.mid) | [overworld.md](overworld.md) | ✅ Done |
+| Main Theme (Overworld) | [midi/ff1overworld.mid](midi/ff1overworld.mid) | in progress ([reference draft](reference/overworld-claude-draft.md)) | 🔜 In progress |
 | Battle Theme | — | — | Planned |
 
 ## Key findings so far (Cornelia Castle)
