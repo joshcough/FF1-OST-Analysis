@@ -667,10 +667,15 @@ function draw() {
     const x = RULER_W + tick * ppt - view.x;
     ctx.fillStyle = css("--gold");
     ctx.fillRect(x, 0, 1.5, H);
-  } else if (playCursor > 0) {
+  } else {
     const x = RULER_W + playCursor * ppt - view.x;
     ctx.fillStyle = css("--accent");
-    ctx.fillRect(x, 0, 1.5, H);
+    ctx.fillRect(x - 1, 0, 2.5, H);
+    ctx.beginPath(); // grab handle
+    ctx.moveTo(x - 6, RULER_H);
+    ctx.lineTo(x + 6, RULER_H);
+    ctx.lineTo(x, RULER_H + 7);
+    ctx.fill();
   }
 
   // top ruler
@@ -759,6 +764,20 @@ function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
 
 // ---------------------------------------------------------------- gestures
 let drag = null, pinch = null;
+function cursorHit(pos) {
+  if (playing || !song) return false;
+  if (pos.y < RULER_H) return true; // scrub from the ruler
+  if (mode !== "select") return false;
+  const x = RULER_W + playCursor * pxPerTick() - view.x;
+  return Math.abs(pos.x - x) < 12;
+}
+function scrubTo(pos) {
+  const snap = song.ppq / 2; // 8th-note snap
+  const tick = (pos.x - RULER_W + view.x) / pxPerTick();
+  playCursor = Math.max(0, Math.round(tick / snap) * snap);
+  updateSubtitle();
+  draw();
+}
 canvas.addEventListener("pointerdown", e => {
   canvas.setPointerCapture(e.pointerId);
   if (pinch) return;
@@ -767,7 +786,8 @@ canvas.addEventListener("pointerdown", e => {
     drag = null;
     return;
   }
-  drag = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false};
+  drag = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false,
+          cursor: cursorHit(evtPos(e))};
 });
 canvas.addEventListener("pointermove", e => {
   if (pinch) {
@@ -788,8 +808,8 @@ canvas.addEventListener("pointermove", e => {
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 8) drag.moved = true;
   if (drag.moved) {
-    view.x -= dx; view.y -= dy;
-    clampView(); draw();
+    if (drag.cursor) scrubTo(evtPos(e));
+    else { view.x -= dx; view.y -= dy; clampView(); draw(); }
   }
   drag.x = e.clientX; drag.y = e.clientY;
 });
@@ -855,8 +875,11 @@ function tap(pos) {
   }
   selNote = hit;
   if (hit) {
+    const n = song.tracks[hit.ti].notes[hit.ni];
+    playCursor = n.t; // note tap re-anchors the cursor (and + Note)
     setInfo(noteLabel(hit.ti, hit.ni));
-    previewNote(hit.ti, song.tracks[hit.ti].notes[hit.ni].p);
+    previewNote(hit.ti, n.p);
+    updateSubtitle();
   } else setInfo("—");
   draw();
 }
@@ -1013,6 +1036,7 @@ document.getElementById("clearbtn").addEventListener("click", () => {
   loadSong(songKey).catch(e => setInfo(e.message));
 });
 window.addEventListener("resize", resize);
+new ResizeObserver(resize).observe(wrap); // subtitle strip toggling resizes the roll
 
 // ---------------------------------------------------------------- note editor
 const editor = document.getElementById("noteeditor");
