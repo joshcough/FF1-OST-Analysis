@@ -191,6 +191,7 @@
 <header>
   <div class="brand">FF1 <span>//</span> NIGHT ROLL</div>
   <select id="songsel" aria-label="Song"></select>
+  <button id="rwbtn" aria-label="Back to start">⏮</button>
   <button class="primary" id="playbtn">▶ Play</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
@@ -200,7 +201,8 @@
 <div id="rollwrap"><canvas id="roll"></canvas></div>
 <div id="subtitle"></div>
 <footer>
-  <div class="seg" id="modeseg">
+  <button id="editbtn">Edit</button>
+  <div class="seg" id="modeseg" style="display:none">
     <button data-mode="select" class="active">Select</button>
     <button data-mode="pencil">Pencil</button>
     <button data-mode="erase">Erase</button>
@@ -1118,6 +1120,26 @@ sel.value = "midi/ff1overworld.mid";
 sel.addEventListener("change", () => loadSong(sel.value).catch(e => setInfo(e.message)));
 document.getElementById("playbtn").addEventListener("click", () =>
   playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
+document.getElementById("rwbtn").addEventListener("click", () => {
+  if (playing) { stop(); playCursor = 0; view.x = 0; play(0); return; }
+  playCursor = 0;
+  view.x = 0;
+  updateSubtitle();
+  draw();
+});
+let editOn = false;
+document.getElementById("editbtn").addEventListener("click", e => {
+  editOn = !editOn;
+  e.currentTarget.classList.toggle("active", editOn);
+  document.getElementById("modeseg").style.display = editOn ? "" : "none";
+  if (!editOn) { // leaving edit mode: force safe Select
+    mode = "select";
+    for (const x of document.querySelectorAll("#modeseg button"))
+      x.classList.toggle("active", x.dataset.mode === "select");
+    document.getElementById("durseg").style.display = "none";
+    setInfo("tap a note");
+  }
+});
 document.getElementById("fileinput").addEventListener("change", async e => {
   const f = e.target.files[0];
   if (!f) return;
