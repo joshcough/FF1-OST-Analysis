@@ -378,6 +378,7 @@ let mode = "select";
 let pencilDur = 0.5;      // quarters
 let view = { x: 0, y: 0, pxq: 56, rowH: 13 }; // x in px, pxq = px per quarter
 let playing = false, playT0 = 0, playOffset = 0, schedIdx = 0, schedEvents = [], raf = 0, schedTimer = 0;
+let loopLen = 0, loopPass = 0; // seconds per pass; completed passes this playback
 let audio = null, master = null;
 let rollnotes = [];      // {b1,q1,b2,q2,start,end,text,added}
 let playCursor = 0;      // tick
@@ -526,8 +527,12 @@ function sectionPathAt(tick) {
   return rollnotes.filter(n => n.section && tick >= n.start && tick < n.end)
                   .sort((a, b) => a.depth - b.depth).map(s => s.text).join(" › ");
 }
+function playSec() { // current position within the loop, seconds
+  const s = audio.currentTime - playT0 + playOffset;
+  return loopLen > 0 ? s % loopLen : s;
+}
 function curTick() {
-  return playing ? secToTick(song, audio.currentTime - playT0 + playOffset) : playCursor;
+  return playing ? secToTick(song, playSec()) : playCursor;
 }
 let lastSubtitle = null;
 function updateSubtitle() {
@@ -715,8 +720,7 @@ function draw() {
 
   // playhead / cursor
   if (playing) {
-    const sec = audio.currentTime - playT0 + playOffset;
-    const tick = secToTick(song, sec);
+    const tick = secToTick(song, playSec());
     const x = RULER_W + tick * ppt - view.x;
     ctx.fillStyle = css("--gold");
     ctx.fillRect(x, 0, 1.5, H);
@@ -1019,20 +1023,41 @@ function makeOsc(type) {
   } else o.type = type;
   return o;
 }
-function scheduleNote(ti, n, when, durSec) {
-  if (n.ch === 9) { // noise burst for percussion
-    const len = Math.min(0.08, durSec);
-    const buf = audio.createBuffer(1, audio.sampleRate * len, audio.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let k = 0; k < ch.length; k++) ch[k] = (Math.random() * 2 - 1) * (1 - k / ch.length);
-    const src = audio.createBufferSource();
-    src.buffer = buf;
-    const g = audio.createGain();
-    g.gain.value = 0.4 * (n.v / 127);
-    src.connect(g); g.connect(master);
-    src.start(when);
+function trackIsDrums(ti) {
+  const tr = song.tracks[ti];
+  if (tr.drums === undefined)
+    tr.drums = /drum|percussion|kit/i.test(tr.name) || tr.notes.some(x => x.ch === 9);
+  return tr.drums;
+}
+function drumHit(p, when, vel) {
+  const g = audio.createGain();
+  g.connect(master);
+  const v = 0.55 * (0.3 + 0.7 * vel / 127);
+  if (p <= 36 || (p >= 41 && p <= 47 && p !== 42 && p !== 44 && p !== 46)) { // kick & toms: pitched thump
+    const o = audio.createOscillator();
+    o.type = "triangle";
+    const f0 = p <= 36 ? 110 : 150 + (p - 41) * 18;
+    o.frequency.setValueAtTime(f0, when);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.4, when + 0.12);
+    g.gain.setValueAtTime(v, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.16);
+    o.connect(g);
+    o.start(when); o.stop(when + 0.2);
     return;
   }
+  // snare / hats / cymbals: noise burst, length by GM pitch
+  const len = p === 38 || p === 40 || p === 39 ? 0.11 : (p === 49 || p === 51 || p === 57 ? 0.3 : 0.045);
+  const buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * len), audio.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let k = 0; k < ch.length; k++) ch[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / ch.length, 1.5);
+  const src = audio.createBufferSource();
+  src.buffer = buf;
+  g.gain.value = v * (len < 0.06 ? 0.45 : 0.85);
+  src.connect(g);
+  src.start(when);
+}
+function scheduleNote(ti, n, when, durSec) {
+  if (n.ch === 9 || trackIsDrums(ti)) { drumHit(n.p, when, n.v); return; }
   const o = makeOsc(voiceType(ti));
   o.frequency.value = 440 * Math.pow(2, (n.p - 69) / 12);
   const g = audio.createGain();
@@ -1068,24 +1093,35 @@ function play(fromSec = 0) {
   playing = true;
   playOffset = fromSec;
   playT0 = audio.currentTime;
+  loopPass = 0;
+  // loop point: end of the final bar containing any note (any track, muted or not)
+  let lastTick = 0;
+  song.tracks.forEach(tr => tr.notes.forEach(n => { if (!n.gone) lastTick = Math.max(lastTick, n.t + n.d); }));
+  const bt = barTicks();
+  const loopEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt); // tolerate tiny spill past the barline
+  loopLen = tickToSec(song, loopEndTick);
   schedIdx = schedEvents.findIndex(e => e.sec >= fromSec);
   if (schedIdx < 0) schedIdx = schedEvents.length;
   document.getElementById("playbtn").textContent = "■ Stop";
   schedTimer = setInterval(() => {
-    const now = audio.currentTime - playT0 + playOffset;
-    while (schedIdx < schedEvents.length && schedEvents[schedIdx].sec < now + 0.2) {
-      const e = schedEvents[schedIdx++];
-      scheduleNote(e.ti, e.n, playT0 + e.sec - playOffset, e.dur);
+    if (!schedEvents.length || loopLen <= 0) return;
+    const now = audio.currentTime - playT0;
+    for (;;) {
+      if (schedIdx >= schedEvents.length) { loopPass++; schedIdx = 0; }
+      const e = schedEvents[schedIdx];
+      const abs = e.sec + loopPass * loopLen - playOffset; // seconds after playT0
+      if (abs >= now + 0.2) break;
+      if (abs >= -0.05) scheduleNote(e.ti, e.n, playT0 + abs, e.dur);
+      schedIdx++;
     }
-    if (schedIdx >= schedEvents.length && now > (schedEvents.length ? schedEvents[schedEvents.length-1].sec + 2 : 0)) stop();
   }, 60);
   const tick = () => {
     if (!playing) return;
-    // auto-follow playhead
-    const sec = audio.currentTime - playT0 + playOffset;
-    const x = secToTick(song, sec) * pxPerTick();
+    // auto-follow playhead (and snap back on loop wrap)
+    const x = secToTick(song, playSec()) * pxPerTick();
     const W = wrap.clientWidth - RULER_W;
     if (x - view.x > W * 0.85) view.x = x - W * 0.3;
+    else if (x < view.x) view.x = Math.max(0, x - W * 0.1);
     updateSubtitle();
     draw();
     raf = requestAnimationFrame(tick);
@@ -1094,7 +1130,7 @@ function play(fromSec = 0) {
 }
 function stop() {
   if (!playing) { draw(); return; }
-  playCursor = secToTick(song, audio.currentTime - playT0 + playOffset);
+  playCursor = secToTick(song, playSec());
   playing = false;
   clearInterval(schedTimer);
   cancelAnimationFrame(raf);
