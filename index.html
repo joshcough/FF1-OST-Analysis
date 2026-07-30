@@ -228,6 +228,11 @@
     </div>
     <textarea id="ntext" placeholder="What's happening at this beat?"></textarea>
     <div class="row">
+      <label class="lbl" style="display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="nsec"> section (label shows in the ruler; nest by containment)
+      </label>
+    </div>
+    <div class="row">
       <button class="primary" id="nsave">Save</button>
       <button id="ndelete" style="display:none">Delete</button>
       <button id="ncancel">Cancel</button>
@@ -374,7 +379,9 @@ let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
 const canvas = document.getElementById("roll");
 const ctx = canvas.getContext("2d");
 const wrap = document.getElementById("rollwrap");
-const RULER_W = 46, RULER_H = 24;
+const RULER_W = 46, BASE_RULER_H = 24, LANE_H = 15;
+let RULER_H = BASE_RULER_H; // grows when section lanes exist
+let sectionColors = {};     // label -> color
 const PMIN = 24, PMAX = 96; // C1..C7 display range
 
 // ---------------------------------------------------------------- edits
@@ -429,7 +436,11 @@ function parseRollnotes(text) {
     }
   }
   if (cur) out.push(cur);
-  out.forEach(n => n.text = n.text.trim());
+  out.forEach(n => {
+    n.text = n.text.trim();
+    const m = n.text.match(/^section:\s*(.+)/s);
+    if (m) { n.section = true; n.text = m[1].split("\n")[0].trim(); }
+  });
   return out.filter(n => n.text);
 }
 function resolveNote(n) {
@@ -441,12 +452,26 @@ function resolveNote(n) {
 function finalizeNotes() {
   rollnotes.sort((a, b) => a.start - b.start);
   const bt = barTicks();
-  rollnotes.forEach((n, i) => {
+  const plain = rollnotes.filter(n => !n.section);
+  plain.forEach((n, i) => {
     if (n.end === null || n.end <= n.start) {
-      const next = rollnotes[i + 1];
+      const next = plain[i + 1];
       n.end = next && next.start > n.start ? next.start : n.start + bt;
     }
   });
+  // sections: depth from containment; lane colors by label (same label = same color)
+  const secs = rollnotes.filter(n => n.section);
+  secs.forEach(s => { if (s.end === null || s.end <= s.start) s.end = s.start + bt; });
+  let maxDepth = -1;
+  sectionColors = {};
+  let ci = 0;
+  for (const s of secs) {
+    s.depth = secs.filter(t => t !== s && t.start <= s.start && t.end >= s.end &&
+                               (t.start < s.start || t.end > s.end)).length;
+    maxDepth = Math.max(maxDepth, s.depth);
+    if (!(s.text in sectionColors)) sectionColors[s.text] = TRACK_COLORS[ci++ % TRACK_COLORS.length];
+  }
+  RULER_H = BASE_RULER_H + (maxDepth + 1) * LANE_H;
 }
 async function loadNotes() {
   rollnotes = [];
@@ -469,7 +494,8 @@ async function loadNotes() {
 }
 function saveLocalNotes() {
   if (!notesStoreKey()) return;
-  const local = rollnotes.filter(n => n.added).map(n => ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text}));
+  const local = rollnotes.filter(n => n.added).map(n =>
+    ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text, section: n.section || undefined}));
   if (local.length) localStorage.setItem(notesStoreKey(), JSON.stringify(local));
   else localStorage.removeItem(notesStoreKey());
 }
@@ -478,14 +504,18 @@ function serializeRollnotes() {
   for (const n of rollnotes) {
     const a = n.b1 + (n.q1 !== 1 ? "." + n.q1 : ".1");
     const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || song.timesig[0]) : "";
-    lines.push("[" + a + b + "]", n.text, "");
+    lines.push("[" + a + b + "]", (n.section ? "section: " : "") + n.text, "");
   }
   return lines.join("\n");
 }
 function activeNoteAt(tick) {
   let best = null;
-  for (const n of rollnotes) if (tick >= n.start && tick < n.end) best = n;
+  for (const n of rollnotes) if (!n.section && tick >= n.start && tick < n.end) best = n;
   return best;
+}
+function sectionPathAt(tick) {
+  return rollnotes.filter(n => n.section && tick >= n.start && tick < n.end)
+                  .sort((a, b) => a.depth - b.depth).map(s => s.text).join(" › ");
 }
 function curTick() {
   return playing ? secToTick(song, audio.currentTime - playT0 + playOffset) : playCursor;
@@ -500,7 +530,9 @@ function updateSubtitle() {
   el.innerHTML = "";
   const where = document.createElement("span");
   where.className = "where";
-  where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "") + (n.added ? " · unsynced" : "");
+  const sec = sectionPathAt(n.start);
+  where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "") + (sec ? " · " + sec : "") +
+                      (n.added ? " · unsynced" : "");
   el.append(where, document.createTextNode(n.text));
   el.classList.add("on");
 }
@@ -603,8 +635,9 @@ function draw() {
     }
   }
 
-  // annotation range tints (under everything else)
+  // annotation range tints (under everything else) — sections live in the ruler instead
   for (const n of rollnotes) {
+    if (n.section) continue;
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
     if (x + w < RULER_W || x > W) continue;
@@ -712,8 +745,31 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  // section lanes under the bar numbers
+  for (const n of rollnotes) {
+    if (!n.section) continue;
+    const x = RULER_W + n.start * ppt - view.x;
+    const w = (n.end - n.start) * ppt;
+    if (x + w < RULER_W || x > W) continue;
+    const y = BASE_RULER_H + n.depth * LANE_H;
+    const color = sectionColors[n.text] || css("--accent");
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(x + 1, y + 1, w - 2, LANE_H - 2);
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(Math.max(x, RULER_W), y, w - 2, LANE_H);
+    ctx.clip();
+    ctx.fillStyle = css("--text");
+    ctx.font = "10px " + css("--mono");
+    ctx.fillText(n.text, Math.max(x, RULER_W) + 5, y + 11);
+    ctx.restore();
+  }
+
   // annotation marker flags on the ruler
   for (const n of rollnotes) {
+    if (n.section) continue;
     const x = RULER_W + n.start * ppt - view.x;
     if (x < RULER_W - 8 || x > W) continue;
     ctx.fillStyle = css("--gold");
@@ -869,10 +925,21 @@ function clampView() {
 }
 
 function tap(pos) {
-  if (pos.y < RULER_H) { // marker tap or seek
+  if (pos.y < RULER_H) { // section tap, marker tap, or seek
     rangeSel = null; // a plain ruler tap clears any range selection
     const {tick} = posToTickPitch(pos);
     const ppt = pxPerTick();
+    if (pos.y >= BASE_RULER_H) { // section lanes
+      const lane = Math.floor((pos.y - BASE_RULER_H) / LANE_H);
+      const sec = rollnotes.find(n => n.section && n.depth === lane && tick >= n.start && tick < n.end);
+      if (sec) {
+        rangeSel = {a: sec.start, b: sec.end};
+        playCursor = sec.start;
+        setInfo("section " + sec.text + " · bar " + sec.b1 + "–" + (sec.b2 || sec.b1));
+        updateSubtitle(); draw();
+        return;
+      }
+    }
     let hitMark = null;
     for (const n of rollnotes) {
       if (Math.abs((n.start - tick) * ppt) < 14) { hitMark = n; break; }
@@ -1092,6 +1159,7 @@ function openEditor(note) {
   document.getElementById("nb2").value = note ? (note.b2 || "") : b2;
   document.getElementById("nq2").value = note ? (note.q2 || "") : q2;
   document.getElementById("ntext").value = note ? note.text : "";
+  document.getElementById("nsec").checked = !!(note && note.section);
   document.getElementById("ndelete").style.display = note && note.added ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
     ? "Synced note — edits create an unsynced copy until you Sync." : "";
@@ -1112,7 +1180,9 @@ document.getElementById("nsave").addEventListener("click", () => {
   const b2raw = +document.getElementById("nb2").value || 0;
   const q2raw = +document.getElementById("nq2").value || 0;
   if (editingNote && editingNote.added) rollnotes = rollnotes.filter(n => n !== editingNote);
-  rollnotes.push(resolveNote({b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null, text, added: true}));
+  const isSec = document.getElementById("nsec").checked;
+  rollnotes.push(resolveNote({b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+                              text: isSec ? text.split("\n")[0] : text, section: isSec || undefined, added: true}));
   rangeSel = null;
   finalizeNotes();
   saveLocalNotes();
