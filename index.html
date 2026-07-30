@@ -134,6 +134,57 @@
   .seg { display: flex; border: 1px solid var(--grid); border-radius: 6px; overflow: hidden; }
   .seg button { border: none; border-radius: 0; min-height: 36px; padding: 6px 11px; }
   .hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
+
+  #subtitle {
+    display: none;
+    padding: 10px 16px;
+    background: var(--panel2);
+    border-top: 1px solid var(--grid);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--gold);
+    white-space: pre-wrap;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  #subtitle.on { display: block; }
+  #subtitle .where { color: var(--dim); font-size: 11px; display: block; margin-bottom: 2px; }
+
+  .overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 9, 18, 0.72);
+    z-index: 10;
+  }
+  .overlay.on { display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 12px 12px 0 0;
+    padding: 16px;
+    width: min(560px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sheet h2 { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; color: var(--dim); font-weight: 600; }
+  .sheet .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sheet input[type=number], .sheet input[type=password], .sheet textarea {
+    font-family: var(--mono);
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 8px;
+  }
+  .sheet input[type=number] { width: 64px; }
+  .sheet input[type=password] { flex: 1; min-width: 0; }
+  .sheet textarea { width: 100%; min-height: 84px; resize: vertical; }
+  .sheet .lbl { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+  .sheet .status { font-family: var(--mono); font-size: 11px; color: var(--dim); min-height: 14px; }
 </style>
 </head>
 <body>
@@ -147,6 +198,7 @@
 </header>
 <div id="trackbar"></div>
 <div id="rollwrap"><canvas id="roll"></canvas></div>
+<div id="subtitle"></div>
 <footer>
   <div class="seg" id="modeseg">
     <button data-mode="select" class="active">Select</button>
@@ -160,8 +212,45 @@
     <button data-dur="2">1/2</button>
   </div>
   <div id="noteinfo">tap a note</div>
+  <button id="notebtn">+ Note</button>
+  <button id="syncbtn">Sync</button>
   <button id="clearbtn" style="display:none">Clear edits</button>
 </footer>
+
+<div class="overlay" id="noteeditor">
+  <div class="sheet">
+    <h2>ANNOTATION</h2>
+    <div class="row">
+      <span class="lbl">from bar</span><input type="number" id="nb1" min="1" value="1">
+      <span class="lbl">beat</span><input type="number" id="nq1" min="1" step="0.5" value="1">
+      <span class="lbl">to bar</span><input type="number" id="nb2" min="0" placeholder="—">
+      <span class="lbl">beat</span><input type="number" id="nq2" min="1" step="0.5" placeholder="—">
+    </div>
+    <textarea id="ntext" placeholder="What's happening at this beat?"></textarea>
+    <div class="row">
+      <button class="primary" id="nsave">Save</button>
+      <button id="ndelete" style="display:none">Delete</button>
+      <button id="ncancel">Cancel</button>
+    </div>
+    <div class="status" id="nstatus"></div>
+  </div>
+</div>
+
+<div class="overlay" id="syncsheet">
+  <div class="sheet">
+    <h2>SYNC .ROLLNOTES</h2>
+    <div class="row">
+      <input type="password" id="ghtoken" placeholder="GitHub fine-grained token (stays on this device)" autocomplete="off">
+    </div>
+    <div class="row">
+      <button class="primary" id="ghsave">Commit to GitHub</button>
+      <button id="copyfile">Copy file</button>
+      <button id="dlfile">Download</button>
+      <button id="synccancel">Close</button>
+    </div>
+    <div class="status" id="syncstatus">Token: Settings → Developer settings → Fine-grained tokens → this repo only, Contents read/write.</div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -277,6 +366,9 @@ let pencilDur = 0.5;      // quarters
 let view = { x: 0, y: 0, pxq: 56, rowH: 13 }; // x in px, pxq = px per quarter
 let playing = false, playT0 = 0, playOffset = 0, schedIdx = 0, schedEvents = [], raf = 0, schedTimer = 0;
 let audio = null, master = null;
+let rollnotes = [];      // {b1,q1,b2,q2,start,end,text,added}
+let playCursor = 0;      // tick
+let editingNote = null;  // rollnote being edited, or null for new
 
 const canvas = document.getElementById("roll");
 const ctx = canvas.getContext("2d");
@@ -318,6 +410,100 @@ function updateClearBtn() {
   document.getElementById("clearbtn").style.display = has ? "" : "none";
 }
 
+// ---------------------------------------------------------------- rollnotes
+function barTicks() { return song.timesig[0] * 4 / song.timesig[1] * song.ppq; }
+function notesBase() { return songKey ? songKey.replace(/\.midi?$/i, "") : null; }
+function notesStoreKey() { return songKey ? "ff1roll-notes-" + songKey : null; }
+
+function parseRollnotes(text) {
+  const out = [];
+  let cur = null;
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\[\s*(\d+)(?:\.(\d+(?:\.\d+)?))?\s*(?:-\s*(\d+)(?:\.(\d+(?:\.\d+)?))?\s*)?\]/);
+    if (m) {
+      if (cur) out.push(cur);
+      cur = {b1: +m[1], q1: m[2] ? +m[2] : 1, b2: m[3] ? +m[3] : null, q2: m[4] ? +m[4] : null, text: ""};
+    } else if (cur && !line.startsWith("#")) {
+      cur.text += (cur.text ? "\n" : "") + line;
+    }
+  }
+  if (cur) out.push(cur);
+  out.forEach(n => n.text = n.text.trim());
+  return out.filter(n => n.text);
+}
+function resolveNote(n) {
+  const bt = barTicks();
+  n.start = (n.b1 - 1) * bt + (n.q1 - 1) * song.ppq;
+  n.end = n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null;
+  return n;
+}
+function finalizeNotes() {
+  rollnotes.sort((a, b) => a.start - b.start);
+  const bt = barTicks();
+  rollnotes.forEach((n, i) => {
+    if (n.end === null || n.end <= n.start) {
+      const next = rollnotes[i + 1];
+      n.end = next && next.start > n.start ? next.start : n.start + bt;
+    }
+  });
+}
+async function loadNotes() {
+  rollnotes = [];
+  if (songKey) {
+    try {
+      const res = await fetch("midi/" + notesBase() + ".rollnotes", {cache: "no-cache"});
+      if (res.ok) rollnotes = parseRollnotes(await res.text()).map(resolveNote);
+    } catch (err) { /* no sidecar */ }
+    try {
+      const local = JSON.parse(localStorage.getItem(notesStoreKey()) || "[]");
+      for (const n of local) {
+        const dup = rollnotes.some(r => r.b1 === n.b1 && r.q1 === n.q1 && r.text === n.text);
+        if (!dup) rollnotes.push(resolveNote({...n, added: true}));
+      }
+    } catch (err) { /* corrupted local notes */ }
+  }
+  finalizeNotes();
+  updateSubtitle();
+  draw();
+}
+function saveLocalNotes() {
+  if (!notesStoreKey()) return;
+  const local = rollnotes.filter(n => n.added).map(n => ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text}));
+  if (local.length) localStorage.setItem(notesStoreKey(), JSON.stringify(local));
+  else localStorage.removeItem(notesStoreKey());
+}
+function serializeRollnotes() {
+  const lines = ["# " + (notesBase() || "notes") + ".rollnotes — beat-anchored annotations", ""];
+  for (const n of rollnotes) {
+    const a = n.b1 + (n.q1 !== 1 ? "." + n.q1 : ".1");
+    const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || song.timesig[0]) : "";
+    lines.push("[" + a + b + "]", n.text, "");
+  }
+  return lines.join("\n");
+}
+function activeNoteAt(tick) {
+  let best = null;
+  for (const n of rollnotes) if (tick >= n.start && tick < n.end) best = n;
+  return best;
+}
+function curTick() {
+  return playing ? secToTick(song, audio.currentTime - playT0 + playOffset) : playCursor;
+}
+let lastSubtitle = null;
+function updateSubtitle() {
+  const el = document.getElementById("subtitle");
+  const n = song ? activeNoteAt(curTick()) : null;
+  if (n === lastSubtitle) return;
+  lastSubtitle = n;
+  if (!n) { el.classList.remove("on"); return; }
+  el.innerHTML = "";
+  const where = document.createElement("span");
+  where.className = "where";
+  where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "") + (n.added ? " · unsynced" : "");
+  el.append(where, document.createTextNode(n.text));
+  el.classList.add("on");
+}
+
 // ---------------------------------------------------------------- load song
 async function loadSong(file) {
   stop();
@@ -338,9 +524,12 @@ function setSong(parsed, key) {
     song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
   view.x = 0;
   view.y = ((PMAX - 79) * view.rowH); // center roughly around G4
+  playCursor = 0;
+  lastSubtitle = undefined;
   renderTrackbar();
   setInfo("tap a note");
   draw();
+  loadNotes();
 }
 
 // ---------------------------------------------------------------- track chips
@@ -413,6 +602,17 @@ function draw() {
     }
   }
 
+  // annotation range tints (under everything else)
+  for (const n of rollnotes) {
+    const x = RULER_W + n.start * ppt - view.x;
+    const w = (n.end - n.start) * ppt;
+    if (x + w < RULER_W || x > W) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = 0.045;
+    ctx.fillRect(x, RULER_H, w, H);
+    ctx.globalAlpha = 1;
+  }
+
   // beat + bar lines
   const t0 = view.x / ppt, t1 = (view.x + W) / ppt;
   const beatT = song.ppq;
@@ -460,12 +660,16 @@ function draw() {
   });
   ctx.globalAlpha = 1;
 
-  // playhead
+  // playhead / cursor
   if (playing) {
     const sec = audio.currentTime - playT0 + playOffset;
     const tick = secToTick(song, sec);
     const x = RULER_W + tick * ppt - view.x;
     ctx.fillStyle = css("--gold");
+    ctx.fillRect(x, 0, 1.5, H);
+  } else if (playCursor > 0) {
+    const x = RULER_W + playCursor * ppt - view.x;
+    ctx.fillStyle = css("--accent");
     ctx.fillRect(x, 0, 1.5, H);
   }
 
@@ -480,6 +684,20 @@ function draw() {
     const x = RULER_W + t * ppt - view.x;
     if (x < RULER_W - 4) continue;
     ctx.fillText(String(Math.round(t / barTicks) + 1), x + 4, 15);
+  }
+
+  // annotation marker flags on the ruler
+  for (const n of rollnotes) {
+    const x = RULER_W + n.start * ppt - view.x;
+    if (x < RULER_W - 8 || x > W) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = n.added ? 0.6 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, RULER_H - 8);
+    ctx.lineTo(x + 8, RULER_H - 4.5);
+    ctx.lineTo(x, RULER_H - 1);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   // left ruler
@@ -600,9 +818,17 @@ function clampView() {
 }
 
 function tap(pos) {
-  if (pos.y < RULER_H) { // seek
+  if (pos.y < RULER_H) { // marker tap or seek
     const {tick} = posToTickPitch(pos);
-    if (playing) { stop(); play(tickToSec(song, Math.max(0, tick))); }
+    const ppt = pxPerTick();
+    let hitMark = null;
+    for (const n of rollnotes) {
+      if (Math.abs((n.start - tick) * ppt) < 14) { hitMark = n; break; }
+    }
+    const target = hitMark ? hitMark.start
+                 : Math.max(0, Math.round(tick / song.ppq) * song.ppq); // snap to beat
+    if (playing) { stop(); play(tickToSec(song, target)); }
+    else { playCursor = target; updateSubtitle(); draw(); }
     return;
   }
   if (mode === "pencil") {
@@ -729,6 +955,7 @@ function play(fromSec = 0) {
     const x = secToTick(song, sec) * pxPerTick();
     const W = wrap.clientWidth - RULER_W;
     if (x - view.x > W * 0.85) view.x = x - W * 0.3;
+    updateSubtitle();
     draw();
     raf = requestAnimationFrame(tick);
   };
@@ -736,11 +963,13 @@ function play(fromSec = 0) {
 }
 function stop() {
   if (!playing) { draw(); return; }
+  playCursor = secToTick(song, audio.currentTime - playT0 + playOffset);
   playing = false;
   clearInterval(schedTimer);
   cancelAnimationFrame(raf);
   document.getElementById("playbtn").textContent = "▶ Play";
   if (audio) { master.disconnect(); master = null; audio.close(); audio = null; pulse25 = null; }
+  updateSubtitle();
   draw();
 }
 
@@ -753,7 +982,8 @@ for (const [title, file] of SONGS) {
 }
 sel.value = "ff1overworld.mid";
 sel.addEventListener("change", () => loadSong(sel.value).catch(e => setInfo(e.message)));
-document.getElementById("playbtn").addEventListener("click", () => playing ? stop() : play(0));
+document.getElementById("playbtn").addEventListener("click", () =>
+  playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
 document.getElementById("fileinput").addEventListener("change", async e => {
   const f = e.target.files[0];
   if (!f) return;
@@ -783,6 +1013,111 @@ document.getElementById("clearbtn").addEventListener("click", () => {
   loadSong(songKey).catch(e => setInfo(e.message));
 });
 window.addEventListener("resize", resize);
+
+// ---------------------------------------------------------------- note editor
+const editor = document.getElementById("noteeditor");
+function openEditor(note) {
+  editingNote = note || null;
+  const bt = barTicks();
+  const bar = Math.floor(playCursor / bt) + 1;
+  const beat = (playCursor % bt) / song.ppq + 1;
+  document.getElementById("nb1").value = note ? note.b1 : bar;
+  document.getElementById("nq1").value = note ? note.q1 : beat;
+  document.getElementById("nb2").value = note && note.b2 ? note.b2 : "";
+  document.getElementById("nq2").value = note && note.q2 ? note.q2 : "";
+  document.getElementById("ntext").value = note ? note.text : "";
+  document.getElementById("ndelete").style.display = note && note.added ? "" : "none";
+  document.getElementById("nstatus").textContent = note && !note.added
+    ? "Synced note — edits create an unsynced copy until you Sync." : "";
+  editor.classList.add("on");
+  document.getElementById("ntext").focus();
+}
+document.getElementById("notebtn").addEventListener("click", () => {
+  if (!song) return;
+  const at = activeNoteAt(playCursor);
+  openEditor(at && at.added ? at : null);
+});
+document.getElementById("ncancel").addEventListener("click", () => editor.classList.remove("on"));
+document.getElementById("nsave").addEventListener("click", () => {
+  const text = document.getElementById("ntext").value.trim();
+  if (!text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
+  const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
+  const b2raw = +document.getElementById("nb2").value || 0;
+  const q2raw = +document.getElementById("nq2").value || 0;
+  if (editingNote && editingNote.added) rollnotes = rollnotes.filter(n => n !== editingNote);
+  rollnotes.push(resolveNote({b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null, text, added: true}));
+  finalizeNotes();
+  saveLocalNotes();
+  lastSubtitle = undefined;
+  updateSubtitle();
+  editor.classList.remove("on");
+  draw();
+});
+document.getElementById("ndelete").addEventListener("click", () => {
+  rollnotes = rollnotes.filter(n => n !== editingNote);
+  finalizeNotes();
+  saveLocalNotes();
+  lastSubtitle = undefined;
+  updateSubtitle();
+  editor.classList.remove("on");
+  draw();
+});
+
+// ---------------------------------------------------------------- sync
+const syncsheet = document.getElementById("syncsheet");
+const REPO_API = "https://api.github.com/repos/joshcough/FF1-OST-Analysis/contents/";
+document.getElementById("syncbtn").addEventListener("click", () => {
+  if (!song) return;
+  document.getElementById("ghtoken").value = localStorage.getItem("ff1roll-ghtoken") || "";
+  document.getElementById("syncstatus").textContent = songKey
+    ? "Token: Settings → Developer settings → Fine-grained tokens → this repo only, Contents read/write."
+    : "Local file — Copy/Download only (no repo path to commit to).";
+  syncsheet.classList.add("on");
+});
+document.getElementById("synccancel").addEventListener("click", () => syncsheet.classList.remove("on"));
+document.getElementById("copyfile").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(serializeRollnotes());
+    document.getElementById("syncstatus").textContent = "Copied to clipboard.";
+  } catch (err) { document.getElementById("syncstatus").textContent = "Copy failed: " + err.message; }
+});
+document.getElementById("dlfile").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([serializeRollnotes()], {type: "text/plain"}));
+  a.download = (notesBase() || "notes") + ".rollnotes";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+document.getElementById("ghsave").addEventListener("click", async () => {
+  const status = document.getElementById("syncstatus");
+  const token = document.getElementById("ghtoken").value.trim();
+  if (!token) { status.textContent = "Paste a token first (or use Copy/Download)."; return; }
+  if (!songKey) { status.textContent = "Local file — no repo path. Use Copy/Download."; return; }
+  localStorage.setItem("ff1roll-ghtoken", token);
+  const path = "midi/" + notesBase() + ".rollnotes";
+  const headers = {Authorization: "Bearer " + token, Accept: "application/vnd.github+json"};
+  status.textContent = "Committing…";
+  try {
+    let sha = null;
+    const g = await fetch(REPO_API + path + "?ref=main", {headers});
+    if (g.ok) sha = (await g.json()).sha;
+    const body = {
+      message: "Update " + path + " from Night Roll",
+      content: btoa(unescape(encodeURIComponent(serializeRollnotes()))),
+      branch: "main",
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(REPO_API + path, {method: "PUT", headers, body: JSON.stringify(body)});
+    if (!r.ok) throw new Error("HTTP " + r.status + (r.status === 401 || r.status === 403 ? " — check token scope" : ""));
+    rollnotes.forEach(n => n.added = false); // now canonical in the repo
+    saveLocalNotes();
+    lastSubtitle = undefined;
+    updateSubtitle();
+    draw();
+    status.textContent = "Committed. (GitHub Pages takes ~1 min to serve the new file.)";
+  } catch (err) { status.textContent = "Commit failed: " + err.message; }
+});
 
 resize();
 loadSong(sel.value).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));

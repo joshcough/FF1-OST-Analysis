@@ -1,0 +1,52 @@
+# ff1overworld.rollnotes — beat-anchored annotations
+# From the 2026-07-21 bass-first session (see overworld.md).
+# Anchors cover the first 16-bar pass; the MIDI repeats the loop.
+
+[1.1 - 2.4]
+G — I, root position. Home. The gallop begins: strong-beat
+note twice, then a dip to D (5th of G).
+
+[3.1 - 4.4]
+D/F# — V, first inversion. Root sacrificed so the bass keeps
+the chromatic pair G→F#. Dip note D frozen from last bar:
+5th of G becomes root of D.
+
+[5.1 - 6.4]
+Am — ii, root position. Pair 2 begins: A→G# is pair 1 (G→F#)
+moved up a whole step. Same move, transposed.
+
+[7.1 - 8.4]
+E/G# — V/ii. The G# giveaway: out of key, so it's functional —
+a secondary dominant aiming at Am. Dip note E shared: 5th of
+Am = root of E.
+
+[9.1]
+C — IV. E7's promise DEFERRED — it aimed at Am but landed here.
+
+[10.1]
+D — V. Fake cadence setup. (Bass gives only D+A; major third
+confirmed later in the upper tracks.)
+
+[11.1]
+Bdim — iiø/ii. The B–F tritone is in the bass itself —
+instability you can hear. Aim at the aimer.
+
+[12.1]
+E — V/ii again. ii–V–i in A minor underway: Bdim → E → Am.
+
+[13.1]
+Am — the promised target finally lands, four bars late,
+with a stronger escort. Tonicization: a real key visit.
+
+[14.1]
+F octaves — bVII, borrowed from G minor. No Gm ever sounds:
+mixture, not modulation. Also doubles as V of the coming Bb.
+
+[15.1]
+Bb octaves — bIII, borrowed. F→Bb is a real V→I inside the
+borrowing — the devices nest.
+
+[16.1 - 16.4]
+Turnaround: the gallop stops for the first time. Bass walks
+D–C–B–A in even quarters, delivering onto G at the loop restart.
+Texture change marks the cadence.
