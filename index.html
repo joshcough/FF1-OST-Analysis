@@ -1113,7 +1113,8 @@ document.getElementById("dlfile").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
-document.getElementById("ghsave").addEventListener("click", async () => {
+document.getElementById("ghsave").addEventListener("click", async e => {
+  const btn = e.currentTarget;
   const status = document.getElementById("syncstatus");
   const token = document.getElementById("ghtoken").value.trim();
   if (!token) { status.textContent = "Paste a token first (or use Copy/Download)."; return; }
@@ -1121,10 +1122,9 @@ document.getElementById("ghsave").addEventListener("click", async () => {
   localStorage.setItem("ff1roll-ghtoken", token);
   const path = "midi/" + notesBase() + ".rollnotes";
   const headers = {Authorization: "Bearer " + token, Accept: "application/vnd.github+json"};
-  status.textContent = "Committing…";
-  try {
+  const putOnce = async () => {
     let sha = null;
-    const g = await fetch(REPO_API + path + "?ref=main", {headers});
+    const g = await fetch(REPO_API + path + "?ref=main", {headers, cache: "no-store"});
     if (g.ok) sha = (await g.json()).sha;
     const body = {
       message: "Update " + path + " from Night Roll",
@@ -1132,7 +1132,16 @@ document.getElementById("ghsave").addEventListener("click", async () => {
       branch: "main",
     };
     if (sha) body.sha = sha;
-    const r = await fetch(REPO_API + path, {method: "PUT", headers, body: JSON.stringify(body)});
+    return fetch(REPO_API + path, {method: "PUT", headers, body: JSON.stringify(body)});
+  };
+  btn.disabled = true;
+  status.textContent = "Committing…";
+  try {
+    let r = await putOnce();
+    if (r.status === 409) { // stale sha (e.g. a commit raced us) — refetch and retry once
+      status.textContent = "Retrying with fresh file version…";
+      r = await putOnce();
+    }
     if (!r.ok) throw new Error("HTTP " + r.status + (r.status === 401 || r.status === 403 ? " — check token scope" : ""));
     rollnotes.forEach(n => n.added = false); // now canonical in the repo
     saveLocalNotes();
@@ -1141,6 +1150,7 @@ document.getElementById("ghsave").addEventListener("click", async () => {
     draw();
     status.textContent = "Committed. (GitHub Pages takes ~1 min to serve the new file.)";
   } catch (err) { status.textContent = "Commit failed: " + err.message; }
+  finally { btn.disabled = false; }
 });
 
 resize();
