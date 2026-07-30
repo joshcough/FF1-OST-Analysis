@@ -260,30 +260,36 @@
 <script>
 "use strict";
 // ---------------------------------------------------------------- catalog
-const SONGS = [
-  ["Prelude", "ff1prelude.mid"],
-  ["Prologue", "ff1prologue.mid"],
-  ["Main Theme (Overworld)", "ff1overworld.mid"],
-  ["Cornelia Castle", "ff1corneliacastle.mid"],
-  ["Castle", "ff1castle.mid"],
-  ["Town", "ff1town.mid"],
-  ["Shop", "ff1shop.mid"],
-  ["Menu", "ff1menu.mid"],
-  ["Battle", "ff1battle.mid"],
-  ["Victory", "ff1victory.mid"],
-  ["Ship", "ff1ship.mid"],
-  ["Airship", "ff1airship.mid"],
-  ["Elfland", "ff1elfland.mid"],
-  ["Matoya's Cave", "ff1matouyascave.mid"],
-  ["Cave", "ff1cave.mid"],
-  ["Dungeon", "ff1dungeon.mid"],
-  ["Chaos Temple", "ff1chaostemple.mid"],
-  ["Gurgu Volcano", "ff1gurguvolcano.mid"],
-  ["Floating Castle", "ff1floatingcastle.mid"],
-  ["Underwater Palace", "ff1underwaterpalace.mid"],
-  ["Game Over", "ff1gameover.mid"],
-  ["Epilogue", "ff1epilogue.mid"],
-];
+const CATALOG = {
+  "Final Fantasy I": [
+    ["Prelude", "midi/ff1prelude.mid"],
+    ["Prologue", "midi/ff1prologue.mid"],
+    ["Main Theme (Overworld)", "midi/ff1overworld.mid"],
+    ["Cornelia Castle", "midi/ff1corneliacastle.mid"],
+    ["Castle", "midi/ff1castle.mid"],
+    ["Town", "midi/ff1town.mid"],
+    ["Shop", "midi/ff1shop.mid"],
+    ["Menu", "midi/ff1menu.mid"],
+    ["Battle", "midi/ff1battle.mid"],
+    ["Victory", "midi/ff1victory.mid"],
+    ["Ship", "midi/ff1ship.mid"],
+    ["Airship", "midi/ff1airship.mid"],
+    ["Elfland", "midi/ff1elfland.mid"],
+    ["Matoya's Cave", "midi/ff1matouyascave.mid"],
+    ["Cave", "midi/ff1cave.mid"],
+    ["Dungeon", "midi/ff1dungeon.mid"],
+    ["Chaos Temple", "midi/ff1chaostemple.mid"],
+    ["Gurgu Volcano", "midi/ff1gurguvolcano.mid"],
+    ["Floating Castle", "midi/ff1floatingcastle.mid"],
+    ["Underwater Palace", "midi/ff1underwaterpalace.mid"],
+    ["Game Over", "midi/ff1gameover.mid"],
+    ["Epilogue", "midi/ff1epilogue.mid"],
+  ],
+  "My Compositions": [
+    ["Key Change Test (07-26)", "compositions/KeyChangeTest-07-26.mid"],
+    ["Baseball / Beach Song", "compositions/CM6-G7b9.mid"],
+  ],
+};
 const TRACK_COLORS = ["#d95926","#3987e5","#199e70","#c98500","#d55181","#9085e9","#008300","#e66767"];
 const NOTE_NAMES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
 
@@ -420,7 +426,8 @@ function updateClearBtn() {
 
 // ---------------------------------------------------------------- rollnotes
 function barTicks() { return song.timesig[0] * 4 / song.timesig[1] * song.ppq; }
-function notesBase() { return songKey ? songKey.replace(/\.midi?$/i, "") : null; }
+function notesBase() { return songKey ? songKey.replace(/\.midi?$/i, "") : null; } // path minus extension
+function baseName() { return notesBase() ? notesBase().split("/").pop() : "notes"; }
 function notesStoreKey() { return songKey ? "ff1roll-notes-" + songKey : null; }
 
 function parseRollnotes(text) {
@@ -477,7 +484,7 @@ async function loadNotes() {
   rollnotes = [];
   if (songKey) {
     try {
-      const res = await fetch("midi/" + notesBase() + ".rollnotes", {cache: "no-cache"});
+      const res = await fetch(notesBase() + ".rollnotes", {cache: "no-cache"});
       if (res.ok) rollnotes = parseRollnotes(await res.text()).map(resolveNote);
     } catch (err) { /* no sidecar */ }
     try {
@@ -500,7 +507,7 @@ function saveLocalNotes() {
   else localStorage.removeItem(notesStoreKey());
 }
 function serializeRollnotes() {
-  const lines = ["# " + (notesBase() || "notes") + ".rollnotes — beat-anchored annotations", ""];
+  const lines = ["# " + baseName() + ".rollnotes — beat-anchored annotations", ""];
   for (const n of rollnotes) {
     const a = n.b1 + (n.q1 !== 1 ? "." + n.q1 : ".1");
     const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || song.timesig[0]) : "";
@@ -538,11 +545,11 @@ function updateSubtitle() {
 }
 
 // ---------------------------------------------------------------- load song
-async function loadSong(file) {
+async function loadSong(path) {
   stop();
-  const res = await fetch("midi/" + file);
-  if (!res.ok) throw new Error("fetch failed: " + file);
-  setSong(parseMidi(await res.arrayBuffer()), file);
+  const res = await fetch(path);
+  if (!res.ok) throw new Error("fetch failed: " + path);
+  setSong(parseMidi(await res.arrayBuffer()), path);
 }
 function setSong(parsed, key) {
   song = parsed;
@@ -1097,12 +1104,17 @@ function stop() {
 
 // ---------------------------------------------------------------- ui wiring
 const sel = document.getElementById("songsel");
-for (const [title, file] of SONGS) {
-  const o = document.createElement("option");
-  o.value = file; o.textContent = title;
-  sel.appendChild(o);
+for (const [group, songs] of Object.entries(CATALOG)) {
+  const og = document.createElement("optgroup");
+  og.label = group;
+  for (const [title, path] of songs) {
+    const o = document.createElement("option");
+    o.value = path; o.textContent = title;
+    og.appendChild(o);
+  }
+  sel.appendChild(og);
 }
-sel.value = "ff1overworld.mid";
+sel.value = "midi/ff1overworld.mid";
 sel.addEventListener("change", () => loadSong(sel.value).catch(e => setInfo(e.message)));
 document.getElementById("playbtn").addEventListener("click", () =>
   playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
@@ -1222,7 +1234,7 @@ document.getElementById("copyfile").addEventListener("click", async () => {
 document.getElementById("dlfile").addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([serializeRollnotes()], {type: "text/plain"}));
-  a.download = (notesBase() || "notes") + ".rollnotes";
+  a.download = baseName() + ".rollnotes";
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -1233,7 +1245,7 @@ document.getElementById("ghsave").addEventListener("click", async e => {
   if (!token) { status.textContent = "Paste a token first (or use Copy/Download)."; return; }
   if (!songKey) { status.textContent = "Local file — no repo path. Use Copy/Download."; return; }
   localStorage.setItem("ff1roll-ghtoken", token);
-  const path = "midi/" + notesBase() + ".rollnotes";
+  const path = notesBase() + ".rollnotes";
   const headers = {Authorization: "Bearer " + token, Accept: "application/vnd.github+json"};
   const putOnce = async () => {
     let sha = null;
