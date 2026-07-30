@@ -1152,8 +1152,13 @@ for (const [group, songs] of Object.entries(CATALOG)) {
   }
   sel.appendChild(og);
 }
-sel.value = "midi/ff1overworld.mid";
-sel.addEventListener("change", () => loadSong(sel.value).catch(e => setInfo(e.message)));
+const ALL_PATHS = Object.values(CATALOG).flat().map(([, p]) => p);
+const lastSong = localStorage.getItem("ff1roll-lastsong");
+sel.value = ALL_PATHS.includes(lastSong) ? lastSong : "midi/ff1overworld.mid";
+sel.addEventListener("change", () => {
+  localStorage.setItem("ff1roll-lastsong", sel.value);
+  loadSong(sel.value).catch(e => setInfo(e.message));
+});
 document.getElementById("playbtn").addEventListener("click", () =>
   playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
 document.getElementById("rwbtn").addEventListener("click", () => {
