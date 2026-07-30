@@ -369,6 +369,7 @@ let audio = null, master = null;
 let rollnotes = [];      // {b1,q1,b2,q2,start,end,text,added}
 let playCursor = 0;      // tick
 let editingNote = null;  // rollnote being edited, or null for new
+let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
 
 const canvas = document.getElementById("roll");
 const ctx = canvas.getContext("2d");
@@ -613,6 +614,16 @@ function draw() {
     ctx.globalAlpha = 1;
   }
 
+  // ruler-drag range selection
+  if (rangeSel) {
+    const x = RULER_W + rangeSel.a * ppt - view.x;
+    const w = (rangeSel.b - rangeSel.a) * ppt;
+    ctx.fillStyle = css("--accent");
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(x, RULER_H, w, H);
+    ctx.globalAlpha = 1;
+  }
+
   // beat + bar lines
   const t0 = view.x / ppt, t1 = (view.x + W) / ppt;
   const beatT = song.ppq;
@@ -691,6 +702,16 @@ function draw() {
     ctx.fillText(String(Math.round(t / barTicks) + 1), x + 4, 15);
   }
 
+  // selection stripe on the ruler
+  if (rangeSel) {
+    const x = RULER_W + rangeSel.a * ppt - view.x;
+    const w = (rangeSel.b - rangeSel.a) * ppt;
+    ctx.fillStyle = css("--accent");
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(x, 0, w, RULER_H);
+    ctx.globalAlpha = 1;
+  }
+
   // annotation marker flags on the ruler
   for (const n of rollnotes) {
     const x = RULER_W + n.start * ppt - view.x;
@@ -765,11 +786,14 @@ function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
 // ---------------------------------------------------------------- gestures
 let drag = null, pinch = null;
 function cursorHit(pos) {
-  if (playing || !song) return false;
-  if (pos.y < RULER_H) return true; // scrub from the ruler
-  if (mode !== "select") return false;
+  if (playing || !song || mode !== "select") return false;
+  if (pos.y < RULER_H) return false; // ruler drags select a range instead
   const x = RULER_W + playCursor * pxPerTick() - view.x;
   return Math.abs(pos.x - x) < 12;
+}
+function tickAtX(x, snap) {
+  const t = (x - RULER_W + view.x) / pxPerTick();
+  return Math.max(0, Math.round(t / snap) * snap);
 }
 function scrubTo(pos) {
   const snap = song.ppq / 2; // 8th-note snap
@@ -786,8 +810,9 @@ canvas.addEventListener("pointerdown", e => {
     drag = null;
     return;
   }
+  const p = evtPos(e);
   drag = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false,
-          cursor: cursorHit(evtPos(e))};
+          cursor: cursorHit(p), ruler: !!song && p.y < RULER_H, spos: p};
 });
 canvas.addEventListener("pointermove", e => {
   if (pinch) {
@@ -809,6 +834,12 @@ canvas.addEventListener("pointermove", e => {
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 8) drag.moved = true;
   if (drag.moved) {
     if (drag.cursor) scrubTo(evtPos(e));
+    else if (drag.ruler) { // drag along the ruler = select a beat range
+      const a = tickAtX(drag.spos.x, song.ppq);
+      const b = tickAtX(evtPos(e).x, song.ppq);
+      rangeSel = a === b ? null : {a: Math.min(a, b), b: Math.max(a, b)};
+      draw();
+    }
     else { view.x -= dx; view.y -= dy; clampView(); draw(); }
   }
   drag.x = e.clientX; drag.y = e.clientY;
@@ -839,6 +870,7 @@ function clampView() {
 
 function tap(pos) {
   if (pos.y < RULER_H) { // marker tap or seek
+    rangeSel = null; // a plain ruler tap clears any range selection
     const {tick} = posToTickPitch(pos);
     const ppt = pxPerTick();
     let hitMark = null;
@@ -1043,12 +1075,22 @@ const editor = document.getElementById("noteeditor");
 function openEditor(note) {
   editingNote = note || null;
   const bt = barTicks();
-  const bar = Math.floor(playCursor / bt) + 1;
-  const beat = (playCursor % bt) / song.ppq + 1;
-  document.getElementById("nb1").value = note ? note.b1 : bar;
-  document.getElementById("nq1").value = note ? note.q1 : beat;
-  document.getElementById("nb2").value = note && note.b2 ? note.b2 : "";
-  document.getElementById("nq2").value = note && note.q2 ? note.q2 : "";
+  let b1 = Math.floor(playCursor / bt) + 1;
+  let q1 = (playCursor % bt) / song.ppq + 1;
+  let b2 = "", q2 = "";
+  if (!note && rangeSel) { // prefill the from/to fields from the ruler selection
+    b1 = Math.floor(rangeSel.a / bt) + 1;
+    q1 = (rangeSel.a % bt) / song.ppq + 1;
+    const last = rangeSel.b - song.ppq; // inclusive last beat of the selection
+    if (last > rangeSel.a) {
+      b2 = Math.floor(last / bt) + 1;
+      q2 = (last % bt) / song.ppq + 1;
+    }
+  }
+  document.getElementById("nb1").value = note ? note.b1 : b1;
+  document.getElementById("nq1").value = note ? note.q1 : q1;
+  document.getElementById("nb2").value = note ? (note.b2 || "") : b2;
+  document.getElementById("nq2").value = note ? (note.q2 || "") : q2;
   document.getElementById("ntext").value = note ? note.text : "";
   document.getElementById("ndelete").style.display = note && note.added ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
@@ -1058,7 +1100,7 @@ function openEditor(note) {
 }
 document.getElementById("notebtn").addEventListener("click", () => {
   if (!song) return;
-  const at = activeNoteAt(playCursor);
+  const at = rangeSel ? null : activeNoteAt(playCursor);
   openEditor(at && at.added ? at : null);
 });
 document.getElementById("ncancel").addEventListener("click", () => editor.classList.remove("on"));
@@ -1071,6 +1113,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   const q2raw = +document.getElementById("nq2").value || 0;
   if (editingNote && editingNote.added) rollnotes = rollnotes.filter(n => n !== editingNote);
   rollnotes.push(resolveNote({b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null, text, added: true}));
+  rangeSel = null;
   finalizeNotes();
   saveLocalNotes();
   lastSubtitle = undefined;
