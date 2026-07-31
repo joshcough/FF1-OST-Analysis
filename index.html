@@ -338,6 +338,7 @@ function parseMidi(buf) {
           else if (mtype === 0x51) tempos.push({tick: t, usq: data[0]<<16 | data[1]<<8 | data[2]});
           else if (mtype === 0x58) timesig = [data[0], 1 << data[1]];
           else if (mtype === 0x59 && keysig === null) keysig = {sf: data[0] > 127 ? data[0] - 256 : data[0], minor: !!data[1]};
+          else if (mtype === 0x2F) break; // end of track — anything after is junk (corrupt files)
         } else if (b === 0xF0 || b === 0xF7) {
           j++; const mlen = varlen(); j += mlen;
         } else {
@@ -357,7 +358,13 @@ function parseMidi(buf) {
       }
     } catch (err) { /* truncated track (e.g. ff1ship.mid) — keep what parsed */ }
     i = end;
+    for (const n of notes) n.d = Math.min(n.d, 32 * ppq); // corrupt-file guard: no note longer than 8 bars
     notes.sort((a,b) => a.t - b.t || a.p - b.p);
+    // corrupt-file guard: an internal silence beyond 32 bars means desynced
+    // junk follows (real tacets in this catalog top out at 24 bars) — truncate
+    for (let k = 1; k < notes.length; k++) {
+      if (notes[k].t - notes[k-1].t > 32 * 4 * ppq) { notes.length = k; break; }
+    }
     if (notes.length) tracks.push({name, notes});
   }
   tempos.sort((a,b) => a.tick - b.tick);
@@ -395,6 +402,8 @@ let view = { x: 0, y: 0, pxq: 56, rowH: 13 }; // x in px, pxq = px per quarter
 let playing = false, playT0 = 0, playOffset = 0, schedIdx = 0, schedEvents = [], raf = 0, schedTimer = 0;
 let loopLen = 0, loopPass = 0; // seconds per pass; completed passes this playback
 let audio = null, master = null;
+let trackGains = [];     // per-track gain nodes: live mute kills sounding notes
+let songEndTick = 0;     // end of the last bar containing any note
 let rollnotes = [];      // {b1,q1,b2,q2,start,end,text,added}
 let playCursor = 0;      // tick
 let editingNote = null;  // rollnote being edited, or null for new
@@ -593,6 +602,12 @@ function setSong(parsed, key) {
   playCursor = 0;
   lastSubtitle = undefined;
   if (!song.keysig) song.keysig = detectKeyJS();
+  {
+    let lastTick = 0;
+    song.tracks.forEach(tr => tr.notes.forEach(n => { lastTick = Math.max(lastTick, n.t + n.d); }));
+    const bt = barTicks();
+    songEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt);
+  }
   renderTrackbar();
   buildScoreModel();
   clampView();
@@ -644,13 +659,13 @@ function renderTrackbar() {
     solo.addEventListener("click", e => {
       e.stopPropagation();
       trackState[ti].solo = !trackState[ti].solo;
-      renderTrackbar(); buildScoreModel(); clampView(); draw();
+      renderTrackbar(); buildScoreModel(); updateTrackGains(); clampView(); draw();
     });
     chip.append(dot, label, solo);
     chip.addEventListener("click", () => {
       if (ti === selTrack) trackState[ti].muted = !trackState[ti].muted;
       selTrack = ti;
-      renderTrackbar(); buildScoreModel(); clampView(); draw();
+      renderTrackbar(); buildScoreModel(); updateTrackGains(); clampView(); draw();
     });
     bar.appendChild(chip);
   });
@@ -1101,7 +1116,10 @@ canvas.addEventListener("wheel", e => {
 }, {passive: false});
 function clampView() {
   const minX = viewMode === "score" && scoreModel ? -SCORE_INTRO_W : 0;
-  view.x = Math.max(minX, view.x);
+  const maxX = song
+    ? Math.max(minX, songEndTick * pxPerTick() + 2 * barTicks() * pxPerTick() - (wrap.clientWidth - RULER_W))
+    : Infinity;
+  view.x = Math.min(maxX, Math.max(minX, view.x));
   const contentH = viewMode === "score" && scoreModel
     ? scoreContentH()
     : (PMAX - PMIN + 1) * view.rowH;
@@ -1177,6 +1195,21 @@ function ensureAudio() {
   master = audio.createGain();
   master.gain.value = 0.22;
   master.connect(audio.destination);
+  trackGains = [];
+}
+function trackGain(ti) {
+  if (!trackGains[ti]) {
+    trackGains[ti] = audio.createGain();
+    trackGains[ti].gain.value = trackAudible(ti) ? 1 : 0;
+    trackGains[ti].connect(master);
+  }
+  return trackGains[ti];
+}
+function updateTrackGains() {
+  if (!audio) return;
+  song.tracks.forEach((_, ti) => {
+    if (trackGains[ti]) trackGains[ti].gain.setValueAtTime(trackAudible(ti) ? 1 : 0, audio.currentTime);
+  });
 }
 function voiceType(ti) {
   if (ti === song.tracks.length - 1 && song.tracks.length > 1) return "triangle"; // bass-ish
@@ -1203,9 +1236,9 @@ function trackIsDrums(ti) {
     tr.drums = /drum|percussion|kit/i.test(tr.name) || tr.notes.some(x => x.ch === 9);
   return tr.drums;
 }
-function drumHit(p, when, vel) {
+function drumHit(ti, p, when, vel) {
   const g = audio.createGain();
-  g.connect(master);
+  g.connect(trackGain(ti));
   const v = 0.55 * (0.3 + 0.7 * vel / 127);
   if (p <= 36 || (p >= 41 && p <= 47 && p !== 42 && p !== 44 && p !== 46)) { // kick & toms: pitched thump
     const o = audio.createOscillator();
@@ -1231,7 +1264,7 @@ function drumHit(p, when, vel) {
   src.start(when);
 }
 function scheduleNote(ti, n, when, durSec) {
-  if (n.ch === 9 || trackIsDrums(ti)) { drumHit(n.p, when, n.v); return; }
+  if (n.ch === 9 || trackIsDrums(ti)) { drumHit(ti, n.p, when, n.v); return; }
   const o = makeOsc(voiceType(ti));
   o.frequency.value = 440 * Math.pow(2, (n.p - 69) / 12);
   const g = audio.createGain();
@@ -1240,7 +1273,7 @@ function scheduleNote(ti, n, when, durSec) {
   g.gain.linearRampToValueAtTime(amp, when + 0.008);
   g.gain.setValueAtTime(amp, Math.max(when + 0.008, when + durSec - 0.03));
   g.gain.linearRampToValueAtTime(0, when + durSec);
-  o.connect(g); g.connect(master);
+  o.connect(g); g.connect(trackGain(ti));
   o.start(when);
   o.stop(when + durSec + 0.05);
 }
@@ -1250,9 +1283,9 @@ function previewNote(ti, pitch) {
   scheduleNote(ti, {p: pitch, v: 90, ch: 0}, audio.currentTime + 0.01, 0.3);
 }
 function buildSchedule() {
+  // all tracks scheduled; per-track gain nodes apply mute/solo live
   schedEvents = [];
   song.tracks.forEach((tr, ti) => {
-    if (!trackAudible(ti)) return;
     for (const n of tr.notes) {
       if (n.gone) continue;
       schedEvents.push({ti, n, sec: tickToSec(song, n.t), dur: Math.max(0.04, tickToSec(song, n.t + n.d) - tickToSec(song, n.t))});
@@ -1268,12 +1301,9 @@ function play(fromSec = 0) {
   playOffset = fromSec;
   playT0 = audio.currentTime;
   loopPass = 0;
-  // loop point: end of the final bar containing any note (any track, muted or not)
-  let lastTick = 0;
-  song.tracks.forEach(tr => tr.notes.forEach(n => { if (!n.gone) lastTick = Math.max(lastTick, n.t + n.d); }));
-  const bt = barTicks();
-  const loopEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt); // tolerate tiny spill past the barline
-  loopLen = tickToSec(song, loopEndTick);
+  loopLen = tickToSec(song, songEndTick); // loop at the end of the final bar containing any note
+  updateTrackGains();
+  song.tracks.forEach((_, ti) => trackGain(ti)); // pre-create so gains exist before first event
   schedIdx = schedEvents.findIndex(e => e.sec >= fromSec);
   if (schedIdx < 0) schedIdx = schedEvents.length;
   document.getElementById("playbtn").textContent = "■ Stop";
@@ -1309,7 +1339,7 @@ function stop() {
   clearInterval(schedTimer);
   cancelAnimationFrame(raf);
   document.getElementById("playbtn").textContent = "▶ Play";
-  if (audio) { master.disconnect(); master = null; audio.close(); audio = null; pulse25 = null; }
+  if (audio) { master.disconnect(); master = null; audio.close(); audio = null; pulse25 = null; trackGains = []; }
   updateSubtitle();
   draw();
 }

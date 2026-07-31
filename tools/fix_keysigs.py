@@ -69,6 +69,8 @@ def _parse_body(d, j, end, notes, open_notes):
         b = d[j]
         if b == 0xFF:
             mtype = d[j+1]
+            if mtype == 0x2F:  # end of track — anything after is junk (corrupt files)
+                break
             if mtype == 0x59:
                 keysig_offsets.append(j)
             mlen, k = read_varlen(d, j + 2)
