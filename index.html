@@ -1588,6 +1588,8 @@ function renderIntro() { // pinned-at-start clef / key / time column
   const renderer = new VF.Renderer(c, VF.Renderer.Backends.CANVAS);
   const ctx2 = renderer.getContext();
   ctx2.scale(dpr, dpr);
+  ctx2.setFillStyle("#C7D0E8");
+  ctx2.setStrokeStyle("#C7D0E8");
   m.staves.forEach((st, si) => {
     const y = SCORE_TOP + si * STAVE_H;
     const stave = new VF.Stave(0, y, SCORE_INTRO_W, {fill_style: "#3A4569"});
