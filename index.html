@@ -193,6 +193,7 @@
   <select id="songsel" aria-label="Song"></select>
   <button id="rwbtn" aria-label="Back to start">⏮</button>
   <button class="primary" id="playbtn">▶ Play</button>
+  <button id="viewbtn" aria-label="Toggle score view">𝄞 Score</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
   <div class="meta" id="songmeta"></div>
@@ -213,6 +214,8 @@
     <button data-dur="1">1/4</button>
     <button data-dur="2">1/2</button>
   </div>
+  <button id="lassobtn">⊞ Lasso</button>
+  <button id="chordbtn" style="display:none">Chord?</button>
   <div id="noteinfo">tap a note</div>
   <button id="notebtn">+ Note</button>
   <button id="syncbtn">Sync</button>
@@ -259,6 +262,7 @@
   </div>
 </div>
 
+<script src="vendor/vexflow.js"></script>
 <script>
 "use strict";
 // ---------------------------------------------------------------- catalog
@@ -307,40 +311,51 @@ function parseMidi(buf) {
   const tracks = [];
   const tempos = []; // {tick, usq}
   let timesig = [4, 4];
-  for (let tn = 0; tn < ntrk; tn++) {
-    if (String.fromCharCode(d[i],d[i+1],d[i+2],d[i+3]) !== "MTrk") throw new Error("bad track chunk");
-    const tlen = u32(i+4);
-    const end = i + 8 + tlen;
+  let keysig = null; // {sf, minor}
+  // Track boundaries by MTrk magic scan — some files (ff1battle) have corrupt
+  // track-length headers, so the declared length can't be trusted alone.
+  const magics = [];
+  for (let k = 8 + hlen; k + 4 <= d.length; k++) {
+    if (d[k] === 0x4D && d[k+1] === 0x54 && d[k+2] === 0x72 && d[k+3] === 0x6B) magics.push(k);
+  }
+  for (let tn = 0; tn < magics.length; tn++) {
+    i = magics[tn];
+    const declaredEnd = i + 8 + u32(i+4);
+    const nextMagic = tn + 1 < magics.length ? magics[tn+1] : d.length;
+    const end = Math.min(declaredEnd, nextMagic);
     let j = i + 8, t = 0, running = null, name = "";
     const open = {}, notes = [];
     const varlen = () => { let v = 0, b; do { b = d[j++]; v = (v<<7) | (b & 0x7F); } while (b & 0x80); return v; };
-    while (j < end) {
-      t += varlen();
-      const b = d[j];
-      if (b === 0xFF) {
-        const mtype = d[j+1]; j += 2;
-        const mlen = varlen();
-        const data = d.subarray(j, j+mlen); j += mlen;
-        if (mtype === 0x03 && !name) name = new TextDecoder("latin1").decode(data);
-        else if (mtype === 0x51) tempos.push({tick: t, usq: data[0]<<16 | data[1]<<8 | data[2]});
-        else if (mtype === 0x58) timesig = [data[0], 1 << data[1]];
-      } else if (b === 0xF0 || b === 0xF7) {
-        j++; const mlen = varlen(); j += mlen;
-      } else {
-        if (b & 0x80) { running = b; j++; }
-        const st = running & 0xF0, ch = running & 0x0F;
-        if (st === 0x90 || st === 0x80) {
-          const p = d[j], v = d[j+1]; j += 2;
-          if (st === 0x90 && v > 0) {
-            (open[p] = open[p] || []).push({t, v});
-          } else if (open[p] && open[p].length) {
-            const o = open[p].shift();
-            notes.push({t: o.t, d: t - o.t, p, v: o.v, ch});
-          }
-        } else if (st === 0xA0 || st === 0xB0 || st === 0xE0) j += 2;
-        else if (st === 0xC0 || st === 0xD0) j += 1;
+    try {
+      while (j < end) {
+        t += varlen();
+        const b = d[j];
+        if (b === 0xFF) {
+          const mtype = d[j+1]; j += 2;
+          const mlen = varlen();
+          const data = d.subarray(j, j+mlen); j += mlen;
+          if (mtype === 0x03 && !name) name = new TextDecoder("latin1").decode(data);
+          else if (mtype === 0x51) tempos.push({tick: t, usq: data[0]<<16 | data[1]<<8 | data[2]});
+          else if (mtype === 0x58) timesig = [data[0], 1 << data[1]];
+          else if (mtype === 0x59 && keysig === null) keysig = {sf: data[0] > 127 ? data[0] - 256 : data[0], minor: !!data[1]};
+        } else if (b === 0xF0 || b === 0xF7) {
+          j++; const mlen = varlen(); j += mlen;
+        } else {
+          if (b & 0x80) { running = b; j++; }
+          const st = running & 0xF0, ch = running & 0x0F;
+          if (st === 0x90 || st === 0x80) {
+            const p = d[j], v = d[j+1]; j += 2;
+            if (st === 0x90 && v > 0) {
+              (open[p] = open[p] || []).push({t, v});
+            } else if (open[p] && open[p].length) {
+              const o = open[p].shift();
+              notes.push({t: o.t, d: t - o.t, p, v: o.v, ch});
+            }
+          } else if (st === 0xA0 || st === 0xB0 || st === 0xE0) j += 2;
+          else if (st === 0xC0 || st === 0xD0) j += 1;
+        }
       }
-    }
+    } catch (err) { /* truncated track (e.g. ff1ship.mid) — keep what parsed */ }
     i = end;
     notes.sort((a,b) => a.t - b.t || a.p - b.p);
     if (notes.length) tracks.push({name, notes});
@@ -353,7 +368,7 @@ function parseMidi(buf) {
     if (k > 0) sec += (tempos[k].tick - tempos[k-1].tick) / ppq * tempos[k-1].usq / 1e6;
     tempos[k].sec = sec;
   }
-  return {ppq, tracks, tempos, timesig};
+  return {ppq, tracks, tempos, timesig, keysig};
 }
 function tickToSec(song, tick) {
   const ts = song.tempos;
@@ -384,6 +399,10 @@ let rollnotes = [];      // {b1,q1,b2,q2,start,end,text,added}
 let playCursor = 0;      // tick
 let editingNote = null;  // rollnote being edited, or null for new
 let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
+let lassoMode = false;   // one-finger drag selects notes instead of panning
+let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
+let multiSel = [];       // [{ti,ni}] lasso-selected notes
+let multiSelKey = new Set();
 
 const canvas = document.getElementById("roll");
 const ctx = canvas.getContext("2d");
@@ -554,7 +573,7 @@ function updateSubtitle() {
 // ---------------------------------------------------------------- load song
 async function loadSong(path) {
   stop();
-  const res = await fetch(path);
+  const res = await fetch(path, {cache: "no-cache"});
   if (!res.ok) throw new Error("fetch failed: " + path);
   setSong(parseMidi(await res.arrayBuffer()), path);
 }
@@ -569,14 +588,40 @@ function setSong(parsed, key) {
   const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
     song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
-  view.x = 0;
-  view.y = ((PMAX - 79) * view.rowH); // center roughly around G4
+  view.x = viewMode === "score" ? -SCORE_INTRO_W : 0;
+  view.y = viewMode === "score" ? 0 : ((PMAX - 79) * view.rowH); // roll: center near G4
   playCursor = 0;
   lastSubtitle = undefined;
+  if (!song.keysig) song.keysig = detectKeyJS();
   renderTrackbar();
+  buildScoreModel();
+  clampView();
   setInfo("tap a note");
   draw();
   loadNotes();
+}
+
+function detectKeyJS() { // Krumhansl fallback for files without keysig metadata
+  const MAJP = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  const MINP = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+  const hist = new Array(12).fill(0);
+  song.tracks.forEach((tr, ti) => {
+    if (trackIsDrums(ti)) return;
+    for (const n of tr.notes) hist[n.p % 12] += Math.max(n.d, 1);
+  });
+  if (!hist.some(h => h)) return {sf: 0, minor: false};
+  let best = null;
+  for (const [minor, prof] of [[false, MAJP], [true, MINP]]) {
+    for (let tonic = 0; tonic < 12; tonic++) {
+      let s = 0;
+      for (let pc = 0; pc < 12; pc++) s += prof[(pc - tonic + 12) % 12] * hist[pc];
+      if (!best || s > best.s) best = {s, tonic, minor};
+    }
+  }
+  const rel = best.minor ? (best.tonic + 3) % 12 : best.tonic;
+  let sf = (rel * 7) % 12;
+  if (sf > 6) sf -= 12;
+  return {sf, minor: best.minor};
 }
 
 // ---------------------------------------------------------------- track chips
@@ -599,13 +644,13 @@ function renderTrackbar() {
     solo.addEventListener("click", e => {
       e.stopPropagation();
       trackState[ti].solo = !trackState[ti].solo;
-      renderTrackbar(); draw();
+      renderTrackbar(); buildScoreModel(); clampView(); draw();
     });
     chip.append(dot, label, solo);
     chip.addEventListener("click", () => {
       if (ti === selTrack) trackState[ti].muted = !trackState[ti].muted;
       selTrack = ti;
-      renderTrackbar(); draw();
+      renderTrackbar(); buildScoreModel(); clampView(); draw();
     });
     bar.appendChild(chip);
   });
@@ -630,6 +675,11 @@ function draw() {
   const W = wrap.clientWidth, H = wrap.clientHeight;
   ctx.fillStyle = css("--bg");
   ctx.fillRect(0, 0, W, H);
+  if (viewMode === "score" && VF && scoreModel) {
+    drawScore(W, H);
+    drawRuler(W, H);
+    return;
+  }
   const ppt = pxPerTick();
   const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
   const barTicks = beatsPerBar * song.ppq;
@@ -685,8 +735,8 @@ function draw() {
 
   // notes
   song.tracks.forEach((tr, ti) => {
+    if (!trackAudible(ti)) return; // hidden = gone, not dimmed
     const color = TRACK_COLORS[ti % TRACK_COLORS.length];
-    const audible = trackAudible(ti);
     for (let ni = 0; ni < tr.notes.length; ni++) {
       const n = tr.notes[ni];
       if (n.gone) continue;
@@ -695,7 +745,7 @@ function draw() {
       if (x + w < RULER_W || x > W) continue;
       const y = RULER_H + (PMAX - n.p) * rowH - view.y;
       if (y < RULER_H - rowH || y > H) continue;
-      ctx.globalAlpha = audible ? (0.55 + 0.45 * (n.v / 127)) : 0.15;
+      ctx.globalAlpha = 0.55 + 0.45 * (n.v / 127);
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(x, y + 1.5, w, rowH - 3, 2.5);
@@ -707,7 +757,7 @@ function draw() {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      if (selNote && selNote.ti === ti && selNote.ni === ni) {
+      if ((selNote && selNote.ti === ti && selNote.ni === ni) || multiSelKey.has(ti + ":" + ni)) {
         ctx.globalAlpha = 1;
         ctx.strokeStyle = css("--gold");
         ctx.lineWidth = 2;
@@ -735,65 +785,8 @@ function draw() {
     ctx.fill();
   }
 
-  // top ruler
-  ctx.fillStyle = css("--panel");
-  ctx.fillRect(0, 0, W, RULER_H);
-  ctx.strokeStyle = css("--grid");
-  ctx.beginPath(); ctx.moveTo(0, RULER_H - 0.5); ctx.lineTo(W, RULER_H - 0.5); ctx.stroke();
-  ctx.font = "10px " + css("--mono");
-  ctx.fillStyle = css("--dim");
-  for (let t = Math.floor(t0 / barTicks) * barTicks; t < t1; t += barTicks) {
-    const x = RULER_W + t * ppt - view.x;
-    if (x < RULER_W - 4) continue;
-    ctx.fillText(String(Math.round(t / barTicks) + 1), x + 4, 15);
-  }
-
-  // selection stripe on the ruler
-  if (rangeSel) {
-    const x = RULER_W + rangeSel.a * ppt - view.x;
-    const w = (rangeSel.b - rangeSel.a) * ppt;
-    ctx.fillStyle = css("--accent");
-    ctx.globalAlpha = 0.3;
-    ctx.fillRect(x, 0, w, RULER_H);
-    ctx.globalAlpha = 1;
-  }
-
-  // section lanes under the bar numbers
-  for (const n of rollnotes) {
-    if (!n.section) continue;
-    const x = RULER_W + n.start * ppt - view.x;
-    const w = (n.end - n.start) * ppt;
-    if (x + w < RULER_W || x > W) continue;
-    const y = BASE_RULER_H + n.depth * LANE_H;
-    const color = sectionColors[n.text] || css("--accent");
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.3;
-    ctx.fillRect(x + 1, y + 1, w - 2, LANE_H - 2);
-    ctx.globalAlpha = 1;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(Math.max(x, RULER_W), y, w - 2, LANE_H);
-    ctx.clip();
-    ctx.fillStyle = css("--text");
-    ctx.font = "10px " + css("--mono");
-    ctx.fillText(n.text, Math.max(x, RULER_W) + 5, y + 11);
-    ctx.restore();
-  }
-
-  // annotation marker flags on the ruler
-  for (const n of rollnotes) {
-    if (n.section) continue;
-    const x = RULER_W + n.start * ppt - view.x;
-    if (x < RULER_W - 8 || x > W) continue;
-    ctx.fillStyle = css("--gold");
-    ctx.globalAlpha = n.added ? 0.6 : 1;
-    ctx.beginPath();
-    ctx.moveTo(x, RULER_H - 8);
-    ctx.lineTo(x + 8, RULER_H - 4.5);
-    ctx.lineTo(x, RULER_H - 1);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  drawLasso();
+  drawRuler(W, H);
 
   // left ruler
   ctx.fillStyle = css("--panel");
@@ -814,6 +807,154 @@ function draw() {
     }
   }
   ctx.textAlign = "left";
+}
+
+// ---------------------------------------------------------------- lasso / chord id
+function spellPc(pc) {
+  const sf = song && song.keysig ? Math.max(-7, Math.min(7, song.keysig.sf)) : 0;
+  const s = keySpelling(sf)[pc];
+  return s.letter + (s.acc || "");
+}
+function pitchName(p) { return spellPc(p % 12) + (Math.floor(p / 12) - 1); }
+const CHORD_TEMPLATES = [
+  ["", [0,4,7]], ["m", [0,3,7]], ["dim", [0,3,6]], ["aug", [0,4,8]],
+  ["7", [0,4,7,10]], ["maj7", [0,4,7,11]], ["m7", [0,3,7,10]],
+  ["m7b5", [0,3,6,10]], ["dim7", [0,3,6,9]], ["6", [0,4,7,9]], ["m6", [0,3,7,9]],
+  ["sus4", [0,5,7]], ["sus2", [0,2,7]], ["7b9", [0,4,7,10,1]], ["5", [0,7]],
+  ["9", [0,4,7,10,2]], ["m9", [0,3,7,10,2]], ["maj9", [0,4,7,11,2]], ["add9", [0,4,7,2]],
+];
+function nameChord(pitches) {
+  const pcs = [...new Set(pitches.map(p => p % 12))];
+  if (pcs.length < 2) return pcs.length ? spellPc(pcs[0]) + " (one pitch class)" : "";
+  const bassPc = pitches.reduce((a, b) => Math.min(a, b)) % 12;
+  let best = null;
+  const tryMatch = (allowNo5th) => {
+    for (const root of pcs) {
+      const rel = new Set(pcs.map(pc => (pc - root + 12) % 12));
+      for (const [suffix, tmpl] of CHORD_TEMPLATES) {
+        const need = allowNo5th ? tmpl.filter(iv => iv !== 7 || tmpl.length <= 2) : tmpl;
+        if (!need.every(iv => rel.has(iv))) continue;
+        if (![...rel].every(iv => tmpl.includes(iv))) continue;
+        const score = tmpl.length + (root === bassPc ? 0.5 : 0) - (allowNo5th ? 0.4 : 0);
+        if (!best || score > best.score) best = {score, root, suffix, no5: allowNo5th && !rel.has(7) && tmpl.includes(7)};
+      }
+    }
+  };
+  tryMatch(false);
+  if (!best) tryMatch(true);
+  if (!best) return "no standard chord match";
+  const inv = best.root !== bassPc ? "/" + spellPc(bassPc) : "";
+  return spellPc(best.root) + best.suffix + inv + (best.no5 ? " (no 5th)" : "");
+}
+function clearMultiSel() {
+  if (!multiSel.length && !lassoRect) return;
+  multiSel = []; multiSelKey = new Set(); lassoRect = null;
+  document.getElementById("chordbtn").style.display = "none";
+}
+function finalizeLasso() {
+  const r = lassoRect;
+  lassoRect = null;
+  if (!r) return;
+  const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1);
+  const y0 = Math.min(r.y0, r.y1), y1 = Math.max(r.y0, r.y1);
+  const ppt = pxPerTick();
+  const t0 = (x0 - RULER_W + view.x) / ppt, t1 = (x1 - RULER_W + view.x) / ppt;
+  multiSel = [];
+  if (viewMode === "score" && scoreModel) {
+    const topY = RULER_H + 4 - (view.y || 0);
+    scoreModel.staves.forEach((st, si) => {
+      const bandTop = topY + SCORE_TOP + si * STAVE_H, bandBot = bandTop + STAVE_H;
+      if (bandBot <= y0 + 4 || bandTop >= y1 - 4) return;
+      song.tracks[st.ti].notes.forEach((n, ni) => {
+        if (!n.gone && n.t < t1 && n.t + n.d > t0) multiSel.push({ti: st.ti, ni});
+      });
+    });
+  } else {
+    const pHi = PMAX - Math.floor((y0 - RULER_H + view.y) / view.rowH);
+    const pLo = PMAX - Math.floor((y1 - RULER_H + view.y) / view.rowH);
+    song.tracks.forEach((tr, ti) => {
+      if (!trackAudible(ti)) return;
+      tr.notes.forEach((n, ni) => {
+        if (!n.gone && n.p >= pLo && n.p <= pHi && n.t < t1 && n.t + n.d > t0) multiSel.push({ti, ni});
+      });
+    });
+  }
+  multiSelKey = new Set(multiSel.map(s => s.ti + ":" + s.ni));
+  if (!multiSel.length) { setInfo("lasso: nothing selected"); draw(); return; }
+  const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
+  setInfo(pitches.map(pitchName).join(" · ") + "  (" + multiSel.length + " notes)");
+  document.getElementById("chordbtn").style.display = "";
+  draw();
+}
+function drawLasso() {
+  if (!lassoRect) return;
+  const r = lassoRect;
+  ctx.strokeStyle = css("--gold");
+  ctx.fillStyle = css("--gold");
+  ctx.globalAlpha = 0.08;
+  ctx.fillRect(Math.min(r.x0, r.x1), Math.min(r.y0, r.y1), Math.abs(r.x1 - r.x0), Math.abs(r.y1 - r.y0));
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(Math.min(r.x0, r.x1), Math.min(r.y0, r.y1), Math.abs(r.x1 - r.x0), Math.abs(r.y1 - r.y0));
+  ctx.setLineDash([]);
+}
+
+function drawRuler(W, H) {
+  const ppt = pxPerTick();
+  const bt = barTicks();
+  const t0 = view.x / ppt, t1 = (view.x + W) / ppt;
+  ctx.fillStyle = css("--panel");
+  ctx.fillRect(0, 0, W, RULER_H);
+  ctx.strokeStyle = css("--grid");
+  ctx.beginPath(); ctx.moveTo(0, RULER_H - 0.5); ctx.lineTo(W, RULER_H - 0.5); ctx.stroke();
+  ctx.font = "10px " + css("--mono");
+  ctx.fillStyle = css("--dim");
+  ctx.textAlign = "left";
+  for (let t = Math.floor(t0 / bt) * bt; t < t1; t += bt) {
+    const x = RULER_W + t * ppt - view.x;
+    if (x < RULER_W - 4) continue;
+    ctx.fillText(String(Math.round(t / bt) + 1), x + 4, 15);
+  }
+  if (rangeSel) {
+    const x = RULER_W + rangeSel.a * ppt - view.x;
+    ctx.fillStyle = css("--accent");
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(x, 0, (rangeSel.b - rangeSel.a) * ppt, RULER_H);
+    ctx.globalAlpha = 1;
+  }
+  for (const n of rollnotes) {
+    if (!n.section) continue;
+    const x = RULER_W + n.start * ppt - view.x;
+    const w = (n.end - n.start) * ppt;
+    if (x + w < RULER_W || x > W) continue;
+    const y = BASE_RULER_H + n.depth * LANE_H;
+    const color = sectionColors[n.text] || css("--accent");
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(x + 1, y + 1, w - 2, LANE_H - 2);
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(Math.max(x, RULER_W), y, w - 2, LANE_H);
+    ctx.clip();
+    ctx.fillStyle = css("--text");
+    ctx.font = "10px " + css("--mono");
+    ctx.fillText(n.text, Math.max(x, RULER_W) + 5, y + 11);
+    ctx.restore();
+  }
+  for (const n of rollnotes) {
+    if (n.section) continue;
+    const x = RULER_W + n.start * ppt - view.x;
+    if (x < RULER_W - 8 || x > W) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = n.added ? 0.6 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, RULER_H - 8);
+    ctx.lineTo(x + 8, RULER_H - 4.5);
+    ctx.lineTo(x, RULER_H - 1);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 }
 
 // ---------------------------------------------------------------- hit test / coords
@@ -857,7 +998,8 @@ let drag = null, pinch = null;
 function cursorHit(pos) {
   if (playing || !song || mode !== "select") return false;
   if (pos.y < RULER_H) return false; // ruler drags select a range instead
-  const x = RULER_W + playCursor * pxPerTick() - view.x;
+  const x = viewMode === "score" ? scoreTickToX(playCursor)
+                                 : RULER_W + playCursor * pxPerTick() - view.x;
   return Math.abs(pos.x - x) < 12;
 }
 function tickAtX(x, snap) {
@@ -871,25 +1013,38 @@ function scrubTo(pos) {
   updateSubtitle();
   draw();
 }
+// iOS Safari ignores user-scalable=no: kill page-level pinch zoom explicitly,
+// or a missed gesture zooms the whole page and hides the footer.
+for (const ev of ["gesturestart", "gesturechange", "gestureend"]) {
+  document.addEventListener(ev, e => e.preventDefault(), {passive: false});
+}
+document.addEventListener("touchmove", e => {
+  if (e.touches.length > 1) e.preventDefault();
+}, {passive: false});
+
+function pinchDist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) || 1; }
 canvas.addEventListener("pointerdown", e => {
   canvas.setPointerCapture(e.pointerId);
-  if (pinch) return;
+  if (pinch) return; // third finger: ignore
   if (drag && drag.id !== e.pointerId) {
-    pinch = {a: drag, b: {id: e.pointerId, x: e.clientX, y: e.clientY}, pxq: view.pxq, vx: view.x};
+    pinch = {a: {id: drag.id, x: drag.x, y: drag.y},
+             b: {id: e.pointerId, x: e.clientX, y: e.clientY},
+             pxq: view.pxq, vx: view.x};
+    pinch.d0 = pinchDist(pinch.a, pinch.b);
     drag = null;
     return;
   }
   const p = evtPos(e);
+  const lasso = lassoMode && !!song && p.y >= RULER_H;
   drag = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false,
-          cursor: cursorHit(p), ruler: !!song && p.y < RULER_H, spos: p};
+          lasso, cursor: !lasso && cursorHit(p), ruler: !lasso && !!song && p.y < RULER_H, spos: p};
 });
 canvas.addEventListener("pointermove", e => {
   if (pinch) {
     const pt = pinch.a.id === e.pointerId ? pinch.a : pinch.b.id === e.pointerId ? pinch.b : null;
     if (!pt) return;
     pt.x = e.clientX; pt.y = e.clientY;
-    const dist = Math.abs(pinch.a.x - pinch.b.x) || 1;
-    if (!pinch.d0) { pinch.d0 = dist; return; }
+    const dist = pinchDist(pinch.a, pinch.b);
     const mid = (pinch.a.x + pinch.b.x) / 2 - RULER_W;
     const scale = dist / pinch.d0;
     const newPxq = Math.min(400, Math.max(8, pinch.pxq * scale));
@@ -902,7 +1057,12 @@ canvas.addEventListener("pointermove", e => {
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 8) drag.moved = true;
   if (drag.moved) {
-    if (drag.cursor) scrubTo(evtPos(e));
+    if (drag.lasso) {
+      const p = evtPos(e);
+      lassoRect = {x0: drag.spos.x, y0: drag.spos.y, x1: p.x, y1: p.y};
+      draw();
+    }
+    else if (drag.cursor) scrubTo(evtPos(e));
     else if (drag.ruler) { // drag along the ruler = select a beat range
       const a = tickAtX(drag.spos.x, song.ppq);
       const b = tickAtX(evtPos(e).x, song.ppq);
@@ -914,13 +1074,21 @@ canvas.addEventListener("pointermove", e => {
   drag.x = e.clientX; drag.y = e.clientY;
 });
 function endPointer(e) {
-  if (pinch && (pinch.a.id === e.pointerId || pinch.b.id === e.pointerId)) { pinch = null; return; }
+  if (pinch && (pinch.a.id === e.pointerId || pinch.b.id === e.pointerId)) {
+    // one finger lifted: hand control to the survivor as a fresh pan drag
+    const survivor = pinch.a.id === e.pointerId ? pinch.b : pinch.a;
+    drag = {id: survivor.id, x: survivor.x, y: survivor.y, sx: survivor.x, sy: survivor.y,
+            moved: true, cursor: false, ruler: false};
+    pinch = null;
+    return;
+  }
   if (!drag || drag.id !== e.pointerId) return;
-  if (!drag.moved) tap(evtPos(e));
+  if (drag.lasso && drag.moved) finalizeLasso();
+  else if (!drag.moved) tap(evtPos(e));
   drag = null;
 }
 canvas.addEventListener("pointerup", endPointer);
-canvas.addEventListener("pointercancel", () => { drag = null; pinch = null; });
+canvas.addEventListener("pointercancel", () => { drag = null; pinch = null; draw(); });
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) {
@@ -932,12 +1100,17 @@ canvas.addEventListener("wheel", e => {
   clampView(); draw();
 }, {passive: false});
 function clampView() {
-  view.x = Math.max(0, view.x);
-  const maxY = (PMAX - PMIN + 1) * view.rowH - (wrap.clientHeight - RULER_H);
+  const minX = viewMode === "score" && scoreModel ? -SCORE_INTRO_W : 0;
+  view.x = Math.max(minX, view.x);
+  const contentH = viewMode === "score" && scoreModel
+    ? scoreContentH()
+    : (PMAX - PMIN + 1) * view.rowH;
+  const maxY = contentH - (wrap.clientHeight - RULER_H);
   view.y = Math.min(Math.max(0, maxY), Math.max(0, view.y));
 }
 
 function tap(pos) {
+  clearMultiSel();
   if (pos.y < RULER_H) { // section tap, marker tap, or seek
     rangeSel = null; // a plain ruler tap clears any range selection
     const {tick} = posToTickPitch(pos);
@@ -963,6 +1136,7 @@ function tap(pos) {
     else { playCursor = target; updateSubtitle(); draw(); }
     return;
   }
+  if (viewMode === "score") { scoreTap(pos); return; }
   if (mode === "pencil") {
     const {tick, pitch} = posToTickPitch(pos);
     if (pitch < PMIN || pitch > PMAX || tick < 0) return;
@@ -1140,6 +1314,387 @@ function stop() {
   draw();
 }
 
+// ---------------------------------------------------------------- score view
+const VF = (() => {
+  try { return Vex.Flow.Stave ? Vex.Flow : Vex; } catch (e) { return null; }
+})();
+let viewMode = localStorage.getItem("ff1roll-view") || "roll";
+let scoreModel = null;      // built per song
+let scoreCache = new Map(); // measureIndex -> {canvas, geo:[{tick,x0,x1,y0,y1,ti,ni,pitch}], timeMap:[{tick,x}]}
+let scoreZoom = 0;          // pxq the cache was built at
+let scoreIntro = null;      // cached clef/key/time column
+const STAVE_H = 100, SCORE_TOP = 6, SCORE_PAD = 50, SCORE_INTRO_W = 100;
+
+const SF_MAJOR = {0:"C",1:"G",2:"D",3:"A",4:"E",5:"B",6:"F#",7:"C#","-1":"F","-2":"Bb","-3":"Eb","-4":"Ab","-5":"Db","-6":"Gb","-7":"Cb"};
+const LETTERS = "CDEFGAB";
+const LETTER_PC = {C:0, D:2, E:4, F:5, G:7, A:9, B:11};
+
+function keySpelling(sf) {
+  // map each pitch class -> {letter, acc} for this key signature
+  const tonicName = SF_MAJOR[sf] || "C";
+  const tonicLetter = tonicName[0];
+  const tonicPc = (LETTER_PC[tonicLetter] + (tonicName[1] === "#" ? 1 : tonicName[1] === "b" ? -1 : 0) + 12) % 12;
+  const steps = [2, 2, 1, 2, 2, 2, 1];
+  const map = {};
+  let letter = LETTERS.indexOf(tonicLetter), pc = tonicPc;
+  for (let dg = 0; dg < 7; dg++) {
+    const L = LETTERS[letter % 7];
+    const natural = LETTER_PC[L];
+    let diff = (pc - natural + 12) % 12;
+    if (diff > 6) diff -= 12;
+    map[pc] = {letter: L, acc: diff === 0 ? "" : diff === 1 ? "#" : diff === -1 ? "b" : diff === 2 ? "##" : "bb"};
+    pc = (pc + steps[dg]) % 12;
+    letter++;
+  }
+  // chromatic degrees: leading-tone-ish get sharps, borrowed-from-minor get flats
+  const CHROM = {1: "#", 3: "b", 6: "#", 8: "#", 10: "b"};
+  const SHARP = {0:["C",""],1:["C","#"],2:["D",""],3:["D","#"],4:["E",""],5:["F",""],6:["F","#"],7:["G",""],8:["G","#"],9:["A",""],10:["A","#"],11:["B",""]};
+  const FLAT  = {0:["C",""],1:["D","b"],2:["D",""],3:["E","b"],4:["E",""],5:["F",""],6:["G","b"],7:["G",""],8:["A","b"],9:["A",""],10:["B","b"],11:["B",""]};
+  for (let p = 0; p < 12; p++) {
+    if (map[p]) continue;
+    const rel = (p - tonicPc + 12) % 12;
+    const pick = (CHROM[rel] === "#" ? SHARP : FLAT)[p];
+    map[p] = {letter: pick[0], acc: pick[1]};
+  }
+  return map;
+}
+function vexKey(pitch, spell) {
+  const s = spell[pitch % 12];
+  const naturalPc = LETTER_PC[s.letter];
+  const accSemis = s.acc === "#" ? 1 : s.acc === "b" ? -1 : s.acc === "##" ? 2 : s.acc === "bb" ? -2 : 0;
+  // octave of the *letter*: derive from the letter's natural pitch nearest this note
+  const letterMidi = pitch - accSemis;
+  const octave = Math.floor(letterMidi / 12) - 1;
+  return s.letter.toLowerCase() + (s.acc || "") + "/" + octave;
+}
+
+// duration decomposition: ticks -> notated pieces (greedy, tied)
+function durationPieces(ticks, ppq) {
+  const table = [
+    [4 * ppq, "w", 0], [3 * ppq, "h", 1], [2 * ppq, "h", 0], [1.5 * ppq, "q", 1],
+    [ppq, "q", 0], [0.75 * ppq, "8", 1], [0.5 * ppq, "8", 0],
+    [0.375 * ppq, "16", 1], [0.25 * ppq, "16", 0],
+  ];
+  const out = [];
+  let rem = ticks;
+  let guard = 0;
+  while (rem >= 0.25 * ppq - 1 && guard++ < 32) {
+    const hit = table.find(([tk]) => tk <= rem + 1);
+    if (!hit) break;
+    out.push({dur: hit[1], dots: hit[2], ticks: hit[0]});
+    rem -= hit[0];
+  }
+  return out.length ? out : [{dur: "16", dots: 0, ticks: 0.25 * ppq}];
+}
+
+function buildScoreModel() {
+  scoreModel = null;
+  scoreCache.clear();
+  scoreIntro = null;
+  if (!VF || !song) return;
+  const bt = barTicks();
+  const grid = song.ppq / 4; // 16th grid
+  let lastTick = 0;
+  song.tracks.forEach(tr => tr.notes.forEach(n => { if (!n.gone) lastTick = Math.max(lastTick, n.t + n.d); }));
+  const nMeasures = Math.max(1, Math.ceil(lastTick / bt - 0.05));
+  const sf = song.keysig ? Math.max(-7, Math.min(7, song.keysig.sf)) : 0;
+  const spell = keySpelling(sf);
+  const staves = [];
+  song.tracks.forEach((tr, ti) => {
+    if (trackIsDrums(ti) || !tr.notes.length || !trackAudible(ti)) return;
+    // quantize + chord-group
+    const byStart = new Map();
+    for (let ni = 0; ni < tr.notes.length; ni++) {
+      const n = tr.notes[ni];
+      if (n.gone) continue;
+      const qt = Math.round(n.t / grid) * grid;
+      const qd = Math.max(grid, Math.round(n.d / grid) * grid);
+      const cur = byStart.get(qt);
+      if (cur) {
+        if (!cur.pitches.includes(n.p)) { cur.pitches.push(n.p); cur.refs.push({ti, ni}); }
+        cur.dur = Math.max(cur.dur, qd);
+      } else byStart.set(qt, {start: qt, dur: qd, pitches: [n.p], refs: [{ti, ni}]});
+    }
+    const evs = [...byStart.values()].sort((a, b) => a.start - b.start);
+    for (let k = 0; k + 1 < evs.length; k++) {
+      if (evs[k].start + evs[k].dur > evs[k+1].start) evs[k].dur = evs[k+1].start - evs[k].start;
+    }
+    const clean = evs.filter(e => e.dur > 0);
+    // avg pitch -> clef
+    const avg = clean.reduce((a, e) => a + e.pitches[0], 0) / (clean.length || 1);
+    const clef = avg < 58 ? "bass" : "treble";
+    // split into measures, fragments tied across barlines, gaps become rests
+    const measures = Array.from({length: nMeasures}, () => []);
+    let pos = 0; // rest-fill position
+    const pushRest = (from, to) => {
+      let f = from;
+      while (f < to - 1) {
+        const mi = Math.floor(f / bt);
+        if (mi >= nMeasures) break;
+        const mEnd = Math.min(to, (mi + 1) * bt);
+        for (const p of durationPieces(mEnd - f, song.ppq)) {
+          measures[mi].push({rest: true, start: f, dur: p.dur, dots: p.dots});
+          f += p.ticks;
+          if (f >= mEnd - 1) break;
+        }
+        f = Math.max(f, mEnd);
+      }
+    };
+    for (const e of clean) {
+      if (e.start > pos) pushRest(pos, e.start);
+      let f = e.start;
+      const endT = e.start + e.dur;
+      let prevPiece = null;
+      while (f < endT - 1) {
+        const mi = Math.floor(f / bt);
+        if (mi >= nMeasures) break;
+        const mEnd = Math.min(endT, (mi + 1) * bt);
+        for (const p of durationPieces(mEnd - f, song.ppq)) {
+          const piece = {rest: false, start: f, dur: p.dur, dots: p.dots,
+                         pitches: e.pitches.slice().sort((a, b) => a - b), refs: e.refs,
+                         tieFrom: prevPiece};
+          measures[mi].push(piece);
+          prevPiece = piece;
+          f += p.ticks;
+          if (f >= mEnd - 1) break;
+        }
+        f = Math.max(f, mEnd);
+      }
+      pos = Math.max(pos, endT);
+    }
+    staves.push({ti, clef, color: TRACK_COLORS[ti % TRACK_COLORS.length], measures});
+  });
+  scoreModel = {nMeasures, bt, sf, keyName: SF_MAJOR[sf] || "C", spell, staves};
+}
+
+function scoreContentH() {
+  return scoreModel ? SCORE_TOP + scoreModel.staves.length * STAVE_H + 30 : 0;
+}
+
+function renderMeasure(mi) {
+  const key = mi;
+  if (scoreCache.has(key)) return scoreCache.get(key);
+  const m = scoreModel;
+  const ppt = pxPerTick();
+  const mw = m.bt * ppt;
+  const c = document.createElement("canvas");
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.ceil((mw + SCORE_PAD * 2) * dpr);
+  c.height = Math.ceil(scoreContentH() * dpr);
+  const geo = [], timeMap = [];
+  const renderer = new VF.Renderer(c, VF.Renderer.Backends.CANVAS);
+  const ctx2 = renderer.getContext();
+  ctx2.scale(dpr, dpr);
+  ctx2.setFillStyle("#C7D0E8");
+  ctx2.setStrokeStyle("#C7D0E8");
+  m.staves.forEach((st, si) => {
+    const y = SCORE_TOP + si * STAVE_H;
+    const stave = new VF.Stave(SCORE_PAD, y, mw, {fill_style: "#3A4569"});
+    stave.setContext(ctx2).draw();
+    const events = st.measures[mi] || [];
+    if (!events.length) { timeMap.push({tick: mi * m.bt, x: SCORE_PAD}); return; }
+    const vnotes = [];
+    for (const e of events) {
+      let vn;
+      if (e.rest) {
+        vn = new VF.StaveNote({clef: st.clef, keys: [st.clef === "bass" ? "d/3" : "b/4"], duration: e.dur + "r"});
+        vn.setStyle({fillStyle: st.color, strokeStyle: st.color});
+      } else {
+        vn = new VF.StaveNote({clef: st.clef, keys: e.pitches.map(p => vexKey(p, m.spell)), duration: e.dur, auto_stem: true});
+        vn.setStyle({fillStyle: st.color, strokeStyle: st.color});
+      }
+      for (let dd = 0; dd < e.dots; dd++) VF.Dot.buildAndAttach([vn], {all: true});
+      e.vn = vn;
+      vnotes.push(vn);
+    }
+    const voice = new VF.Voice({num_beats: song.timesig[0], beat_value: song.timesig[1]});
+    voice.setMode(VF.Voice.Mode.SOFT);
+    voice.addTickables(vnotes);
+    VF.Accidental.applyAccidentals([voice], m.keyName);
+    new VF.Formatter().joinVoices([voice]).format([voice], mw - (stave.getNoteStartX() - SCORE_PAD) - 14);
+    voice.draw(ctx2, stave);
+    const beams = VF.Beam.generateBeams(vnotes.filter(v => !v.isRest()));
+    beams.forEach(b => {
+      b.setStyle({fillStyle: st.color, strokeStyle: st.color});
+      b.setContext(ctx2).draw();
+    });
+    // ties within the measure
+    for (const e of events) {
+      if (!e.rest && e.tieFrom && e.tieFrom.vn && events.includes(e.tieFrom)) {
+        const idx = e.pitches.map((_, k) => k);
+        const tie = new VF.StaveTie({first_note: e.tieFrom.vn, last_note: e.vn, first_indices: idx, last_indices: idx});
+        if (tie.setStyle) tie.setStyle({fillStyle: st.color, strokeStyle: st.color});
+        tie.setContext(ctx2).draw();
+      }
+    }
+    // geometry + time map
+    for (const e of events) {
+      if (!e.vn) continue;
+      const bx = e.vn.getBoundingBox();
+      if (!e.rest && bx) {
+        geo.push({tick: e.start, x0: bx.x - 2, x1: bx.x + bx.w + 2, y0: bx.y - 2, y1: bx.y + bx.h + 2,
+                  refs: e.refs, pitches: e.pitches, ti: st.ti});
+      }
+      if (si === 0 || !timeMap.some(tm => tm.tick === e.start)) {
+        timeMap.push({tick: e.start, x: e.vn.getAbsoluteX()});
+      }
+      delete e.vn;
+    }
+  });
+  timeMap.sort((a, b) => a.tick - b.tick);
+  const entry = {canvas: c, geo, timeMap, mw};
+  scoreCache.set(key, entry);
+  if (scoreCache.size > 60) scoreCache.delete(scoreCache.keys().next().value);
+  return entry;
+}
+
+function renderIntro() { // pinned-at-start clef / key / time column
+  if (scoreIntro) return scoreIntro;
+  const m = scoreModel;
+  const c = document.createElement("canvas");
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.ceil(SCORE_INTRO_W * dpr);
+  c.height = Math.ceil(scoreContentH() * dpr);
+  const renderer = new VF.Renderer(c, VF.Renderer.Backends.CANVAS);
+  const ctx2 = renderer.getContext();
+  ctx2.scale(dpr, dpr);
+  m.staves.forEach((st, si) => {
+    const y = SCORE_TOP + si * STAVE_H;
+    const stave = new VF.Stave(0, y, SCORE_INTRO_W, {fill_style: "#3A4569"});
+    stave.addClef(st.clef);
+    if (m.sf !== 0) stave.addKeySignature(m.keyName);
+    stave.addTimeSignature(song.timesig[0] + "/" + song.timesig[1]);
+    stave.setContext(ctx2).draw();
+  });
+  scoreIntro = c;
+  return c;
+}
+
+function scoreTickToX(tick) { // piecewise-linear via engraved note positions
+  if (!scoreModel) return RULER_W + tick * pxPerTick() - view.x;
+  const m = scoreModel;
+  const mi = Math.min(m.nMeasures - 1, Math.max(0, Math.floor(tick / m.bt)));
+  const entry = scoreCache.get(mi);
+  const mOriginX = RULER_W + mi * m.bt * pxPerTick() - view.x - SCORE_PAD;
+  if (!entry || entry.timeMap.length < 1) return RULER_W + tick * pxPerTick() - view.x;
+  const tm = entry.timeMap;
+  let a = {tick: mi * m.bt, x: SCORE_PAD}, b = null;
+  for (const p of tm) {
+    if (p.tick <= tick) a = p;
+    else { b = p; break; }
+  }
+  if (!b) b = {tick: (mi + 1) * m.bt, x: SCORE_PAD + entry.mw};
+  const f = b.tick === a.tick ? 0 : (tick - a.tick) / (b.tick - a.tick);
+  return mOriginX + a.x + f * (b.x - a.x);
+}
+function scoreXToTick(x) { // inverse, coarse: linear within measure
+  const t = (x - RULER_W + view.x) / pxPerTick();
+  return Math.max(0, t);
+}
+
+function drawScore(W, H) {
+  const m = scoreModel;
+  const ppt = pxPerTick();
+  const mw = m.bt * ppt;
+  if (scoreZoom !== view.pxq) { scoreCache.clear(); scoreZoom = view.pxq; }
+  const first = Math.max(0, Math.floor(view.x / mw) - 1);
+  const last = Math.min(m.nMeasures - 1, Math.ceil((view.x + W) / mw) + 1);
+  // annotation range tints under the score
+  for (const n of rollnotes) {
+    if (n.section) continue;
+    const x = RULER_W + n.start * ppt - view.x;
+    const w = (n.end - n.start) * ppt;
+    if (x + w < RULER_W || x > W) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = 0.045;
+    ctx.fillRect(x, RULER_H, w, H);
+    ctx.globalAlpha = 1;
+  }
+  if (rangeSel) {
+    const x = RULER_W + rangeSel.a * ppt - view.x;
+    ctx.fillStyle = css("--accent");
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(x, RULER_H, (rangeSel.b - rangeSel.a) * ppt, H);
+    ctx.globalAlpha = 1;
+  }
+  const dpr = window.devicePixelRatio || 1;
+  for (let mi = first; mi <= last; mi++) {
+    const entry = renderMeasure(mi);
+    const x = RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD;
+    ctx.drawImage(entry.canvas, 0, 0, entry.canvas.width, entry.canvas.height,
+                  x, RULER_H + 4 - (view.y || 0), entry.canvas.width / dpr, entry.canvas.height / dpr);
+  }
+  { // intro column (clef/key/time) lives just left of bar 1
+    const intro = renderIntro();
+    const x = RULER_W - SCORE_INTRO_W - view.x;
+    if (x + SCORE_INTRO_W > RULER_W - 4) {
+      ctx.drawImage(intro, 0, 0, intro.width, intro.height,
+                    x, RULER_H + 4 - (view.y || 0), intro.width / dpr, intro.height / dpr);
+    }
+  }
+  // lasso-selected noteheads
+  if (multiSelKey.size) {
+    ctx.strokeStyle = css("--gold");
+    ctx.lineWidth = 2;
+    for (let mi = first; mi <= last; mi++) {
+      const entry = scoreCache.get(mi);
+      if (!entry) continue;
+      const mx = RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD;
+      const my = RULER_H + 4 - (view.y || 0);
+      for (const g of entry.geo) {
+        if (g.refs.some(rf => multiSelKey.has(rf.ti + ":" + rf.ni))) {
+          ctx.strokeRect(mx + g.x0, my + g.y0, g.x1 - g.x0, g.y1 - g.y0);
+        }
+      }
+    }
+    ctx.lineWidth = 1;
+  }
+  drawLasso();
+  // playhead / cursor — playhead uses time-linear x so motion stays smooth
+  if (playing) {
+    const tick = secToTick(song, playSec());
+    ctx.fillStyle = css("--gold");
+    ctx.fillRect(RULER_W + tick * ppt - view.x, 0, 1.5, H);
+  } else {
+    const x = scoreTickToX(playCursor);
+    ctx.fillStyle = css("--accent");
+    ctx.fillRect(x - 1, 0, 2.5, H);
+    ctx.beginPath();
+    ctx.moveTo(x - 6, RULER_H); ctx.lineTo(x + 6, RULER_H); ctx.lineTo(x, RULER_H + 7);
+    ctx.fill();
+  }
+}
+
+function scoreTap(pos) {
+  const m = scoreModel;
+  const ppt = pxPerTick();
+  const mw = m.bt * ppt;
+  const mi = Math.floor((pos.x - RULER_W + view.x) / mw);
+  const entry = scoreCache.get(mi);
+  if (entry) {
+    const localX = pos.x - (RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD);
+    const localY = pos.y - (RULER_H + 4 - (view.y || 0));
+    for (const g of entry.geo) {
+      if (localX >= g.x0 && localX <= g.x1 && localY >= g.y0 && localY <= g.y1) {
+        selNote = g.refs[0] ? {ti: g.refs[0].ti, ni: g.refs[0].ni} : null;
+        playCursor = g.tick;
+        if (selNote) {
+          setInfo(noteLabel(selNote.ti, selNote.ni));
+          previewNote(g.ti, g.pitches[g.pitches.length - 1]);
+        }
+        updateSubtitle(); draw();
+        return;
+      }
+    }
+  }
+  // empty area: move the cursor to that beat
+  const snap = song.ppq / 2;
+  playCursor = Math.max(0, Math.round(scoreXToTick(pos.x) / snap) * snap);
+  selNote = null;
+  setInfo("—");
+  updateSubtitle(); draw();
+}
+
 // ---------------------------------------------------------------- ui wiring
 const sel = document.getElementById("songsel");
 for (const [group, songs] of Object.entries(CATALOG)) {
@@ -1162,12 +1717,47 @@ sel.addEventListener("change", () => {
 document.getElementById("playbtn").addEventListener("click", () =>
   playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
 document.getElementById("rwbtn").addEventListener("click", () => {
-  if (playing) { stop(); playCursor = 0; view.x = 0; play(0); return; }
+  const startX = viewMode === "score" ? -SCORE_INTRO_W : 0;
+  if (playing) { stop(); playCursor = 0; view.x = startX; play(0); return; }
   playCursor = 0;
-  view.x = 0;
+  view.x = startX;
   updateSubtitle();
   draw();
 });
+const lassobtn = document.getElementById("lassobtn");
+lassobtn.addEventListener("click", () => {
+  lassoMode = !lassoMode;
+  lassobtn.classList.toggle("active", lassoMode);
+  clearMultiSel();
+  setInfo(lassoMode ? "lasso: drag across notes to identify them" : "tap a note");
+  draw();
+});
+document.getElementById("chordbtn").addEventListener("click", () => {
+  if (!multiSel.length) return;
+  const pitches = multiSel.map(s => song.tracks[s.ti].notes[s.ni].p);
+  const names = [...new Set(pitches)].sort((a, b) => a - b).map(pitchName).join(" · ");
+  setInfo(names + "  →  " + nameChord(pitches));
+});
+
+const viewbtn = document.getElementById("viewbtn");
+function applyViewMode() {
+  viewbtn.textContent = viewMode === "score" ? "▦ Roll" : "𝄞 Score";
+  document.getElementById("editbtn").style.display = viewMode === "score" ? "none" : "";
+  if (viewMode === "score") {
+    if (editOn) document.getElementById("editbtn").click(); // force-exit edit mode
+    view.y = 0;
+    if (view.x < 40) view.x = -SCORE_INTRO_W; // near the start: show clef/key column
+  } else if (view.x < 0) view.x = 0;
+  clampView();
+  draw();
+}
+viewbtn.addEventListener("click", () => {
+  if (!VF) { setInfo("score engine failed to load"); return; }
+  viewMode = viewMode === "score" ? "roll" : "score";
+  localStorage.setItem("ff1roll-view", viewMode);
+  applyViewMode();
+});
+
 let editOn = false;
 document.getElementById("editbtn").addEventListener("click", e => {
   editOn = !editOn;
@@ -1341,6 +1931,7 @@ document.getElementById("ghsave").addEventListener("click", async e => {
   finally { btn.disabled = false; }
 });
 
+applyViewMode();
 resize();
 loadSong(sel.value).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
 </script>
