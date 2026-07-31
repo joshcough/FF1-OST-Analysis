@@ -39,9 +39,15 @@ session start alongside the quiz.)
 
 ## Tooling to-do
 
-- **Score view** — plan agreed in [score-view-plan.md](score-view-plan.md),
-  not started. Tier 1 = MuseScore batch render + position-map cursor sync.
-  Four open questions at the bottom of that doc.
+- **Score view** — BUILT overnight 2026-07-30 (tier 2, live engraving),
+  uncommitted pending Josh's morning review. Status + known limitations in
+  [score-view-plan.md](score-view-plan.md). Review, then commit or revise.
+- **Score spelling refinement** — Ab in the Baseball song spells as G#
+  (static chromatic heuristic); context-aware spelling someday.
+- **Track visibility variants** — mute now fully hides a track (Josh's
+  request); later maybe: dim-but-visible, and audio-mute-only toggles.
+- **Lasso later ideas** — cross-staff chord naming conventions, remembering
+  reveals per song, maybe a "quiz me" mode built on lasso selections.
 - **Loop passes:** rollnotes anchors cover the first loop pass only; FF1
   MIDIs repeat. Decide whether annotations should apply to every pass.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,

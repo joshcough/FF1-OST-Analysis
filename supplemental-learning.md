@@ -38,6 +38,12 @@ instead of a root pedal under the dominant, and a melody that outlines the
 dim7 arpeggio (bars 13–14) before a stepwise scale resolution. Questions
 awaiting Josh in open-items.md.
 
+**2026-07-30 (overnight build):** live sheet-music view in Night Roll (see
+score-view-plan.md); every MIDI's key signature corrected in the file itself
+(detected + analysis-pinned); Battle's corrupted MIDI repaired (was hiding 4
+of its 5 music tracks — and its key is **G minor**, quiz-worthy: what's the
+relative major?).
+
 ## Current composition exercise (in progress)
 
 Two 8-bar loops: chords from G-land → C7 → F **major** + melody; then the same but resolving to F **minor**. Guidelines agreed: introduce C as plain IV before it returns as C7 (furniture, then door); melody crosses the seam on common tones (C, F, G); chord tone on every chord-arrival downbeat; in the minor version let one prominent note (Ab on the Fm downbeat) carry the darkness; sing before playing; save both versions (MIDI or recording) and bring them back for analysis with the same tools used on Uematsu.
