@@ -164,6 +164,20 @@ test("beatLabel: 1e&a counting with fractional fallback", () => {
   assert.equal(label(1.33), "1.33");
 });
 
+test("loop directive: at song end return to target; whole song without one", () => {
+  installSong();
+  run(`rollnotes = parseRollnotes("[25.1]\\nloop: 2.1\\n").map(resolveNote); finalizeNotes();`);
+  assert.equal(run(`rollnotes[0].loopTo`), 1920); // bar 2 beat 1 at ppq 480
+  run(`songEndTick = 25 * 4 * 480;`);
+  const seg = val(`currentLoop()`);
+  assert.ok(Math.abs(seg.start - run(`tickToSec(song, 1920)`)) < 1e-9);
+  assert.ok(Math.abs(seg.end - run(`tickToSec(song, 25 * 4 * 480)`)) < 1e-9);
+  run(`rollnotes = []; finalizeNotes();`);
+  const whole = val(`currentLoop()`);
+  assert.equal(whole.start, 0);
+  assert.ok(Math.abs(whole.end - run(`tickToSec(song, songEndTick)`)) < 1e-9);
+});
+
 test("saveEdits: an added note that was erased is not persisted (regression)", () => {
   installSong();
   run(`

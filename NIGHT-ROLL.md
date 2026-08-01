@@ -90,6 +90,12 @@ key: Bb            ← "key:" prefix = key directive. Open-ended: applies
 [2.1 - 4.4]
 key: Db            ← ranged key: applies bars 2–4, then the surrounding
                      key resumes (score draws cancellation naturals).
+
+[25.1]
+loop: 2.1          ← "loop:" prefix = loop directive. At the end of the
+                     song, playback returns to the target (here bar 2,
+                     skipping ship's pickup-intro bar) instead of the
+                     top. Anchor it wherever reads best; one per song.
 ```
 
 - `#` lines are comments — **dropped on round-trip** (the app rewrites the

@@ -363,6 +363,7 @@
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
       <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
+      <dt>Loop points</dt><dd>Some songs loop back past an intro (not to bar 1). When you discover one, write a note whose text is <b>loop: B.Q</b> (e.g. "loop: 2.1") — at the end of the song, playback returns there instead of to the top. Anchor the note wherever reads best.</dd>
       <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
     </dl>
 
@@ -541,7 +542,7 @@ let mode = "select";
 let pencilDur = 0.5;      // quarters
 let view = { x: 0, y: 0, pxq: 56, rowH: 13 }; // x in px, pxq = px per quarter
 let playing = false, playT0 = 0, playOffset = 0, schedIdx = 0, schedEvents = [], raf = 0, schedTimer = 0;
-let loopLen = 0, loopPass = 0; // seconds per pass; completed passes this playback
+let loopSeg = null, loopPass = 0; // {start, end} secs — wrap at end back to start ("loop:" directive or whole song)
 let audio = null, master = null;
 let trackGains = [];     // per-track gain nodes: live mute kills sounding notes
 let songEndTick = 0;     // end of the last bar containing any note
@@ -673,6 +674,13 @@ function finalizeNotes() {
       n.end = next && next.start > n.start ? next.start : n.start + bt;
     }
   });
+  // "loop: B.Q" directive — anchor = jump point, value = jump target.
+  // Discovered per song (some FF1 loops return past an intro, e.g. to bar 2).
+  for (const n of rollnotes) {
+    const lm = n.text.match(/^loop:\s*(\d+)(?:\.(\d+(?:\.\d+)?))?\s*$/);
+    if (lm) n.loopTo = (+lm[1] - 1) * bt + ((lm[2] ? +lm[2] : 1) - 1) * song.ppq;
+    else delete n.loopTo;
+  }
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir],
                 end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null,
@@ -751,7 +759,7 @@ function dropLocalKeyAt(bar) { // a new key change replaces any local key marker
 function activeNoteAt(tick) {
   let best = null;
   for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined) continue; // key directives show as staff signatures
+    if (n.section || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
     if (tick >= n.start && tick < n.end) best = n;
   }
   return best;
@@ -760,9 +768,10 @@ function sectionPathAt(tick) {
   return rollnotes.filter(n => n.section && tick >= n.start && tick < n.end)
                   .sort((a, b) => a.depth - b.depth).map(s => s.text).join(" › ");
 }
-function playSec() { // current position within the loop, seconds
+function playSec() { // current position on the song timeline, seconds
   const s = audio.currentTime - playT0 + playOffset;
-  return loopLen > 0 ? s % loopLen : s;
+  if (!loopSeg || loopSeg.end <= loopSeg.start) return s;
+  return s < loopSeg.end ? s : loopSeg.start + (s - loopSeg.end) % (loopSeg.end - loopSeg.start);
 }
 function curTick() {
   return playing ? secToTick(song, playSec()) : playCursor;
@@ -878,7 +887,7 @@ function css(name) {
 function drawRangeTints(W, H) {
   const ppt = pxPerTick();
   for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined) continue;
+    if (n.section || n.keydir !== undefined || n.loopTo !== undefined) continue;
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
     if (x + w < RULER_W || x > W) continue;
@@ -1522,6 +1531,13 @@ function buildSchedule() {
   });
   schedEvents.sort((a, b) => a.sec - b.sec);
 }
+function currentLoop() { // "loop: B.Q" = at song end, return to B.Q (else to the top)
+  const whole = {start: 0, end: tickToSec(song, songEndTick)};
+  const dir = rollnotes.find(n => n.loopTo !== undefined);
+  if (!dir) return whole;
+  const start = tickToSec(song, dir.loopTo);
+  return start < whole.end ? {start, end: whole.end} : whole;
+}
 function play(fromSec = 0) {
   ensureAudio();
   if (audio.state === "suspended") audio.resume();
@@ -1530,19 +1546,30 @@ function play(fromSec = 0) {
   playOffset = fromSec;
   playT0 = audio.currentTime;
   loopPass = 0;
-  loopLen = tickToSec(song, songEndTick); // loop at the end of the final bar containing any note
+  loopSeg = currentLoop();
+  if (fromSec >= loopSeg.end - 0.01) loopSeg = {start: 0, end: tickToSec(song, songEndTick)};
   updateTrackGains();
   song.tracks.forEach((_, ti) => trackGain(ti)); // pre-create so gains exist before first event
   schedIdx = schedEvents.findIndex(e => e.sec >= fromSec);
   if (schedIdx < 0) schedIdx = schedEvents.length;
+  const wrapIdx = schedEvents.findIndex(e => e.sec >= loopSeg.start);
   document.getElementById("playbtn").textContent = "■ Stop";
   schedTimer = setInterval(() => {
-    if (!schedEvents.length || loopLen <= 0) return;
+    const segLen = loopSeg.end - loopSeg.start;
+    if (!schedEvents.length || segLen <= 0) return;
     const now = audio.currentTime - playT0;
     for (;;) {
-      if (schedIdx >= schedEvents.length) { loopPass++; schedIdx = 0; }
+      // every pass ends at the loop point; material past it (a written-out
+      // repeat, e.g. ship's bar 25.5 seam) is shown but never played
+      if (schedIdx >= schedEvents.length || schedEvents[schedIdx].sec >= loopSeg.end - 1e-9) {
+        if (wrapIdx < 0 || schedEvents[wrapIdx].sec >= loopSeg.end) break; // nothing inside the segment
+        loopPass++;
+        schedIdx = wrapIdx;
+      }
       const e = schedEvents[schedIdx];
-      const abs = e.sec + loopPass * loopLen - playOffset; // seconds after playT0
+      const abs = (loopPass === 0 ? e.sec
+                                  : loopSeg.end + (loopPass - 1) * segLen + (e.sec - loopSeg.start))
+                  - playOffset; // seconds after playT0
       if (abs >= now + 0.2) break;
       if (abs >= -0.05) scheduleNote(e.ti, e.n, playT0 + abs, e.dur);
       schedIdx++;
@@ -2071,8 +2098,8 @@ function renderNoteList() {
     where.className = "where";
     where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "");
     const kind = document.createElement("span");
-    kind.className = "kind" + (n.section ? " sec" : n.keydir !== undefined ? " key" : "");
-    kind.textContent = n.section ? "section" : n.keydir !== undefined ? "key" : "note";
+    kind.className = "kind" + (n.section ? " sec" : n.keydir !== undefined || n.loopTo !== undefined ? " key" : "");
+    kind.textContent = n.section ? "section" : n.keydir !== undefined ? "key" : n.loopTo !== undefined ? "loop" : "note";
     if (n.section && sectionColors[n.text]) kind.style.borderColor = sectionColors[n.text];
     const body = document.createElement("span");
     body.className = "body";
