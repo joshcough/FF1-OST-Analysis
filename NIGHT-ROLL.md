@@ -61,7 +61,9 @@ unsynced additions persist in localStorage keyed by song path.
 **Robustness:** MIDI parser finds tracks by MTrk magic scan (ff1battle has
 corrupt length headers), honors end-of-track, clamps note durations to 8
 bars, truncates a track at any internal silence > 32 bars (real tacets max
-24 in this catalog). ff1ship.mid is truncated; partial recovery.
+24 in this catalog). ff1ship.mid was truncated at the source
+(thefinalfantasy.net serves a 512-byte file); replaced 2026-07-31 with
+vgmusic.com's ff1ship2.mid — same transcription, 5 tracks incl. drums.
 
 ## .rollnotes format (the spec)
 
