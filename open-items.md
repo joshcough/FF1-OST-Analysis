@@ -51,6 +51,17 @@ session start alongside the quiz.)
 - **Mid-song key signature changes** — DONE 2026-07-31: `key:` directives in
   .rollnotes, set from the key dial at the cursor bar; signature drawn at
   change barlines.
+- **iPad app** (discussed 2026-07-31, parked — "worth exploring"):
+  - Tier 1, ~an hour: web manifest + icon + standalone mode → Add to Home
+    Screen gives an app icon, full-screen launch, durable storage; updates
+    still flow via git push. Do this first whenever wanted.
+  - Tier 2, days + $99/yr: Capacitor/WKWebView wrapper for the App Store.
+    Only real feature gain: native MIDI hardware input (play a keyboard
+    into the app — iPad Safari has no Web MIDI).
+  - Native Swift rewrite: roll/audio/annotations portable in days, but no
+    VexFlow equivalent exists — hand-rolling engraving is the months-shaped
+    part — and build/sign/install kills the push-and-reload iteration loop
+    that built this in six hours. Not worth it.
 - **Enharmonic respelling** (idea, Josh undecided): tap a score note to flip
   G#↔Ab — notehead moves line↔space, choice stored in rollnotes. Maybe
   moot if direction-aware spelling (raise ascending, flatten descending)
