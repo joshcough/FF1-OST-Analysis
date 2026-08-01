@@ -21,7 +21,8 @@ lines — splitting adds Pages cache-skew risk for no payoff at this size.)
 ## Feature inventory
 
 **Views:** piano roll (canvas) and engraved score (VexFlow → per-measure
-cached canvases), toggled in the header, persisted. Both share one
+cached canvases), toggled in the header, persisted. On song load the roll
+auto-fits the whole song and its pitch range to the screen (fitView). Both share one
 time-linear x-axis, the bar ruler, sections, markers, cursor, playhead,
 subtitles, and gestures. Score extras: intro column (clef/key/time) left of
 bar 1; signatures redraw at key changes with cancellation naturals; playhead
@@ -58,8 +59,9 @@ this repo via the GitHub Contents API (fine-grained token, stored in
 browser localStorage, never in the repo). Copy/Download fallbacks. Local
 unsynced additions persist in localStorage keyed by song path.
 
-**Robustness:** MIDI parser finds tracks by MTrk magic scan (ff1battle has
-corrupt length headers), honors end-of-track, clamps note durations to 8
+**Robustness:** MIDI parser finds tracks by MTrk magic scan (the original
+ff1battle had corrupt length headers — since rebuilt clean, guard kept),
+honors end-of-track, clamps note durations to 8
 bars, truncates a track at any internal silence > 32 bars (real tacets max
 24 in this catalog). ff1ship.mid was truncated at the source
 (thefinalfantasy.net serves a 512-byte file); replaced 2026-07-31 with

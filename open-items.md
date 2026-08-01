@@ -97,8 +97,12 @@ session start alongside the quiz.)
   as G#.
 - **Loop passes:** MOSTLY DONE 2026-08-01 — 13 MIDIs with exact repeats
   trimmed to their first pass (tools/trim_loops.py), so anchors now cover
-  those songs fully. Awaiting Josh's by-ear cut bars for the 9 with varied
-  repeats: battle, corneliacastle, dungeon, elfland, epilogue,
+  those songs fully. Battle since rebuilt at 29 bars (3-bar intro +
+  26-bar loop). Cornelia had a half-bar of leading silence (whole song
+  shifted 2 beats): unshifted + trimmed to its 8-bar loop (2026-08-01) —
+  Josh's existing cornelia rollnotes anchors may now sit 2 beats late;
+  offer to auto-shift them if they look off.
+  Awaiting Josh's by-ear cut bars for: dungeon, elfland, epilogue,
   floatingcastle, prelude, ship, victory.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,
   sections/arrangement lanes, range-select ruler drag, grouped dropdown

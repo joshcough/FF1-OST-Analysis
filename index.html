@@ -807,8 +807,6 @@ function setSong(parsed, key) {
   const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
     song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
-  view.x = viewMode === "score" ? -SCORE_INTRO_W : 0;
-  view.y = viewMode === "score" ? 0 : ((PMAX - 79) * view.rowH); // roll: center near G4
   playCursor = 0;
   lastSubtitle = undefined;
   {
@@ -817,6 +815,7 @@ function setSong(parsed, key) {
     const bt = barTicks();
     songEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt);
   }
+  fitView();
   renderTrackbar();
   buildScoreModel();
   clampView();
@@ -1323,6 +1322,22 @@ canvas.addEventListener("wheel", e => {
   } else { view.x += e.deltaX; view.y += e.deltaY; }
   clampView(); draw();
 }, {passive: false});
+function fitView() { // on song load: fit the whole song on screen (roll view)
+  if (viewMode === "score") { view.x = -SCORE_INTRO_W; view.y = 0; return; }
+  const W = Math.max(100, wrap.clientWidth - RULER_W);
+  const H = Math.max(100, wrap.clientHeight - RULER_H);
+  view.pxq = Math.min(56, Math.max(6, W / (songEndTick / song.ppq + 2)));
+  let lo = PMAX, hi = PMIN;
+  song.tracks.forEach(tr => tr.notes.forEach(n => {
+    if (!n.gone) { if (n.p < lo) lo = n.p; if (n.p > hi) hi = n.p; }
+  }));
+  if (lo > hi) { lo = 55; hi = 79; }
+  lo = Math.max(PMIN, lo - 1);
+  hi = Math.min(PMAX, hi + 1);
+  view.rowH = Math.min(20, Math.max(6, H / (hi - lo + 1)));
+  view.x = 0;
+  view.y = (PMAX - hi) * view.rowH;
+}
 function clampView() {
   const minX = viewMode === "score" && scoreModel ? -SCORE_INTRO_W : 0;
   const maxX = song
