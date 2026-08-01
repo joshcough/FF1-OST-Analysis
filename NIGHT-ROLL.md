@@ -31,9 +31,9 @@ sweeps from each measure's note-start x (hops signature glyphs).
 **Playback:** WebAudio. Pulse/pulse/triangle voices by track index; drum
 tracks (name match or channel 10) get a synthesized kit. Per-track gain
 nodes make mute/solo instant mid-playback. Songs loop at the final bar
-(`songEndTick`) or per a "loop:" directive. Rewind ⏮. Practice-tempo
-dropdown (native→quarter, steps of 10) scales tickToSec/secToTick via
-playRate; resets per song. Persistent AudioContext, declick ramps.
+(`songEndTick`) or per a "loop:" directive. Rewind ⏮. Speed slider
+(25–200%, applies on release) scales tickToSec/secToTick via playRate;
+persists across songs. Persistent AudioContext, declick ramps.
 
 **Tracks:** chips mute (= fully hide, roll and score) and solo. Score model
 rebuilds on toggle.

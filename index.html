@@ -250,7 +250,9 @@
   <button id="helpbtn" aria-label="Help">?</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
-  <select id="bpmsel" aria-label="Tempo" style="margin-left:auto"></select>
+  <input type="range" id="speedsl" min="25" max="200" step="5" value="100"
+         aria-label="Playback speed" style="width:110px;margin-left:auto">
+  <span class="meta" id="speedlbl" style="margin-left:0">100%</span>
   <div class="meta" id="songmeta" style="margin-left:0"></div>
 </header>
 <div id="trackbar"></div>
@@ -347,7 +349,7 @@
     <dl>
       <dt>▶ Play / ■ Stop</dt><dd>NES-style voices; drum tracks get a real kit. Songs loop at their final bar forever.</dd>
       <dt>⏮</dt><dd>Back to bar 1.</dd>
-      <dt>Tempo dropdown</dt><dd>Slow the song down (native bpm to a quarter, steps of 10) for close listening or instrument practice — pitch stays true; only time stretches. Resets to native on song change.</dd>
+      <dt>Speed slider</dt><dd>25–200% of the song's own tempo, for close listening or instrument practice — pitch stays true; only time stretches. Applies when you let go; keeps its setting across songs.</dd>
       <dt>Blue cursor</dt><dd>Play starts here. Tap the bar ruler to place it, or drag its handle (triangle under the ruler). Tapping any note also moves it there.</dd>
     </dl>
 
@@ -822,11 +824,9 @@ function setSong(parsed, key) {
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
-  nativeBpm = Math.round(6e7 / song.tempos[0].usq);
-  playRate = 1;
-  fillBpmSel();
+  const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
-    song.timesig[0] + "/" + song.timesig[1] + " · " + song.tracks.length + "trk";
+    song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
   playCursor = 0;
   lastSubtitle = undefined;
   {
@@ -2085,23 +2085,17 @@ document.getElementById("rwbtn").addEventListener("click", () => {
   updateSubtitle();
   draw();
 });
-// practice tempo: native bpm down to a quarter (guitar practice), steps of 10
-let nativeBpm = 120;
-const bpmsel = document.getElementById("bpmsel");
-function fillBpmSel() {
-  bpmsel.innerHTML = "";
-  for (let v = nativeBpm; v >= nativeBpm / 4 - 0.01; v -= 10) {
-    const o = document.createElement("option");
-    o.value = String(v);
-    o.textContent = v + "bpm";
-    bpmsel.appendChild(o);
-  }
-}
-bpmsel.addEventListener("change", () => {
+// playback speed slider: 25–200% of the song's own tempo, persists across songs
+const speedsl = document.getElementById("speedsl");
+const speedlbl = document.getElementById("speedlbl");
+speedsl.addEventListener("input", () => { speedlbl.textContent = speedsl.value + "%"; });
+speedsl.addEventListener("change", () => { // applied on release, not per drag-tick
+  speedlbl.textContent = speedsl.value + "%";
+  if (!song) { playRate = +speedsl.value / 100; return; }
   const tk = curTick(); // keep the musical position across the rate change
   const wasPlaying = playing;
   if (wasPlaying) stop();
-  playRate = +bpmsel.value / nativeBpm;
+  playRate = +speedsl.value / 100;
   if (wasPlaying) play(tickToSec(song, tk));
   else { playCursor = tk; updateSubtitle(); draw(); }
 });
