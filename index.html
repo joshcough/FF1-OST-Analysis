@@ -851,7 +851,7 @@ function setSong(parsed, key) {
   loadEdits();
   const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
-    song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
+    song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm";
   playCursor = 0;
   lastSubtitle = undefined;
   {
