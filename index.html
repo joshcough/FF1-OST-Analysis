@@ -73,6 +73,30 @@
     white-space: nowrap;
   }
   input[type=file] { display: none; }
+  #speedsl {
+    -webkit-appearance: none;
+    appearance: none;
+    width: min(240px, 30vw);
+    height: 40px;
+    background: transparent;
+    cursor: pointer;
+  }
+  #speedsl::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--grid);
+  }
+  #speedsl::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--panel);
+  }
+  #speedsl::-moz-range-track { height: 6px; border-radius: 3px; background: var(--grid); }
+  #speedsl::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); }
 
   #trackbar {
     display: flex;
@@ -251,7 +275,7 @@
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
   <input type="range" id="speedsl" min="25" max="200" step="5" value="100"
-         aria-label="Playback speed" style="width:110px;margin-left:auto">
+         aria-label="Playback speed" style="margin-left:auto">
   <span class="meta" id="speedlbl" style="margin-left:0">100%</span>
   <div class="meta" id="songmeta" style="margin-left:0"></div>
 </header>
