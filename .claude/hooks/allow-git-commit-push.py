@@ -10,7 +10,10 @@ import sys, json, re
 
 data = json.load(sys.stdin)
 c = data.get("tool_input", {}).get("command", "")
-segs = [s for s in re.split(r"&&|;|\|\|", c) if s.strip()]
+# blank quoted strings first so separators inside commit messages don't
+# produce bogus segments (a ";" in a -m body used to break the match)
+stripped = re.sub(r'"[^"]*"|\'[^\']*\'', '""', c)
+segs = [s for s in re.split(r"&&|;|\|\|", stripped) if s.strip()]
 GIT = r"\s*(rtk\s+)?git\s+(-C\s+\S+\s+)?(add|commit|push|status|diff|log|show|fetch|pull|restore|rm|mv)\b"
 git_only = bool(segs) and all(re.match(GIT, s) for s in segs)
 if git_only and re.search(r"\bgit\s+(-C\s+\S+\s+)?(commit|push)\b", c):
