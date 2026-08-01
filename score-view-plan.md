@@ -1,10 +1,11 @@
 # Score View Plan — sheet music in Night Roll
 
-**Status: TIER 2 BUILT 2026-07-30 (overnight), uncommitted — pending Josh's
-review.** Tier 1 (pre-rendered MuseScore) was skipped entirely; the live
-engraving view below replaced it. Working-tree changes: `index.html` (score
-engine + parser fixes), `vendor/vexflow.js` (engraving library, vendored),
-`tools/fix_keysigs.py` + all `.mid` files (real key signatures written in).
+**Status: SHIPPED.** Built overnight 2026-07-30, reviewed and committed
+2026-07-31, then extended the same evening: track-colored beams/ties/rests,
+intro clef column, smooth playhead that hops signature glyphs, key-discovery
+system (default C, live dial, `key:` rollnotes directives incl. ranged keys
+with cancellation naturals), lasso chord ID, notes manager, type-first
+editor. Tier 1 (pre-rendered MuseScore) was never needed.
 
 ## What was built (tier 2, live)
 

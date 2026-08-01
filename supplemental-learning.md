@@ -44,6 +44,20 @@ score-view-plan.md); every MIDI's key signature corrected in the file itself
 of its 5 music tracks — and its key is **G minor**, quiz-worthy: what's the
 relative major?).
 
+**2026-07-31 (tooling evening + engraving concepts):** score view shipped and
+polished; key-discovery system built (Josh's design: keys hidden until he
+finds them — "having the key set for me is cheating"). Concepts learned
+through the tool's own behavior, quiz-source worthy: **cancellation
+naturals** (readers can't see absence — revoked flats are announced with
+explicit naturals, essential for returns to C); **reprint rules differ per
+symbol** (clefs and time signatures print once until changed; key signatures
+reprint at every change, with cancellation); **enharmonic spelling by
+direction** (Josh derived raise-ascending/flatten-descending himself from
+his own both-ways melody); **signature ink is not musical time** (playhead
+hops glyphs); pivot-chord ambiguity (IV of G = V of F — answered instantly;
+the *why* re-banked for retrieval). Also: quizzes.md created (protocol +
+bank), notes manager, ranged key changes with automatic revert.
+
 ## Current composition exercise (in progress)
 
 Two 8-bar loops: chords from G-land → C7 → F **major** + melody; then the same but resolving to F **minor**. Guidelines agreed: introduce C as plain IV before it returns as C7 (furniture, then door); melody crosses the seam on common tones (C, F, G); chord tone on every chord-arrival downbeat; in the minor version let one prominent note (Ab on the Fm downbeat) carry the darkness; sing before playing; save both versions (MIDI or recording) and bring them back for analysis with the same tools used on Uematsu.
