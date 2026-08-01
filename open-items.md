@@ -102,8 +102,8 @@ session start alongside the quiz.)
   shifted 2 beats): unshifted + trimmed to its 8-bar loop (2026-08-01) —
   Josh's existing cornelia rollnotes anchors may now sit 2 beats late;
   offer to auto-shift them if they look off.
-  Awaiting Josh's by-ear cut bars for: dungeon, elfland, epilogue,
-  floatingcastle, prelude, ship, victory.
+  Dungeon trimmed to 16 by Josh's ear (2026-08-01). Awaiting cut bars
+  for: elfland, epilogue, floatingcastle, prelude, ship, victory.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,
   sections/arrangement lanes, range-select ruler drag, grouped dropdown
   with compositions/, CVD-safe track palette, rewind + Edit toggle.)
