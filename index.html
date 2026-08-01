@@ -1817,24 +1817,37 @@ function renderIntro() { // pinned-at-start clef / key / time column
   return c;
 }
 
-function scoreTickToX(tick) { // piecewise-linear via engraved note positions
+function scoreTickToX(tick) {
+  // piecewise-linear between engraved noteheads at their attack ticks — the
+  // line touches each notehead exactly when it sounds and glides between
+  // them, across barlines too, so pads and signature glyphs are absorbed
+  // into the glide instead of hopped (notation-app style)
   if (!scoreModel) return RULER_W + tick * pxPerTick() - view.x;
   const m = scoreModel;
+  const ppt = pxPerTick();
+  const mOrigin = k => RULER_W + k * m.bt * ppt - view.x - SCORE_PAD;
   const mi = Math.min(m.nMeasures - 1, Math.max(0, Math.floor(tick / m.bt)));
   const entry = scoreCache.get(mi);
-  const mOriginX = RULER_W + mi * m.bt * pxPerTick() - view.x - SCORE_PAD;
-  if (!entry || entry.timeMap.length < 1) return RULER_W + tick * pxPerTick() - view.x;
-  const tm = entry.timeMap;
-  // sweep origin: hop signature glyphs only where they exist (key changes);
-  // plain measures start at the pad so barline crossings are continuous
-  let a = {tick: mi * m.bt, x: entry.keyChanged ? entry.noteStartX : SCORE_PAD}, b = null;
-  for (const p of tm) {
-    if (p.tick <= tick) a = p;
-    else { b = p; break; }
+  if (!entry) return RULER_W + tick * ppt - view.x;
+  let a = null, b = null; // surrounding anchors, screen coords
+  for (const p of entry.timeMap) {
+    if (p.tick <= tick) a = {tick: p.tick, x: mOrigin(mi) + p.x};
+    else { b = {tick: p.tick, x: mOrigin(mi) + p.x}; break; }
   }
-  if (!b) b = {tick: (mi + 1) * m.bt, x: SCORE_PAD + entry.mw};
+  if (!a) { // before this measure's first note: reach back to the previous one
+    const prev = mi > 0 ? scoreCache.get(mi - 1) : null;
+    const lp = prev && prev.timeMap.length ? prev.timeMap[prev.timeMap.length - 1] : null;
+    a = lp ? {tick: lp.tick, x: mOrigin(mi - 1) + lp.x}
+           : {tick: mi * m.bt, x: mOrigin(mi) + (entry.keyChanged ? entry.noteStartX : SCORE_PAD)};
+  }
+  if (!b) { // after this measure's last note: reach ahead to the next one
+    const nxt = mi + 1 < m.nMeasures ? scoreCache.get(mi + 1) : null;
+    const np = nxt && nxt.timeMap.length ? nxt.timeMap[0] : null;
+    b = np ? {tick: np.tick, x: mOrigin(mi + 1) + np.x}
+           : {tick: (mi + 1) * m.bt, x: mOrigin(mi) + SCORE_PAD + entry.mw};
+  }
   const f = b.tick === a.tick ? 0 : (tick - a.tick) / (b.tick - a.tick);
-  return mOriginX + a.x + f * (b.x - a.x);
+  return a.x + f * (b.x - a.x);
 }
 function scoreXToTick(x) { // inverse, coarse: linear within measure
   const t = (x - RULER_W + view.x) / pxPerTick();
@@ -1885,22 +1898,9 @@ function drawScore(W, H) {
     ctx.lineWidth = 1;
   }
   drawLasso();
-  // playhead / cursor — smooth linear sweep per measure, but the sweep starts
-  // where the notes start, hopping clef/key-signature glyphs at the barline
+  // playhead / cursor — both interpolate notehead-to-notehead (scoreTickToX)
   if (playing) {
-    const tick = secToTick(song, playSec());
-    const mi2 = Math.min(m.nMeasures - 1, Math.max(0, Math.floor(tick / m.bt)));
-    const entry = scoreCache.get(mi2);
-    let x = RULER_W + tick * ppt - view.x;
-    if (entry) {
-      const frac = (tick - mi2 * m.bt) / m.bt;
-      const blitX = RULER_W + mi2 * m.bt * ppt - view.x - SCORE_PAD;
-      // hop only actual signature glyphs (key changes); plain measures sweep
-      // from the pad, making every ordinary barline crossing continuous
-      const xStart = blitX + (entry.keyChanged ? entry.noteStartX : SCORE_PAD);
-      const xEnd = blitX + SCORE_PAD + entry.mw;
-      x = xStart + frac * (xEnd - xStart);
-    }
+    const x = scoreTickToX(secToTick(song, playSec()));
     ctx.fillStyle = css("--gold");
     ctx.fillRect(x, 0, 1.5, H);
   } else {
