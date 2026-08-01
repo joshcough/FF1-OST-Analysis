@@ -58,6 +58,21 @@ hops glyphs); pivot-chord ambiguity (IV of G = V of F — answered instantly;
 the *why* re-banked for retrieval). Also: quizzes.md created (protocol +
 bank), notes manager, ranged key changes with automatic revert.
 
+**2026-08-01 (catalog cleanup + ship loop discovery):** MIDIs trimmed to
+their first pass; GM arranger padding stripped so tracks ≈ NES voices
+(Shop turned out to be 3 real parts triplicated across 9 instrument
+tracks). Quiz-source concepts from the session: **loop point ≠ song
+start** — Josh discovered by ear that Ship returns to bar 2, not bar 1
+(verified: bars 26+ = bars 2+ note-for-note): the two-note **pickup**
+(A, Bb on beats 3–4 of bar 1) plays once, then the 24-bar loop excludes
+it — and the same pickup notes recur melodically at the end of bar 25 to
+lead the ear back in. New `loop:` annotation type records such
+discoveries per song. **Arrangement vs. composition:** octave doublings,
+unison copies, and pad chords in downloaded MIDIs are arranger additions
+the NES (2 pulses + triangle + noise) could never play — spotting them
+is itself ear training. Also: unit tests exist now (`make test`),
+fit-to-screen on load, vertical pinch zoom, note chasing on play.
+
 ## Current composition exercise (in progress)
 
 Two 8-bar loops: chords from G-land → C7 → F **major** + melody; then the same but resolving to F **minor**. Guidelines agreed: introduce C as plain IV before it returns as C7 (furniture, then door); melody crosses the seam on common tones (C, F, G); chord tone on every chord-arrival downbeat; in the minor version let one prominent note (Ab on the Fm downbeat) carry the darkness; sing before playing; save both versions (MIDI or recording) and bring them back for analysis with the same tools used on Uematsu.
