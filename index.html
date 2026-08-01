@@ -229,7 +229,7 @@
   <button id="lassobtn">⊞ Lasso</button>
   <button id="chordbtn" style="display:none">Chord?</button>
   <select id="keysel" aria-label="Key">
-    <option value="">key? (C)</option>
+    <option value="" id="keyunset">key: not set (C)</option>
   </select>
   <button id="keyset" style="display:none">Set</button>
   <div id="noteinfo">tap a note</div>
@@ -599,6 +599,12 @@ function finalizeNotes() {
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir]}))
     .sort((a, b) => a.start - b.start);
+  const unsetOpt = document.getElementById("keyunset");
+  if (unsetOpt) {
+    unsetOpt.textContent = keyRegions.length
+      ? "key: " + keyRegions.map(r => r.name).join(", ") + " ✓"
+      : "key: not set (C)";
+  }
   // sections: depth from containment; lane colors by label (same label = same color)
   const secs = rollnotes.filter(n => n.section);
   secs.forEach(s => { if (s.end === null || s.end <= s.start) s.end = s.start + bt; });
