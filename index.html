@@ -277,6 +277,7 @@
   <input type="range" id="speedsl" min="25" max="200" step="5" value="100"
          aria-label="Playback speed" style="margin-left:auto">
   <span class="meta" id="speedlbl" style="margin-left:0">100%</span>
+  <button id="speedreset" style="display:none;min-height:32px;padding:4px 9px">100%</button>
   <div class="meta" id="songmeta" style="margin-left:0"></div>
 </header>
 <div id="trackbar"></div>
@@ -2112,17 +2113,22 @@ document.getElementById("rwbtn").addEventListener("click", () => {
 // playback speed slider: 25–200% of the song's own tempo, persists across songs
 const speedsl = document.getElementById("speedsl");
 const speedlbl = document.getElementById("speedlbl");
-speedsl.addEventListener("input", () => { speedlbl.textContent = speedsl.value + "%"; });
-speedsl.addEventListener("change", () => { // applied on release, not per drag-tick
-  speedlbl.textContent = speedsl.value + "%";
-  if (!song) { playRate = +speedsl.value / 100; return; }
+const speedreset = document.getElementById("speedreset");
+function applySpeed(pct) {
+  speedsl.value = String(pct);
+  speedlbl.textContent = pct + "%";
+  speedreset.style.display = pct === 100 ? "none" : ""; // snap-back appears when off-native
+  if (!song) { playRate = pct / 100; return; }
   const tk = curTick(); // keep the musical position across the rate change
   const wasPlaying = playing;
   if (wasPlaying) stop();
-  playRate = +speedsl.value / 100;
+  playRate = pct / 100;
   if (wasPlaying) play(tickToSec(song, tk));
   else { playCursor = tk; updateSubtitle(); draw(); }
-});
+}
+speedsl.addEventListener("input", () => { speedlbl.textContent = speedsl.value + "%"; });
+speedsl.addEventListener("change", () => applySpeed(+speedsl.value)); // on release, not per drag-tick
+speedreset.addEventListener("click", () => applySpeed(100));
 
 // key dial: preview any signature live; Set writes "key: X" at the cursor bar
 const keysel = document.getElementById("keysel");
