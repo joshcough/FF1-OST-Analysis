@@ -48,6 +48,10 @@ session start alongside the quiz.)
   request); later maybe: dim-but-visible, and audio-mute-only toggles.
 - **Lasso later ideas** — cross-staff chord naming conventions, remembering
   reveals per song, maybe a "quiz me" mode built on lasso selections.
+- **Mid-song key signature changes** — the score uses one home-key signature;
+  departures render as accidentals (also standard engraving for short
+  tonicizations). For pieces with a sustained modulation, detect windowed
+  key shifts and insert a new signature at the barline. Not built.
 - **Loop passes:** rollnotes anchors cover the first loop pass only; FF1
   MIDIs repeat. Decide whether annotations should apply to every pass.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,

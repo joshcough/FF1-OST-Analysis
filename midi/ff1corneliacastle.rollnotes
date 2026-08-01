@@ -2,6 +2,9 @@
 # From the Cornelia Castle sessions (see cornelia-castle.md).
 # Anchors cover the first 8-bar pass; the MIDI repeats the loop.
 
+[1.1]
+key: D
+
 [1.1 - 4.4]
 section: A — the four-slot sentence
 

@@ -216,6 +216,10 @@
   </div>
   <button id="lassobtn">⊞ Lasso</button>
   <button id="chordbtn" style="display:none">Chord?</button>
+  <select id="keysel" aria-label="Key">
+    <option value="">key? (C)</option>
+  </select>
+  <button id="keyset" style="display:none">Set</button>
   <div id="noteinfo">tap a note</div>
   <button id="notebtn">+ Note</button>
   <button id="syncbtn">Sync</button>
@@ -412,6 +416,9 @@ let lassoMode = false;   // one-finger drag selects notes instead of panning
 let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
 let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
+let multiSelSf = 0;      // key context captured at lasso time
+let keyRegions = [];     // [{start, sf, name}] from rollnotes "key:" directives
+let previewSf = null;    // key dial preview override (null = follow regions)
 
 const canvas = document.getElementById("roll");
 const ctx = canvas.getContext("2d");
@@ -478,9 +485,34 @@ function parseRollnotes(text) {
     n.text = n.text.trim();
     const m = n.text.match(/^section:\s*(.+)/s);
     if (m) { n.section = true; n.text = m[1].split("\n")[0].trim(); }
+    const km = n.text.match(/^key:\s*(\S+)/);
+    if (km) {
+      const sf = keyNameToSf(km[1]);
+      if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1]; }
+    }
   });
   return out.filter(n => n.text);
 }
+function keyNameToSf(name) {
+  const minor = /m$/.test(name) && name.length > 1;
+  const base = minor ? name.slice(0, -1) : name;
+  const L = base[0] ? base[0].toUpperCase() : "";
+  if (!(L in LETTER_PC)) return null;
+  let pc = LETTER_PC[L] + (base[1] === "#" ? 1 : base[1] === "b" ? -1 : 0);
+  pc = ((pc % 12) + 12) % 12;
+  if (minor) pc = (pc + 3) % 12; // relative major carries the signature
+  let sf = (pc * 7) % 12;
+  if (sf > 6) sf -= 12;
+  return sf;
+}
+function sfAt(tick) {
+  if (previewSf !== null) return previewSf;
+  let sf = 0;
+  for (const r of keyRegions) if (r.start <= tick) sf = r.sf;
+  return sf;
+}
+const spellMemo = {};
+function spellFor(sf) { return spellMemo[sf] || (spellMemo[sf] = keySpelling(sf)); }
 function resolveNote(n) {
   const bt = barTicks();
   n.start = (n.b1 - 1) * bt + (n.q1 - 1) * song.ppq;
@@ -497,6 +529,9 @@ function finalizeNotes() {
       n.end = next && next.start > n.start ? next.start : n.start + bt;
     }
   });
+  keyRegions = rollnotes.filter(n => n.keydir !== undefined)
+    .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir]}))
+    .sort((a, b) => a.start - b.start);
   // sections: depth from containment; lane colors by label (same label = same color)
   const secs = rollnotes.filter(n => n.section);
   secs.forEach(s => { if (s.end === null || s.end <= s.start) s.end = s.start + bt; });
@@ -527,6 +562,7 @@ async function loadNotes() {
     } catch (err) { /* corrupted local notes */ }
   }
   finalizeNotes();
+  buildScoreModel(); // key regions may have changed spelling/signatures
   updateSubtitle();
   draw();
 }
@@ -825,12 +861,11 @@ function draw() {
 }
 
 // ---------------------------------------------------------------- lasso / chord id
-function spellPc(pc) {
-  const sf = song && song.keysig ? Math.max(-7, Math.min(7, song.keysig.sf)) : 0;
-  const s = keySpelling(sf)[pc];
+function spellPc(pc, sf) {
+  const s = spellFor(sf === undefined ? sfAt(playCursor) : sf)[pc];
   return s.letter + (s.acc || "");
 }
-function pitchName(p) { return spellPc(p % 12) + (Math.floor(p / 12) - 1); }
+function pitchName(p, sf) { return spellPc(p % 12, sf) + (Math.floor(p / 12) - 1); }
 const CHORD_TEMPLATES = [
   ["", [0,4,7]], ["m", [0,3,7]], ["dim", [0,3,6]], ["aug", [0,4,8]],
   ["7", [0,4,7,10]], ["maj7", [0,4,7,11]], ["m7", [0,3,7,10]],
@@ -838,9 +873,9 @@ const CHORD_TEMPLATES = [
   ["sus4", [0,5,7]], ["sus2", [0,2,7]], ["7b9", [0,4,7,10,1]], ["5", [0,7]],
   ["9", [0,4,7,10,2]], ["m9", [0,3,7,10,2]], ["maj9", [0,4,7,11,2]], ["add9", [0,4,7,2]],
 ];
-function nameChord(pitches) {
+function nameChord(pitches, sf) {
   const pcs = [...new Set(pitches.map(p => p % 12))];
-  if (pcs.length < 2) return pcs.length ? spellPc(pcs[0]) + " (one pitch class)" : "";
+  if (pcs.length < 2) return pcs.length ? spellPc(pcs[0], sf) + " (one pitch class)" : "";
   const bassPc = pitches.reduce((a, b) => Math.min(a, b)) % 12;
   let best = null;
   const tryMatch = (allowNo5th) => {
@@ -858,8 +893,8 @@ function nameChord(pitches) {
   tryMatch(false);
   if (!best) tryMatch(true);
   if (!best) return "no standard chord match";
-  const inv = best.root !== bassPc ? "/" + spellPc(bassPc) : "";
-  return spellPc(best.root) + best.suffix + inv + (best.no5 ? " (no 5th)" : "");
+  const inv = best.root !== bassPc ? "/" + spellPc(bassPc, sf) : "";
+  return spellPc(best.root, sf) + best.suffix + inv + (best.no5 ? " (no 5th)" : "");
 }
 function clearMultiSel() {
   if (!multiSel.length && !lassoRect) return;
@@ -897,7 +932,9 @@ function finalizeLasso() {
   multiSelKey = new Set(multiSel.map(s => s.ti + ":" + s.ni));
   if (!multiSel.length) { setInfo("lasso: nothing selected"); draw(); return; }
   const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
-  setInfo(pitches.map(pitchName).join(" · ") + "  (" + multiSel.length + " notes)");
+  const selSf = sfAt(Math.max(0, t0));
+  multiSelSf = selSf;
+  setInfo(pitches.map(p => pitchName(p, selSf)).join(" · ") + "  (" + multiSel.length + " notes)");
   document.getElementById("chordbtn").style.display = "";
   draw();
 }
@@ -995,15 +1032,22 @@ function hitNote(pos) {
   }
   return null;
 }
+function beatLabel(beat) {
+  const base = Math.floor(beat + 0.03);
+  const frac = beat - base;
+  const SYL = [[0, ""], [0.25, "e"], [0.5, "&"], [0.75, "a"]];
+  for (const [f, s] of SYL) if (Math.abs(frac - f) < 0.06) return base + s;
+  return beat.toFixed(2);
+}
 function noteLabel(ti, ni) {
   const n = song.tracks[ti].notes[ni];
   const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
   const barTicks = beatsPerBar * song.ppq;
   const bar = Math.floor(n.t / barTicks) + 1;
   const beat = (n.t % barTicks) / song.ppq + 1;
-  const name = NOTE_NAMES[n.p % 12] + (Math.floor(n.p / 12) - 1);
+  const name = pitchName(n.p, sfAt(n.t));
   const tname = song.tracks[ti].name || "tr" + (ti+1);
-  return name + " · bar " + bar + " beat " + beat.toFixed(2) + " · " +
+  return name + " · bar " + bar + " beat " + beatLabel(beat) + " · " +
          (n.d / song.ppq).toFixed(2) + "q · vel " + n.v + " · " + tname + (n.added ? " · added" : "");
 }
 function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
@@ -1427,8 +1471,7 @@ function buildScoreModel() {
   let lastTick = 0;
   song.tracks.forEach(tr => tr.notes.forEach(n => { if (!n.gone) lastTick = Math.max(lastTick, n.t + n.d); }));
   const nMeasures = Math.max(1, Math.ceil(lastTick / bt - 0.05));
-  const sf = song.keysig ? Math.max(-7, Math.min(7, song.keysig.sf)) : 0;
-  const spell = keySpelling(sf);
+  const sf0 = sfAt(0);
   const staves = [];
   song.tracks.forEach((tr, ti) => {
     if (trackIsDrums(ti) || !tr.notes.length || !trackAudible(ti)) return;
@@ -1494,7 +1537,7 @@ function buildScoreModel() {
     }
     staves.push({ti, clef, color: TRACK_COLORS[ti % TRACK_COLORS.length], measures});
   });
-  scoreModel = {nMeasures, bt, sf, keyName: SF_MAJOR[sf] || "C", spell, staves};
+  scoreModel = {nMeasures, bt, sf: sf0, keyName: SF_MAJOR[sf0] || "C", staves};
 }
 
 function scoreContentH() {
@@ -1517,9 +1560,13 @@ function renderMeasure(mi) {
   ctx2.scale(dpr, dpr);
   ctx2.setFillStyle("#C7D0E8");
   ctx2.setStrokeStyle("#C7D0E8");
+  const sfM = sfAt(mi * m.bt);
+  const spell = spellFor(sfM);
+  const keyChanged = mi > 0 && sfM !== sfAt((mi - 1) * m.bt);
   m.staves.forEach((st, si) => {
     const y = SCORE_TOP + si * STAVE_H;
     const stave = new VF.Stave(SCORE_PAD, y, mw, {fill_style: "#3A4569"});
+    if (keyChanged) stave.addKeySignature(SF_MAJOR[sfM] || "C");
     stave.setContext(ctx2).draw();
     const events = st.measures[mi] || [];
     if (!events.length) { timeMap.push({tick: mi * m.bt, x: SCORE_PAD}); return; }
@@ -1530,7 +1577,7 @@ function renderMeasure(mi) {
         vn = new VF.StaveNote({clef: st.clef, keys: [st.clef === "bass" ? "d/3" : "b/4"], duration: e.dur + "r"});
         vn.setStyle({fillStyle: st.color, strokeStyle: st.color});
       } else {
-        vn = new VF.StaveNote({clef: st.clef, keys: e.pitches.map(p => vexKey(p, m.spell)), duration: e.dur, auto_stem: true});
+        vn = new VF.StaveNote({clef: st.clef, keys: e.pitches.map(p => vexKey(p, spell)), duration: e.dur, auto_stem: true});
         vn.setStyle({fillStyle: st.color, strokeStyle: st.color});
       }
       for (let dd = 0; dd < e.dots; dd++) VF.Dot.buildAndAttach([vn], {all: true});
@@ -1540,7 +1587,7 @@ function renderMeasure(mi) {
     const voice = new VF.Voice({num_beats: song.timesig[0], beat_value: song.timesig[1]});
     voice.setMode(VF.Voice.Mode.SOFT);
     voice.addTickables(vnotes);
-    VF.Accidental.applyAccidentals([voice], m.keyName);
+    VF.Accidental.applyAccidentals([voice], SF_MAJOR[sfM] || "C");
     new VF.Formatter().joinVoices([voice]).format([voice], mw - (stave.getNoteStartX() - SCORE_PAD) - 14);
     voice.draw(ctx2, stave);
     const beams = VF.Beam.generateBeams(vnotes.filter(v => !v.isRest()));
@@ -1756,6 +1803,53 @@ document.getElementById("rwbtn").addEventListener("click", () => {
   updateSubtitle();
   draw();
 });
+// key dial: preview any signature live; Set writes "key: X" at the cursor bar
+const keysel = document.getElementById("keysel");
+const keysetBtn = document.getElementById("keyset");
+{
+  const SIGS = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
+  const MINOR_OF = sf => { // relative minor name for the label
+    const majPc = ((sf * 7) % 12 + 12) % 12;
+    return spellFor(sf)[(majPc + 9) % 12] ? (() => { const s = spellFor(sf)[(majPc + 9) % 12]; return s.letter + (s.acc || ""); })() : "";
+  };
+  const o0 = document.createElement("option");
+  o0.value = "0"; o0.textContent = "0 — C / Am";
+  keysel.appendChild(o0);
+  for (const sf of SIGS) {
+    const o = document.createElement("option");
+    o.value = String(sf);
+    o.textContent = Math.abs(sf) + (sf > 0 ? "♯" : "♭") + " — " + SF_MAJOR[sf] + " / " + MINOR_OF(sf) + "m";
+    keysel.appendChild(o);
+  }
+}
+keysel.addEventListener("change", () => {
+  previewSf = keysel.value === "" ? null : parseInt(keysel.value, 10);
+  keysetBtn.style.display = previewSf === null ? "none" : "";
+  spellMemoReset();
+  buildScoreModel();
+  clampView();
+  draw();
+});
+function spellMemoReset() { /* spellings are pure per-sf; nothing to reset */ }
+keysetBtn.addEventListener("click", () => {
+  if (previewSf === null || !song || !songKey) return;
+  const bt = barTicks();
+  const bar = Math.floor(playCursor / bt) + 1;
+  const name = SF_MAJOR[previewSf] || "C";
+  rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
+                              keydir: previewSf, added: true}));
+  previewSf = null;
+  keysel.value = "";
+  keysetBtn.style.display = "none";
+  finalizeNotes();
+  saveLocalNotes();
+  buildScoreModel();
+  lastSubtitle = undefined;
+  updateSubtitle();
+  draw();
+  setInfo("key set to " + name + " at bar " + bar + " (unsynced — Sync to commit)");
+});
+
 const lassobtn = document.getElementById("lassobtn");
 lassobtn.addEventListener("click", () => {
   lassoMode = !lassoMode;
@@ -1767,8 +1861,8 @@ lassobtn.addEventListener("click", () => {
 document.getElementById("chordbtn").addEventListener("click", () => {
   if (!multiSel.length) return;
   const pitches = multiSel.map(s => song.tracks[s.ti].notes[s.ni].p);
-  const names = [...new Set(pitches)].sort((a, b) => a - b).map(pitchName).join(" · ");
-  setInfo(names + "  →  " + nameChord(pitches));
+  const names = [...new Set(pitches)].sort((a, b) => a - b).map(p => pitchName(p, multiSelSf)).join(" · ");
+  setInfo(names + "  →  " + nameChord(pitches, multiSelSf));
 });
 
 const viewbtn = document.getElementById("viewbtn");
