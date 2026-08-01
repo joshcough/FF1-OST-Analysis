@@ -639,9 +639,16 @@ function keyNameToSf(name) {
 }
 function sfAt(tick) {
   if (previewSf !== null) return previewSf;
-  let sf = 0;
-  for (const r of keyRegions) if (r.start <= tick) sf = r.sf;
-  return sf;
+  // ranged keys apply inside their span, then the surrounding key resumes;
+  // open keys (no end) apply until the next open key
+  let ranged = null, open = null;
+  for (const r of keyRegions) {
+    if (r.start > tick) continue;
+    if (r.end !== null) {
+      if (tick < r.end && (!ranged || r.start > ranged.start)) ranged = r;
+    } else if (!open || r.start > open.start) open = r;
+  }
+  return ranged ? ranged.sf : open ? open.sf : 0;
 }
 const spellMemo = {};
 function spellFor(sf) { return spellMemo[sf] || (spellMemo[sf] = keySpelling(sf)); }
@@ -662,12 +669,14 @@ function finalizeNotes() {
     }
   });
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
-    .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir]}))
+    .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir],
+                end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null,
+                b1: n.b1, b2: n.b2}))
     .sort((a, b) => a.start - b.start);
   const unsetOpt = document.getElementById("keyunset");
   if (unsetOpt) {
     unsetOpt.textContent = keyRegions.length
-      ? "key: " + keyRegions.map(r => r.name).join(", ") + " ✓"
+      ? "key: " + keyRegions.map(r => r.name + (r.b2 ? "(" + r.b1 + "–" + r.b2 + ")" : "")).join(", ") + " ✓"
       : "key: not set (C)";
   }
   // sections: depth from containment; lane colors by label (same label = same color)
@@ -2188,10 +2197,12 @@ function applyEditorType() {
   const t = editorType();
   document.getElementById("ntext").style.display = t === "key" ? "none" : "";
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
-  document.getElementById("ntorow").style.display = t === "key" ? "none" : "";
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
                     : "What's happening at this beat?";
+  document.getElementById("nstatus").textContent =
+    t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
+    document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
 function snapBeat(q) { return Math.round((q - 1) / 0.25) * 0.25 + 1; }
@@ -2238,7 +2249,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   if (type !== "key" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
-  const b2raw = type === "key" ? 0 : (+document.getElementById("nb2").value || 0);
+  const b2raw = +document.getElementById("nb2").value || 0;
   const q2raw = +document.getElementById("nq2").value || 0;
   if (editingNote) rollnotes = rollnotes.filter(n => n !== editingNote);
   let fresh;
@@ -2246,7 +2257,8 @@ document.getElementById("nsave").addEventListener("click", () => {
     const sf = parseInt(document.getElementById("nkeysel").value, 10);
     // a key change replaces any other local key marker at the same bar
     rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === b1));
-    fresh = {b1, q1, b2: null, q2: null, text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
+    fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+             text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
   } else if (type === "section") {
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: text.split("\n")[0], section: true, added: true};
