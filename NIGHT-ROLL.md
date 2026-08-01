@@ -8,8 +8,9 @@ Live: https://joshcough.github.io/FF1-OST-Analysis/ (GitHub Pages, main
 branch, root). Single file app + `vendor/vexflow.js`. No build step —
 git push is deployment (~1 min propagation; iPad may need a hard reload).
 
-Tests: `node --test tests/night-roll.test.mjs` (zero deps — Node's built-in
-runner). `tests/harness.mjs` extracts the inline `<script>` from index.html
+Tests: `make test` (runs `node --test tests/*.test.mjs` — zero deps, Node's
+built-in runner). `make serve` hosts the app at localhost:8000 (fetch needs
+http, so file:// won't work). `tests/harness.mjs` extracts the inline `<script>` from index.html
 and runs it in a vm with a stub DOM, so the app stays one file. Covers the
 pure logic: MIDI parse, rollnotes parse/serialize round-trip, key math,
 chord namer, duration decomposition, tempo maps, edit persistence. Run them
