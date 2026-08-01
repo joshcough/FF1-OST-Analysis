@@ -1221,6 +1221,8 @@ function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
 
 // ---------------------------------------------------------------- gestures
 let drag = null, pinch = null;
+let followFree = false; // manual scroll during playback suspends auto-follow
+                        // until the playhead walks back into view
 function cursorHit(pos) {
   if (playing || !song || mode !== "select") return false;
   if (pos.y < RULER_H) return false; // ruler drags select a range instead
@@ -1305,7 +1307,7 @@ canvas.addEventListener("pointermove", e => {
       rangeSel = a === b ? null : {a: Math.min(a, b), b: Math.max(a, b)};
       draw();
     }
-    else { view.x -= dx; view.y -= dy; clampView(); draw(); }
+    else { view.x -= dx; view.y -= dy; followFree = true; clampView(); draw(); }
   }
   drag.x = e.clientX; drag.y = e.clientY;
 });
@@ -1334,6 +1336,7 @@ canvas.addEventListener("wheel", e => {
     view.x = (view.x + mid) * (newPxq / view.pxq) - mid;
     view.pxq = newPxq;
   } else { view.x += e.deltaX; view.y += e.deltaY; }
+  followFree = true;
   clampView(); draw();
 }, {passive: false});
 function fitView() { // on song load: fit the whole song on screen (roll view)
@@ -1611,13 +1614,19 @@ function play(fromSec = 0) {
   };
   schedTimer = setInterval(pump, 60);
   pump(); // schedule the first batch immediately — waiting one interval put beat 1 in the past
+  followFree = false;
   const tick = () => {
     if (!playing) return;
-    // auto-follow playhead (and snap back on loop wrap)
     const x = secToTick(song, playSec()) * pxPerTick();
     const W = wrap.clientWidth - RULER_W;
-    if (x - view.x > W * 0.85) view.x = x - W * 0.3;
-    else if (x < view.x) view.x = Math.max(0, x - W * 0.1);
+    if (followFree) {
+      // user scrolled away: hands off until the playhead enters their view
+      if (x >= view.x && x <= view.x + W) followFree = false;
+    } else {
+      // auto-follow playhead (and snap back on loop wrap)
+      if (x - view.x > W * 0.85) view.x = x - W * 0.3;
+      else if (x < view.x) view.x = Math.max(0, x - W * 0.1);
+    }
     updateSubtitle();
     draw();
     raf = requestAnimationFrame(tick);
