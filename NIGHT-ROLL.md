@@ -8,6 +8,15 @@ Live: https://joshcough.github.io/FF1-OST-Analysis/ (GitHub Pages, main
 branch, root). Single file app + `vendor/vexflow.js`. No build step —
 git push is deployment (~1 min propagation; iPad may need a hard reload).
 
+Tests: `node --test tests/night-roll.test.mjs` (zero deps — Node's built-in
+runner). `tests/harness.mjs` extracts the inline `<script>` from index.html
+and runs it in a vm with a stub DOM, so the app stays one file. Covers the
+pure logic: MIDI parse, rollnotes parse/serialize round-trip, key math,
+chord namer, duration decomposition, tempo maps, edit persistence. Run them
+before committing player changes; add cases when touching that logic.
+(2026-07-31 review verdict, second-opinioned: keep single-file until ~4–5k
+lines — splitting adds Pages cache-skew risk for no payoff at this size.)
+
 ## Feature inventory
 
 **Views:** piano roll (canvas) and engraved score (VexFlow → per-measure
@@ -88,8 +97,8 @@ key: Db            ← ranged key: applies bars 2–4, then the surrounding
 
 catalog → CATALOG (grouped dropdown; songs addressed by repo path) ·
 midi parse → parseMidi + tempo maps · rollnotes → parse/serialize/regions/
-sfAt/subtitle · lasso/chord id · load song → setSong (computes songEndTick,
-detects key fallback) · track chips · drawing → draw/drawRuler (roll) ·
+sfAt/subtitle · lasso/chord id · load song → setSong (computes songEndTick;
+loadGen guards stale async loads) · track chips · drawing → draw/drawRuler (roll) ·
 score → buildScoreModel (quantize 16ths, chord-group, clip overlaps,
 measure split with ties, rest fill) / renderMeasure (LRU 60 cache,
 geometry + timeMap per measure) / drawScore · gestures → pointer/pinch/

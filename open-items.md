@@ -39,9 +39,18 @@ session start alongside the quiz.)
 
 ## Tooling to-do
 
-- **Score view** — BUILT overnight 2026-07-30 (tier 2, live engraving),
-  uncommitted pending Josh's morning review. Status + known limitations in
-  [score-view-plan.md](score-view-plan.md). Review, then commit or revise.
+- **Synced-note edits don't survive reload before Sync** (found in 2026-07-31
+  code review): editing/deleting a *synced* note then reloading the page
+  resurrects the original (edits show as duplicates, deletes revert) because
+  localStorage only persists added notes, not tombstones. Sync promptly and
+  it's fine. Fix sketch: persist removed-synced tombstones alongside added
+  notes and re-apply them in loadNotes.
+- **Score cache memory at extreme zoom** (same review): per-measure canvases
+  at max pinch zoom are ~9 MB each and the cache caps at 60 *entries*, not
+  bytes — iOS Safari may silently blank measures at very high zoom. Fix
+  sketch: cap the cache by estimated bytes instead of count.
+- **Score view** — DONE, committed 2026-07-31 (see score-view-plan.md for
+  known limitations).
 - **Score spelling refinement** — Ab in the Baseball song spells as G#
   (static chromatic heuristic); context-aware spelling someday.
 - **Track visibility variants** — mute now fully hides a track (Josh's
