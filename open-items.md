@@ -53,6 +53,18 @@ session start alongside the quiz.)
   known limitations).
 - **Score spelling refinement** — Ab in the Baseball song spells as G#
   (static chromatic heuristic); context-aware spelling someday.
+- **NES-faithful arrangements wanted** (Josh, 2026-08-01): several MIDIs are
+  GM arrangements with many tracks (Shop has 9; Menu has an added chord
+  track the NES likely didn't have — Josh suspects the real chip used 2
+  channels there). He'd love just the 3 NES voices — easier to analyze.
+  Options: hunt leaner transcriptions per song, or build a tools/ script
+  to delete/merge tracks from the current files (mute chips already hide
+  them non-destructively). Related: with >8 tracks the 8-color palette
+  repeats (Shop: reed organ 1 = flute 3 color), hard to tell tracks apart.
+- **Gurgu Volcano loop "slightly off" to Josh's ear** (2026-08-01): trim
+  verified mathematically clean — both passes tick-identical, exactly 42
+  bars, no notes crossing the seam. So the seam feel is in the
+  transcription itself. Revisit musically if it keeps bothering him.
 - **Track visibility variants** — mute now fully hides a track (Josh's
   request); later maybe: dim-but-visible, and audio-mute-only toggles.
 - **Lasso later ideas** — cross-staff chord naming conventions, remembering

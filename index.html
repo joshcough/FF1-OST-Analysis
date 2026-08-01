@@ -334,7 +334,7 @@
     <h3>VIEWS</h3>
     <dl>
       <dt>𝄞 Score / ▦ Roll</dt><dd>Switch between piano roll and engraved sheet music. Same timeline, same everything else. Your choice is remembered.</dd>
-      <dt>Drag / pinch</dt><dd>One finger pans; two fingers zoom. In score view, scroll fully left to see the clefs and key signature.</dd>
+      <dt>Drag / pinch</dt><dd>One finger pans; two fingers zoom — spread horizontally to stretch time, vertically to grow/shrink the pitch rows (roll only). In score view, scroll fully left to see the clefs and key signature.</dd>
     </dl>
 
     <h3>PLAYBACK</h3>
@@ -406,34 +406,33 @@
 // and the project conventions (keys are Josh's discoveries — never pre-fill).
 "use strict";
 // ---------------------------------------------------------------- catalog
-const CATALOG = {
+const CATALOG = { // alphabetical within each group
   "Final Fantasy I": [
+    ["Airship", "midi/ff1airship.mid"],
+    ["Battle", "midi/ff1battle.mid"],
+    ["Cave", "midi/ff1cave.mid"],
+    ["Chaos Temple", "midi/ff1chaostemple.mid"],
+    ["Cornelia Castle", "midi/ff1corneliacastle.mid"],
+    ["Dungeon", "midi/ff1dungeon.mid"],
+    ["Elfland", "midi/ff1elfland.mid"],
+    ["Epilogue", "midi/ff1epilogue.mid"],
+    ["Floating Castle", "midi/ff1floatingcastle.mid"],
+    ["Game Over", "midi/ff1gameover.mid"],
+    ["Gurgu Volcano", "midi/ff1gurguvolcano.mid"],
+    ["Main Theme (Overworld)", "midi/ff1overworld.mid"],
+    ["Matoya's Cave", "midi/ff1matouyascave.mid"],
+    ["Menu", "midi/ff1menu.mid"],
     ["Prelude", "midi/ff1prelude.mid"],
     ["Prologue", "midi/ff1prologue.mid"],
-    ["Main Theme (Overworld)", "midi/ff1overworld.mid"],
-    ["Cornelia Castle", "midi/ff1corneliacastle.mid"],
-    ["Castle", "midi/ff1castle.mid"],
-    ["Town", "midi/ff1town.mid"],
-    ["Shop", "midi/ff1shop.mid"],
-    ["Menu", "midi/ff1menu.mid"],
-    ["Battle", "midi/ff1battle.mid"],
-    ["Victory", "midi/ff1victory.mid"],
     ["Ship", "midi/ff1ship.mid"],
-    ["Airship", "midi/ff1airship.mid"],
-    ["Elfland", "midi/ff1elfland.mid"],
-    ["Matoya's Cave", "midi/ff1matouyascave.mid"],
-    ["Cave", "midi/ff1cave.mid"],
-    ["Dungeon", "midi/ff1dungeon.mid"],
-    ["Chaos Temple", "midi/ff1chaostemple.mid"],
-    ["Gurgu Volcano", "midi/ff1gurguvolcano.mid"],
-    ["Floating Castle", "midi/ff1floatingcastle.mid"],
+    ["Shop", "midi/ff1shop.mid"],
+    ["Town", "midi/ff1town.mid"],
     ["Underwater Palace", "midi/ff1underwaterpalace.mid"],
-    ["Game Over", "midi/ff1gameover.mid"],
-    ["Epilogue", "midi/ff1epilogue.mid"],
+    ["Victory", "midi/ff1victory.mid"],
   ],
   "My Compositions": [
-    ["Key Change Test (07-26)", "compositions/KeyChangeTest-07-26.mid"],
     ["Baseball / Beach Song", "compositions/CM6-G7b9.mid"],
+    ["Key Change Test (07-26)", "compositions/KeyChangeTest-07-26.mid"],
   ],
 };
 const TRACK_COLORS = ["#d95926","#3987e5","#199e70","#c98500","#d55181","#9085e9","#008300","#e66767"];
@@ -1235,15 +1234,15 @@ document.addEventListener("touchmove", e => {
   if (e.touches.length > 1) e.preventDefault();
 }, {passive: false});
 
-function pinchDist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) || 1; }
 canvas.addEventListener("pointerdown", e => {
   canvas.setPointerCapture(e.pointerId);
   if (pinch) return; // third finger: ignore
   if (drag && drag.id !== e.pointerId) {
     pinch = {a: {id: drag.id, x: drag.x, y: drag.y},
              b: {id: e.pointerId, x: e.clientX, y: e.clientY},
-             pxq: view.pxq, vx: view.x};
-    pinch.d0 = pinchDist(pinch.a, pinch.b);
+             pxq: view.pxq, vx: view.x, rowH0: view.rowH, vy: view.y};
+    pinch.dx0 = Math.abs(pinch.a.x - pinch.b.x);
+    pinch.dy0 = Math.abs(pinch.a.y - pinch.b.y);
     drag = null;
     return;
   }
@@ -1257,12 +1256,22 @@ canvas.addEventListener("pointermove", e => {
     const pt = pinch.a.id === e.pointerId ? pinch.a : pinch.b.id === e.pointerId ? pinch.b : null;
     if (!pt) return;
     pt.x = e.clientX; pt.y = e.clientY;
-    const dist = pinchDist(pinch.a, pinch.b);
-    const mid = (pinch.a.x + pinch.b.x) / 2 - RULER_W;
-    const scale = dist / pinch.d0;
-    const newPxq = Math.min(400, Math.max(8, pinch.pxq * scale));
-    view.x = (pinch.vx + mid) * (newPxq / pinch.pxq) - mid;
+    // per-axis zoom: horizontal finger spread scales time, vertical spread
+    // scales pitch rows (roll only). PAD damps the axis the fingers are
+    // nearly aligned on, so a one-axis pinch doesn't wobble the other.
+    const PAD = 40;
+    const sx = (Math.abs(pinch.a.x - pinch.b.x) + PAD) / (pinch.dx0 + PAD);
+    const midX = (pinch.a.x + pinch.b.x) / 2 - RULER_W;
+    const newPxq = Math.min(400, Math.max(8, pinch.pxq * sx));
+    view.x = (pinch.vx + midX) * (newPxq / pinch.pxq) - midX;
     view.pxq = newPxq;
+    if (viewMode !== "score") { // score staves are fixed-height
+      const sy = (Math.abs(pinch.a.y - pinch.b.y) + PAD) / (pinch.dy0 + PAD);
+      const midY = (pinch.a.y + pinch.b.y) / 2 - RULER_H;
+      const newRowH = Math.min(32, Math.max(6, pinch.rowH0 * sy));
+      view.y = (pinch.vy + midY) * (newRowH / pinch.rowH0) - midY;
+      view.rowH = newRowH;
+    }
     clampView(); draw();
     return;
   }
