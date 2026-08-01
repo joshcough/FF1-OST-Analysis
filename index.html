@@ -1277,6 +1277,11 @@ function tap(pos) {
     for (const n of rollnotes) {
       if (Math.abs((n.start - tick) * ppt) < 14) { hitMark = n; break; }
     }
+    if (hitMark && hitMark.keydir !== undefined && hitMark.added && !playing) {
+      playCursor = hitMark.start;
+      openEditor(hitMark); // key markers have no subtitle — flag tap opens the editor (Delete lives there)
+      return;
+    }
     const target = hitMark ? hitMark.start
                  : Math.max(0, Math.round(tick / song.ppq) * song.ppq); // snap to beat
     if (playing) { stop(); play(tickToSec(song, target)); }
@@ -1924,6 +1929,8 @@ keysetBtn.addEventListener("click", () => {
   const bt = barTicks();
   const bar = Math.floor(playCursor / bt) + 1;
   const name = SF_MAJOR[previewSf] || "C";
+  // replace any locally-set key marker at this bar instead of stacking
+  rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === bar));
   rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
                               keydir: previewSf, added: true}));
   previewSf = null;
@@ -2065,8 +2072,14 @@ document.getElementById("nsave").addEventListener("click", () => {
   const q2raw = +document.getElementById("nq2").value || 0;
   if (editingNote && editingNote.added) rollnotes = rollnotes.filter(n => n !== editingNote);
   const isSec = document.getElementById("nsec").checked;
-  rollnotes.push(resolveNote({b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
-                              text: isSec ? text.split("\n")[0] : text, section: isSec || undefined, added: true}));
+  const fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+                 text: isSec ? text.split("\n")[0] : text, section: isSec || undefined, added: true};
+  const km = fresh.text.match(/^key:\s*(\S+)/); // keep key markers being key markers
+  if (km && !isSec) {
+    const sf = keyNameToSf(km[1]);
+    if (sf !== null) fresh.keydir = sf;
+  }
+  rollnotes.push(resolveNote(fresh));
   rangeSel = null;
   finalizeNotes();
   saveLocalNotes();
