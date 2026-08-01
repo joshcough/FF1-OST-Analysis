@@ -62,6 +62,12 @@ session start alongside the quiz.)
     VexFlow equivalent exists — hand-rolling engraving is the months-shaped
     part — and build/sign/install kills the push-and-reload iteration loop
     that built this in six hours. Not worth it.
+- **Mid-song time-signature changes** (parked 2026-07-31): a fourth
+  annotation type ("Time change") in the type-first editor, like key
+  changes. Real work hides underneath: the whole app assumes one meter —
+  bar math (ruler numbers, measure boundaries, beat dropdowns, score
+  measures, loop end) would need to become region-aware. The MIDI parser
+  already sees the 0x58 events; it just keeps only the last one.
 - **Enharmonic respelling** (idea, Josh undecided): tap a score note to flip
   G#↔Ab — notehead moves line↔space, choice stored in rollnotes. Maybe
   moot if direction-aware spelling (raise ascending, flatten descending)
