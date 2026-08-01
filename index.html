@@ -1447,6 +1447,17 @@ function openMaster() { // declick: ramp the master up instead of snapping on
   master.gain.setValueAtTime(master.gain.value, t);
   master.gain.linearRampToValueAtTime(MASTER_VOL, t + 0.03);
 }
+// warm the context on the first touch, wherever it lands: the cold context's
+// first render quantum glitches, so let it happen in silence before Play
+document.addEventListener("pointerdown", function warm() {
+  document.removeEventListener("pointerdown", warm);
+  ensureAudio();
+  if (audio.state === "suspended") audio.resume();
+  const src = audio.createBufferSource();
+  src.buffer = audio.createBuffer(1, 1, audio.sampleRate); // one silent sample
+  src.connect(master);
+  src.start();
+}, {capture: true});
 function trackGain(ti) {
   if (!trackGains[ti]) {
     trackGains[ti] = audio.createGain();
