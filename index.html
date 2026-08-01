@@ -1726,11 +1726,17 @@ function renderMeasure(mi) {
   ctx2.setStrokeStyle("#C7D0E8");
   const sfM = sfAt(mi * m.bt);
   const spell = spellFor(sfM);
-  const keyChanged = mi > 0 && sfM !== sfAt((mi - 1) * m.bt);
+  const sfPrev = mi > 0 ? sfAt((mi - 1) * m.bt) : sfM;
+  const keyChanged = mi > 0 && sfM !== sfPrev;
   m.staves.forEach((st, si) => {
     const y = SCORE_TOP + si * STAVE_H;
     const stave = new VF.Stave(SCORE_PAD, y, mw, {fill_style: "#3A4569"});
-    if (keyChanged) stave.addKeySignature(SF_MAJOR[sfM] || "C");
+    if (keyChanged) {
+      // cancelKey draws naturals for the outgoing signature (essential when
+      // the new key is C, whose own signature is empty)
+      try { stave.addKeySignature(SF_MAJOR[sfM] || "C", SF_MAJOR[sfPrev] || "C"); }
+      catch (e) { stave.addKeySignature(SF_MAJOR[sfM] || "C"); }
+    }
     stave.setContext(ctx2).draw();
     const events = st.measures[mi] || [];
     if (!events.length) { timeMap.push({tick: mi * m.bt, x: SCORE_PAD}); return; }
@@ -2269,6 +2275,8 @@ document.getElementById("nsave").addEventListener("click", () => {
   rangeSel = null;
   finalizeNotes();
   saveLocalNotes();
+  buildScoreModel(); // annotations can change signatures/spelling
+  clampView();
   lastSubtitle = undefined;
   updateSubtitle();
   editor.classList.remove("on");
@@ -2278,6 +2286,8 @@ document.getElementById("ndelete").addEventListener("click", () => {
   rollnotes = rollnotes.filter(n => n !== editingNote);
   finalizeNotes();
   saveLocalNotes();
+  buildScoreModel();
+  clampView();
   lastSubtitle = undefined;
   updateSubtitle();
   editor.classList.remove("on");
