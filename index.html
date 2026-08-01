@@ -557,7 +557,13 @@ async function loadNotes() {
       const local = JSON.parse(localStorage.getItem(notesStoreKey()) || "[]");
       for (const n of local) {
         const dup = rollnotes.some(r => r.b1 === n.b1 && r.q1 === n.q1 && r.text === n.text);
-        if (!dup) rollnotes.push(resolveNote({...n, added: true}));
+        if (dup) continue;
+        const km = (n.text || "").match(/^key:\s*(\S+)/); // re-derive flag (older saves lack it)
+        if (km && n.keydir === undefined) {
+          const sf = keyNameToSf(km[1]);
+          if (sf !== null) n.keydir = sf;
+        }
+        rollnotes.push(resolveNote({...n, added: true}));
       }
     } catch (err) { /* corrupted local notes */ }
   }
@@ -569,7 +575,8 @@ async function loadNotes() {
 function saveLocalNotes() {
   if (!notesStoreKey()) return;
   const local = rollnotes.filter(n => n.added).map(n =>
-    ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text, section: n.section || undefined}));
+    ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text,
+      section: n.section || undefined, keydir: n.keydir}));
   if (local.length) localStorage.setItem(notesStoreKey(), JSON.stringify(local));
   else localStorage.removeItem(notesStoreKey());
 }
