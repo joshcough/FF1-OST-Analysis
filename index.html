@@ -321,6 +321,7 @@
     <div id="notelistrows" style="display:flex;flex-direction:column;gap:7px"></div>
     <div class="row">
       <button class="primary" id="notelistAdd">+ Add note</button>
+      <button id="notelistSync" style="margin-left:auto">Sync</button>
       <button id="notelistClose">Close</button>
     </div>
   </div>
@@ -2077,6 +2078,10 @@ document.getElementById("listbtn").addEventListener("click", () => {
   notelistSheet.classList.add("on");
 });
 document.getElementById("notelistClose").addEventListener("click", () => notelistSheet.classList.remove("on"));
+document.getElementById("notelistSync").addEventListener("click", () => {
+  notelistSheet.classList.remove("on");
+  document.getElementById("syncbtn").click();
+});
 document.getElementById("notelistAdd").addEventListener("click", () => {
   notelistSheet.classList.remove("on");
   openEditor(null);
