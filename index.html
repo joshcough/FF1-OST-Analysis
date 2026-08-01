@@ -2135,6 +2135,7 @@ document.getElementById("notelistClose").addEventListener("click", () => notelis
 document.getElementById("notelistSync").addEventListener("click", () => {
   notelistSheet.classList.remove("on");
   document.getElementById("syncbtn").click();
+  syncReturnToList = true; // after a successful commit, go back to the list
 });
 document.getElementById("notelistAdd").addEventListener("click", () => {
   notelistSheet.classList.remove("on");
@@ -2370,8 +2371,10 @@ document.getElementById("ndelete").addEventListener("click", () => {
 // ---------------------------------------------------------------- sync
 const syncsheet = document.getElementById("syncsheet");
 const REPO_API = "https://api.github.com/repos/joshcough/FF1-OST-Analysis/contents/";
+let syncReturnToList = false; // sync opened from the notes list → return there after commit
 document.getElementById("syncbtn").addEventListener("click", () => {
   if (!song) return;
+  syncReturnToList = false; // notelistSync sets it true right after this handler runs
   document.getElementById("ghtoken").value = localStorage.getItem("ff1roll-ghtoken") || "";
   document.getElementById("syncstatus").textContent = songKey
     ? "Token: Settings → Developer settings → Fine-grained tokens → this repo only, Contents read/write."
@@ -2427,7 +2430,11 @@ document.getElementById("ghsave").addEventListener("click", async e => {
     lastSubtitle = undefined;
     updateSubtitle();
     draw();
-    status.textContent = "Committed. (GitHub Pages takes ~1 min to serve the new file.)";
+    status.textContent = "Committed ✓ (GitHub Pages takes ~1 min to serve the new file.)";
+    setTimeout(() => { // done — close, and return to the notes list if that's where we came from
+      syncsheet.classList.remove("on");
+      if (syncReturnToList) { renderNoteList(); notelistSheet.classList.add("on"); }
+    }, 900);
   } catch (err) { status.textContent = "Commit failed: " + err.message; }
   finally { btn.disabled = false; }
 });
