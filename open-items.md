@@ -53,14 +53,15 @@ session start alongside the quiz.)
   known limitations).
 - **Score spelling refinement** — Ab in the Baseball song spells as G#
   (static chromatic heuristic); context-aware spelling someday.
-- **NES-faithful arrangements wanted** (Josh, 2026-08-01): several MIDIs are
-  GM arrangements with many tracks (Shop has 9; Menu has an added chord
-  track the NES likely didn't have — Josh suspects the real chip used 2
-  channels there). He'd love just the 3 NES voices — easier to analyze.
-  Options: hunt leaner transcriptions per song, or build a tools/ script
-  to delete/merge tracks from the current files (mute chips already hide
-  them non-destructively). Related: with >8 tracks the 8-color palette
-  repeats (Shop: reed organ 1 = flute 3 color), hard to tell tracks apart.
+- **NES-faithful arrangements** — MOSTLY DONE 2026-08-01: padding tracks
+  stripped (tools/strip_tracks.py) from shop (9→3! it was 3 parts × 3
+  instrument copies), cave (6→4), airship, town, dungeon, prologue,
+  chaostemple, gurgu. Chord tracks kept per Josh (useful when stuck).
+  Left alone: elfland (8 tracks) and epilogue (11) — genuinely split
+  orchestrations, too tangled to strip safely; battle's brass and
+  floatingcastle's twin interlocking arps are real split NES parts, kept.
+  If elfland/epilogue bother Josh, hunt leaner transcriptions instead.
+  Palette extended to 12 colors so 11-track epilogue no longer repeats.
 - **Gurgu Volcano loop "slightly off" to Josh's ear** (2026-08-01): trim
   verified mathematically clean — both passes tick-identical, exactly 42
   bars, no notes crossing the seam. So the seam feel is in the
