@@ -1580,6 +1580,12 @@ function play(fromSec = 0) {
   song.tracks.forEach((_, ti) => trackGain(ti)); // pre-create so gains exist before first event
   schedIdx = schedEvents.findIndex(e => e.sec >= fromSec);
   if (schedIdx < 0) schedIdx = schedEvents.length;
+  // chase: a note the cursor lands mid-way through still plays its remainder
+  for (let k = 0; k < schedIdx; k++) {
+    const e = schedEvents[k];
+    if (e.sec + e.dur > fromSec + 0.02 && !(e.n.ch === 9 || trackIsDrums(e.ti)))
+      scheduleNote(e.ti, e.n, playT0, e.sec + e.dur - fromSec);
+  }
   const wrapIdx = schedEvents.findIndex(e => e.sec >= loopSeg.start);
   document.getElementById("playbtn").textContent = "■ Stop";
   const pump = () => {
