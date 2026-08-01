@@ -285,16 +285,25 @@
   <div class="sheet">
     <h2>ANNOTATION</h2>
     <div class="row">
-      <span class="lbl">from bar</span><input type="number" id="nb1" min="1" value="1">
-      <span class="lbl">beat</span><input type="number" id="nq1" min="1" step="0.5" value="1">
-      <span class="lbl">to bar</span><input type="number" id="nb2" min="0" placeholder="—">
-      <span class="lbl">beat</span><input type="number" id="nq2" min="1" step="0.5" placeholder="—">
+      <span class="lbl">type</span>
+      <select id="ntype">
+        <option value="note">Text note</option>
+        <option value="section">Section</option>
+        <option value="key">Key change</option>
+      </select>
+    </div>
+    <div class="row">
+      <span class="lbl">from bar</span><select id="nb1"></select>
+      <span class="lbl">beat</span><select id="nq1"></select>
+    </div>
+    <div class="row" id="ntorow">
+      <span class="lbl">to bar</span><select id="nb2"></select>
+      <span class="lbl">beat</span><select id="nq2"></select>
     </div>
     <textarea id="ntext" placeholder="What's happening at this beat?"></textarea>
-    <div class="row">
-      <label class="lbl" style="display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="nsec"> section (label shows in the ruler; nest by containment)
-      </label>
+    <div class="row" id="nkeyrow" style="display:none">
+      <span class="lbl">new key</span>
+      <select id="nkeysel"></select>
     </div>
     <div class="row">
       <button class="primary" id="nsave">Save</button>
@@ -1967,6 +1976,12 @@ const keysetBtn = document.getElementById("keyset");
     o.textContent = Math.abs(sf) + (sf > 0 ? "♯" : "♭") + " — " + SF_MAJOR[sf] + " / " + MINOR_OF(sf) + "m";
     keysel.appendChild(o);
   }
+  // the annotation editor's key picker gets the same signatures (no "unset" row)
+  const nk = document.getElementById("nkeysel");
+  for (const opt of keysel.querySelectorAll("option")) {
+    if (opt.value === "") continue;
+    nk.appendChild(opt.cloneNode(true));
+  }
 }
 function refreshKeysetLabel() {
   if (previewSf === null || !song) return;
@@ -2137,32 +2152,79 @@ new ResizeObserver(resize).observe(wrap); // subtitle strip toggling resizes the
 
 // ---------------------------------------------------------------- note editor
 const editor = document.getElementById("noteeditor");
+function fillBarBeatSelects() {
+  const bars = Math.max(1, Math.round(songEndTick / barTicks()));
+  const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
+  const mkBars = (id, noneOption) => {
+    const s = document.getElementById(id);
+    s.innerHTML = "";
+    if (noneOption) {
+      const o = document.createElement("option");
+      o.value = ""; o.textContent = "—";
+      s.appendChild(o);
+    }
+    for (let b = 1; b <= bars; b++) {
+      const o = document.createElement("option");
+      o.value = String(b); o.textContent = String(b);
+      s.appendChild(o);
+    }
+  };
+  const mkBeats = (id) => {
+    const s = document.getElementById(id);
+    s.innerHTML = "";
+    for (let b = 1; b <= beatsPerBar; b++) {
+      for (const [f, syl] of [[0, ""], [0.25, "e"], [0.5, "&"], [0.75, "a"]]) {
+        const o = document.createElement("option");
+        o.value = String(b + f); o.textContent = b + syl;
+        s.appendChild(o);
+      }
+    }
+  };
+  mkBars("nb1", false); mkBars("nb2", true);
+  mkBeats("nq1"); mkBeats("nq2");
+}
+function editorType() { return document.getElementById("ntype").value; }
+function applyEditorType() {
+  const t = editorType();
+  document.getElementById("ntext").style.display = t === "key" ? "none" : "";
+  document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
+  document.getElementById("ntorow").style.display = t === "key" ? "none" : "";
+  document.getElementById("ntext").placeholder =
+    t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
+                    : "What's happening at this beat?";
+}
+document.getElementById("ntype").addEventListener("change", applyEditorType);
+function snapBeat(q) { return Math.round((q - 1) / 0.25) * 0.25 + 1; }
 function openEditor(note) {
   editingNote = note || null;
+  fillBarBeatSelects();
   const bt = barTicks();
   let b1 = Math.floor(playCursor / bt) + 1;
-  let q1 = (playCursor % bt) / song.ppq + 1;
+  let q1 = snapBeat((playCursor % bt) / song.ppq + 1);
   let b2 = "", q2 = "";
   if (!note && rangeSel) { // prefill the from/to fields from the ruler selection
     b1 = Math.floor(rangeSel.a / bt) + 1;
-    q1 = (rangeSel.a % bt) / song.ppq + 1;
+    q1 = snapBeat((rangeSel.a % bt) / song.ppq + 1);
     const last = rangeSel.b - song.ppq; // inclusive last beat of the selection
     if (last > rangeSel.a) {
       b2 = Math.floor(last / bt) + 1;
-      q2 = (last % bt) / song.ppq + 1;
+      q2 = snapBeat((last % bt) / song.ppq + 1);
     }
   }
-  document.getElementById("nb1").value = note ? note.b1 : b1;
-  document.getElementById("nq1").value = note ? note.q1 : q1;
-  document.getElementById("nb2").value = note ? (note.b2 || "") : b2;
-  document.getElementById("nq2").value = note ? (note.q2 || "") : q2;
-  document.getElementById("ntext").value = note ? note.text : "";
-  document.getElementById("nsec").checked = !!(note && note.section);
+  const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key" : "note") : "note";
+  document.getElementById("ntype").value = type;
+  document.getElementById("nb1").value = String(note ? note.b1 : b1);
+  document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
+  document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
+  document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : song.timesig[0]) : (q2 || song.timesig[0]));
+  document.getElementById("ntext").value = note && type !== "key" ? note.text : "";
+  if (type === "key" && note) document.getElementById("nkeysel").value = String(note.keydir);
   document.getElementById("ndelete").style.display = note ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
     ? "Synced note — edits and deletes become permanent when you Sync." : "";
+  applyEditorType();
   editor.classList.add("on");
-  document.getElementById("ntext").focus();
+  if (type === "note") document.getElementById("ntext").focus();
 }
 document.getElementById("notebtn").addEventListener("click", () => {
   if (!song) return;
@@ -2171,20 +2233,25 @@ document.getElementById("notebtn").addEventListener("click", () => {
 });
 document.getElementById("ncancel").addEventListener("click", () => editor.classList.remove("on"));
 document.getElementById("nsave").addEventListener("click", () => {
+  const type = editorType();
   const text = document.getElementById("ntext").value.trim();
-  if (!text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  if (type !== "key" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
-  const b2raw = +document.getElementById("nb2").value || 0;
+  const b2raw = type === "key" ? 0 : (+document.getElementById("nb2").value || 0);
   const q2raw = +document.getElementById("nq2").value || 0;
   if (editingNote) rollnotes = rollnotes.filter(n => n !== editingNote);
-  const isSec = document.getElementById("nsec").checked;
-  const fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
-                 text: isSec ? text.split("\n")[0] : text, section: isSec || undefined, added: true};
-  const km = fresh.text.match(/^key:\s*(\S+)/); // keep key markers being key markers
-  if (km && !isSec) {
-    const sf = keyNameToSf(km[1]);
-    if (sf !== null) fresh.keydir = sf;
+  let fresh;
+  if (type === "key") {
+    const sf = parseInt(document.getElementById("nkeysel").value, 10);
+    // a key change replaces any other local key marker at the same bar
+    rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === b1));
+    fresh = {b1, q1, b2: null, q2: null, text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
+  } else if (type === "section") {
+    fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+             text: text.split("\n")[0], section: true, added: true};
+  } else {
+    fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null, text, added: true};
   }
   rollnotes.push(resolveNote(fresh));
   rangeSel = null;
