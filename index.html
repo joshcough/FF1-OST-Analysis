@@ -1720,6 +1720,7 @@ function renderMeasure(mi) {
   c.width = Math.ceil((mw + SCORE_PAD * 2) * dpr);
   c.height = Math.ceil(scoreContentH() * dpr);
   const geo = [], timeMap = [];
+  let noteStartXc = SCORE_PAD;
   const renderer = new VF.Renderer(c, VF.Renderer.Backends.CANVAS);
   const ctx2 = renderer.getContext();
   ctx2.scale(dpr, dpr);
@@ -1739,6 +1740,7 @@ function renderMeasure(mi) {
       catch (e) { stave.addKeySignature(SF_MAJOR[sfM] || "C"); }
     }
     stave.setContext(ctx2).draw();
+    if (si === 0) noteStartXc = stave.getNoteStartX();
     const events = st.measures[mi] || [];
     if (!events.length) { timeMap.push({tick: mi * m.bt, x: SCORE_PAD}); return; }
     const vnotes = [];
@@ -1790,7 +1792,7 @@ function renderMeasure(mi) {
     }
   });
   timeMap.sort((a, b) => a.tick - b.tick);
-  const entry = {canvas: c, geo, timeMap, mw};
+  const entry = {canvas: c, geo, timeMap, mw, noteStartX: noteStartXc};
   scoreCache.set(key, entry);
   if (scoreCache.size > 60) scoreCache.delete(scoreCache.keys().next().value);
   return entry;
@@ -1828,7 +1830,7 @@ function scoreTickToX(tick) { // piecewise-linear via engraved note positions
   const mOriginX = RULER_W + mi * m.bt * pxPerTick() - view.x - SCORE_PAD;
   if (!entry || entry.timeMap.length < 1) return RULER_W + tick * pxPerTick() - view.x;
   const tm = entry.timeMap;
-  let a = {tick: mi * m.bt, x: SCORE_PAD}, b = null;
+  let a = {tick: mi * m.bt, x: entry.noteStartX || SCORE_PAD}, b = null;
   for (const p of tm) {
     if (p.tick <= tick) a = p;
     else { b = p; break; }
@@ -1900,11 +1902,22 @@ function drawScore(W, H) {
     ctx.lineWidth = 1;
   }
   drawLasso();
-  // playhead / cursor — playhead uses time-linear x so motion stays smooth
+  // playhead / cursor — smooth linear sweep per measure, but the sweep starts
+  // where the notes start, hopping clef/key-signature glyphs at the barline
   if (playing) {
     const tick = secToTick(song, playSec());
+    const mi2 = Math.min(m.nMeasures - 1, Math.max(0, Math.floor(tick / m.bt)));
+    const entry = scoreCache.get(mi2);
+    let x = RULER_W + tick * ppt - view.x;
+    if (entry) {
+      const frac = (tick - mi2 * m.bt) / m.bt;
+      const blitX = RULER_W + mi2 * m.bt * ppt - view.x - SCORE_PAD;
+      const xStart = blitX + entry.noteStartX;
+      const xEnd = blitX + SCORE_PAD + entry.mw;
+      x = xStart + frac * (xEnd - xStart);
+    }
     ctx.fillStyle = css("--gold");
-    ctx.fillRect(RULER_W + tick * ppt - view.x, 0, 1.5, H);
+    ctx.fillRect(x, 0, 1.5, H);
   } else {
     const x = scoreTickToX(playCursor);
     ctx.fillStyle = css("--accent");
