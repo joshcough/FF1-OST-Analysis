@@ -185,6 +185,17 @@
   .sheet textarea { width: 100%; min-height: 84px; resize: vertical; }
   .sheet .lbl { font-family: var(--mono); font-size: 11px; color: var(--dim); }
   .sheet .status { font-family: var(--mono); font-size: 11px; color: var(--dim); min-height: 14px; }
+  .sheet.help { max-height: 82dvh; overflow-y: auto; -webkit-user-select: text; user-select: text; }
+  .sheet.help h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+    margin-top: 6px;
+  }
+  .sheet.help dl { margin: 0; }
+  .sheet.help dt { font-family: var(--mono); font-size: 12px; color: var(--text); margin-top: 7px; }
+  .sheet.help dd { font-size: 12px; color: var(--dim); margin: 1px 0 0 0; line-height: 1.45; }
 </style>
 </head>
 <body>
@@ -194,6 +205,7 @@
   <button id="rwbtn" aria-label="Back to start">⏮</button>
   <button class="primary" id="playbtn">▶ Play</button>
   <button id="viewbtn" aria-label="Toggle score view">𝄞 Score</button>
+  <button id="helpbtn" aria-label="Help">?</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
   <div class="meta" id="songmeta"></div>
@@ -247,6 +259,61 @@
       <button id="ncancel">Cancel</button>
     </div>
     <div class="status" id="nstatus"></div>
+  </div>
+</div>
+
+<div class="overlay" id="helpsheet">
+  <div class="sheet help">
+    <h2>NIGHT ROLL — WHAT YOU CAN DO</h2>
+
+    <h3>VIEWS</h3>
+    <dl>
+      <dt>𝄞 Score / ▦ Roll</dt><dd>Switch between piano roll and engraved sheet music. Same timeline, same everything else. Your choice is remembered.</dd>
+      <dt>Drag / pinch</dt><dd>One finger pans; two fingers zoom. In score view, scroll fully left to see the clefs and key signature.</dd>
+    </dl>
+
+    <h3>PLAYBACK</h3>
+    <dl>
+      <dt>▶ Play / ■ Stop</dt><dd>NES-style voices; drum tracks get a real kit. Songs loop at their final bar forever.</dd>
+      <dt>⏮</dt><dd>Back to bar 1.</dd>
+      <dt>Blue cursor</dt><dd>Play starts here. Tap the bar ruler to place it, or drag its handle (triangle under the ruler). Tapping any note also moves it there.</dd>
+    </dl>
+
+    <h3>TRACKS</h3>
+    <dl>
+      <dt>Track chips (top)</dt><dd>Tap a selected chip to hide that track — sound and visuals, instantly, even mid-playback. Tap again to bring back.</dd>
+      <dt>S</dt><dd>Solo: hide everyone else instead.</dd>
+    </dl>
+
+    <h3>NOTES &amp; CHORDS</h3>
+    <dl>
+      <dt>Tap a note</dt><dd>Inspector shows pitch, bar &amp; beat (counted 1e&amp;a), length, velocity, track — and plays it.</dd>
+      <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
+      <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
+    </dl>
+
+    <h3>ANNOTATIONS (.rollnotes)</h3>
+    <dl>
+      <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat. Fill "to bar/beat" to span a range. Ranges glow faint gold in the timeline.</dd>
+      <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
+      <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
+      <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
+    </dl>
+
+    <h3>KEYS</h3>
+    <dl>
+      <dt>key? dial</dt><dd>Songs display in C until YOU set the key. Preview any signature live — the right one makes most accidentals vanish.</dd>
+      <dt>Set @ bar N</dt><dd>Writes your key choice into the song's notes at the cursor's bar. Set a different key mid-song for key changes — the score draws the new signature there.</dd>
+    </dl>
+
+    <h3>EDITING &amp; SYNC</h3>
+    <dl>
+      <dt>Edit</dt><dd>Reveals Pencil (insert MIDI notes) and Erase. Tucked away so bedtime thumbs don't hit them.</dd>
+      <dt>Sync</dt><dd>Commit your annotations, sections, and keys to GitHub (needs your token, one-time), or Copy/Download the file. "Unsynced" = still only on this device.</dd>
+      <dt>Load .mid</dt><dd>Open any MIDI file from your device.</dd>
+    </dl>
+
+    <div class="row"><button class="primary" id="helpclose">Close</button></div>
   </div>
 </div>
 
@@ -1864,6 +1931,11 @@ keysetBtn.addEventListener("click", () => {
   draw();
   setInfo("key set to " + name + " at bar " + bar + " (unsynced — Sync to commit)");
 });
+
+document.getElementById("helpbtn").addEventListener("click", () =>
+  document.getElementById("helpsheet").classList.add("on"));
+document.getElementById("helpclose").addEventListener("click", () =>
+  document.getElementById("helpsheet").classList.remove("on"));
 
 const lassobtn = document.getElementById("lassobtn");
 lassobtn.addEventListener("click", () => {
