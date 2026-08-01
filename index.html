@@ -1432,13 +1432,20 @@ function tap(pos) {
 }
 
 // ---------------------------------------------------------------- audio (NES-ish voices)
-function ensureAudio() {
-  if (audio) return;
+const MASTER_VOL = 0.22;
+function ensureAudio() { // one context for the app's lifetime — iOS Safari
+  if (audio) return;    // glitches the first render quantum of a fresh context
   audio = new (window.AudioContext || window.webkitAudioContext)();
   master = audio.createGain();
-  master.gain.value = 0.22;
+  master.gain.value = MASTER_VOL;
   master.connect(audio.destination);
   trackGains = [];
+}
+function openMaster() { // declick: ramp the master up instead of snapping on
+  const t = audio.currentTime;
+  master.gain.cancelScheduledValues(t);
+  master.gain.setValueAtTime(master.gain.value, t);
+  master.gain.linearRampToValueAtTime(MASTER_VOL, t + 0.03);
 }
 function trackGain(ti) {
   if (!trackGains[ti]) {
@@ -1526,6 +1533,7 @@ function scheduleNote(ti, n, when, durSec) {
 function previewNote(ti, pitch) {
   ensureAudio();
   if (audio.state === "suspended") audio.resume();
+  openMaster(); // master may be faded out from the last stop
   scheduleNote(ti, {p: pitch, v: 90, ch: 0}, audio.currentTime + 0.01, 0.3);
 }
 function buildSchedule() {
@@ -1549,6 +1557,7 @@ function currentLoop() { // "loop: B.Q" = at song end, return to B.Q (else to th
 function play(fromSec = 0) {
   ensureAudio();
   if (audio.state === "suspended") audio.resume();
+  openMaster();
   buildSchedule();
   playing = true;
   playOffset = fromSec;
@@ -1605,7 +1614,15 @@ function stop() {
   clearInterval(schedTimer);
   cancelAnimationFrame(raf);
   document.getElementById("playbtn").textContent = "▶ Play";
-  if (audio) { master.disconnect(); master = null; audio.close(); audio = null; pulse25 = null; trackGains = []; }
+  if (audio) { // fade out instead of tearing the context down — no stop click,
+    const t = audio.currentTime; // and the next play reuses a warm context
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(0, t + 0.03);
+    const old = trackGains;
+    trackGains = [];
+    setTimeout(() => old.forEach(g => g && g.disconnect()), 400);
+  }
   updateSubtitle();
   draw();
 }
