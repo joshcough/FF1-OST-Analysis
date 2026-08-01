@@ -158,13 +158,15 @@
     background: rgba(6, 9, 18, 0.72);
     z-index: 10;
   }
-  .overlay.on { display: flex; align-items: flex-end; justify-content: center; }
+  .overlay.on { display: flex; align-items: center; justify-content: center; padding: 16px; }
   .sheet {
     background: var(--panel);
     border: 1px solid var(--grid);
-    border-radius: 12px 12px 0 0;
+    border-radius: 12px;
     padding: 16px;
     width: min(560px, 100%);
+    max-height: 88dvh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 10px;
