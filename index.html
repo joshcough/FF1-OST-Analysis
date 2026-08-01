@@ -774,7 +774,7 @@ function sectionPathAt(tick) {
                   .sort((a, b) => a.depth - b.depth).map(s => s.text).join(" › ");
 }
 function playSec() { // current position on the song timeline, seconds
-  const s = audio.currentTime - playT0 + playOffset;
+  const s = Math.max(0, audio.currentTime - playT0 + playOffset); // playT0 starts slightly ahead
   if (!loopSeg || loopSeg.end <= loopSeg.start) return s;
   return s < loopSeg.end ? s : loopSeg.start + (s - loopSeg.end) % (loopSeg.end - loopSeg.start);
 }
@@ -1507,6 +1507,9 @@ function drumHit(ti, p, when, vel) {
   src.start(when);
 }
 function scheduleNote(ti, n, when, durSec) {
+  // never start an envelope in the past — WebAudio would skip the attack
+  // ramp and slam the oscillator on at full amplitude (audible click)
+  when = Math.max(when, audio.currentTime + 0.003);
   if (n.ch === 9 || trackIsDrums(ti)) { drumHit(ti, n.p, when, n.v); return; }
   const o = makeOsc(voiceType(ti));
   o.frequency.value = 440 * Math.pow(2, (n.p - 69) / 12);
@@ -1549,7 +1552,7 @@ function play(fromSec = 0) {
   buildSchedule();
   playing = true;
   playOffset = fromSec;
-  playT0 = audio.currentTime;
+  playT0 = audio.currentTime + 0.08; // small lead so the first notes are never in the past
   loopPass = 0;
   loopSeg = currentLoop();
   if (fromSec >= loopSeg.end - 0.01) loopSeg = {start: 0, end: tickToSec(song, songEndTick)};
@@ -1559,7 +1562,7 @@ function play(fromSec = 0) {
   if (schedIdx < 0) schedIdx = schedEvents.length;
   const wrapIdx = schedEvents.findIndex(e => e.sec >= loopSeg.start);
   document.getElementById("playbtn").textContent = "■ Stop";
-  schedTimer = setInterval(() => {
+  const pump = () => {
     const segLen = loopSeg.end - loopSeg.start;
     if (!schedEvents.length || segLen <= 0) return;
     const now = audio.currentTime - playT0;
@@ -1579,7 +1582,9 @@ function play(fromSec = 0) {
       if (abs >= -0.05) scheduleNote(e.ti, e.n, playT0 + abs, e.dur);
       schedIdx++;
     }
-  }, 60);
+  };
+  schedTimer = setInterval(pump, 60);
+  pump(); // schedule the first batch immediately — waiting one interval put beat 1 in the past
   const tick = () => {
     if (!playing) return;
     // auto-follow playhead (and snap back on loop wrap)
