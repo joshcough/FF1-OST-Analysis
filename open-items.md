@@ -82,8 +82,11 @@ session start alongside the quiz.)
   moot if direction-aware spelling (raise ascending, flatten descending)
   is built first; the static heuristic currently misspells Baseball's Ab
   as G#.
-- **Loop passes:** rollnotes anchors cover the first loop pass only; FF1
-  MIDIs repeat. Decide whether annotations should apply to every pass.
+- **Loop passes:** MOSTLY DONE 2026-08-01 — 13 MIDIs with exact repeats
+  trimmed to their first pass (tools/trim_loops.py), so anchors now cover
+  those songs fully. Awaiting Josh's by-ear cut bars for the 9 with varied
+  repeats: battle, corneliacastle, dungeon, elfland, epilogue,
+  floatingcastle, prelude, ship, victory.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,
   sections/arrangement lanes, range-select ruler drag, grouped dropdown
   with compositions/, CVD-safe track palette, rewind + Edit toggle.)

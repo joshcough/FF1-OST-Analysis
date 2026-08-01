@@ -94,7 +94,12 @@ key: Db            ← ranged key: applies bars 2–4, then the surrounding
   whole file on Sync). Never store important info in comments.
 - Key names: C G D A E B F# C# F Bb Eb Ab Db Gb Cb, plus minor as "Em",
   "Bbm" (minor maps to its relative major's signature).
-- Anchors cover the first loop pass only; the MIDIs repeat.
+- Most MIDIs are trimmed to their first pass (2026-08-01, via
+  tools/trim_loops.py at detected exact-repeat points), so anchors cover
+  the whole file and the app's loop replays only unique material. Nine
+  with varied (non-exact) repeats still contain them, pending Josh's
+  by-ear cut points: battle, corneliacastle, dungeon, elfland, epilogue,
+  floatingcastle, prelude, ship, victory.
 
 ## Code map (index.html, section comments mark these)
 
