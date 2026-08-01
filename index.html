@@ -483,6 +483,7 @@ function parseMidi(buf) {
           j++; const mlen = varlen(); j += mlen;
         } else {
           if (b & 0x80) { running = b; j++; }
+          if (running === null) break; // data byte before any status: corrupt
           const st = running & 0xF0, ch = running & 0x0F;
           if (st === 0x90 || st === 0x80) {
             const p = d[j], v = d[j+1]; j += 2;
@@ -585,7 +586,7 @@ function saveEdits() {
   if (!editsKey()) return;
   const removed = [], added = [];
   song.tracks.forEach((tr, ti) => tr.notes.forEach((n, ni) => {
-    if (n.added) added.push({ti, t: n.t, d: n.d, p: n.p});
+    if (n.added) { if (!n.gone) added.push({ti, t: n.t, d: n.d, p: n.p}); }
     else if (n.gone) removed.push(ti + ":" + ni);
   }));
   if (removed.length || added.length)
@@ -698,12 +699,16 @@ function finalizeNotes() {
   RULER_H = BASE_RULER_H + (maxDepth + 1) * LANE_H;
 }
 async function loadNotes() {
+  const gen = loadGen; // abandon if another song starts loading mid-fetch
   rollnotes = [];
   if (songKey) {
     try {
       const res = await fetch(notesBase() + ".rollnotes", {cache: "no-cache"});
-      if (res.ok) rollnotes = parseRollnotes(await res.text()).map(resolveNote);
+      const text = res.ok ? await res.text() : null;
+      if (gen !== loadGen) return;
+      if (text !== null) rollnotes = parseRollnotes(text).map(resolveNote);
     } catch (err) { /* no sidecar */ }
+    if (gen !== loadGen) return;
     try {
       const local = JSON.parse(localStorage.getItem(notesStoreKey()) || "[]");
       for (const n of local) {
@@ -734,11 +739,14 @@ function saveLocalNotes() {
 function serializeRollnotes() {
   const lines = ["# " + baseName() + ".rollnotes — beat-anchored annotations", ""];
   for (const n of rollnotes) {
-    const a = n.b1 + (n.q1 !== 1 ? "." + n.q1 : ".1");
+    const a = n.b1 + "." + n.q1;
     const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || song.timesig[0]) : "";
     lines.push("[" + a + b + "]", (n.section ? "section: " : "") + n.text, "");
   }
   return lines.join("\n");
+}
+function dropLocalKeyAt(bar) { // a new key change replaces any local key marker at the same bar
+  rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === bar));
 }
 function activeNoteAt(tick) {
   let best = null;
@@ -761,7 +769,7 @@ function curTick() {
 }
 let lastSubtitle = null;
 function updateSubtitle() {
-  if (typeof refreshKeysetLabel === "function") refreshKeysetLabel(); // cursor moved: keep "Set @ bar N" honest
+  refreshKeysetLabel(); // cursor moved: keep "Set @ bar N" honest
   const el = document.getElementById("subtitle");
   const n = song ? activeNoteAt(curTick()) : null;
   if (n === lastSubtitle) return;
@@ -778,20 +786,24 @@ function updateSubtitle() {
 }
 
 // ---------------------------------------------------------------- load song
+let loadGen = 0; // bumps on every song switch; stale async loads check it and bail
 async function loadSong(path) {
   stop();
+  const gen = ++loadGen;
   const res = await fetch(path, {cache: "no-cache"});
   if (!res.ok) throw new Error("fetch failed: " + path);
-  setSong(parseMidi(await res.arrayBuffer()), path);
+  const buf = await res.arrayBuffer();
+  if (gen !== loadGen) return; // a newer song load superseded this one
+  setSong(parseMidi(buf), path);
 }
 function setSong(parsed, key) {
+  loadGen++; // covers the local-file path: invalidate any in-flight catalog load
   song = parsed;
   songKey = key;
   selNote = null;
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
-  const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
   const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
     song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
@@ -799,7 +811,6 @@ function setSong(parsed, key) {
   view.y = viewMode === "score" ? 0 : ((PMAX - 79) * view.rowH); // roll: center near G4
   playCursor = 0;
   lastSubtitle = undefined;
-  if (!song.keysig) song.keysig = detectKeyJS();
   {
     let lastTick = 0;
     song.tracks.forEach(tr => tr.notes.forEach(n => { lastTick = Math.max(lastTick, n.t + n.d); }));
@@ -812,29 +823,6 @@ function setSong(parsed, key) {
   setInfo("tap a note");
   draw();
   loadNotes();
-}
-
-function detectKeyJS() { // Krumhansl fallback for files without keysig metadata
-  const MAJP = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
-  const MINP = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
-  const hist = new Array(12).fill(0);
-  song.tracks.forEach((tr, ti) => {
-    if (trackIsDrums(ti)) return;
-    for (const n of tr.notes) hist[n.p % 12] += Math.max(n.d, 1);
-  });
-  if (!hist.some(h => h)) return {sf: 0, minor: false};
-  let best = null;
-  for (const [minor, prof] of [[false, MAJP], [true, MINP]]) {
-    for (let tonic = 0; tonic < 12; tonic++) {
-      let s = 0;
-      for (let pc = 0; pc < 12; pc++) s += prof[(pc - tonic + 12) % 12] * hist[pc];
-      if (!best || s > best.s) best = {s, tonic, minor};
-    }
-  }
-  const rel = best.minor ? (best.tonic + 3) % 12 : best.tonic;
-  let sf = (rel * 7) % 12;
-  if (sf > 6) sf -= 12;
-  return {sf, minor: best.minor};
 }
 
 // ---------------------------------------------------------------- track chips
@@ -881,7 +869,33 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   draw();
 }
-function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+const cssCache = {}; // theme is static — cache so 60fps draw() skips getComputedStyle
+function css(name) {
+  return cssCache[name] || (cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+}
+// annotation range tints + ruler-drag selection (under everything else; both
+// views) — sections live in the ruler, key directives display as staff
+// signatures, so neither tints
+function drawRangeTints(W, H) {
+  const ppt = pxPerTick();
+  for (const n of rollnotes) {
+    if (n.section || n.keydir !== undefined) continue;
+    const x = RULER_W + n.start * ppt - view.x;
+    const w = (n.end - n.start) * ppt;
+    if (x + w < RULER_W || x > W) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = 0.045;
+    ctx.fillRect(x, RULER_H, w, H);
+    ctx.globalAlpha = 1;
+  }
+  if (rangeSel) {
+    const x = RULER_W + rangeSel.a * ppt - view.x;
+    ctx.fillStyle = css("--accent");
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(x, RULER_H, (rangeSel.b - rangeSel.a) * ppt, H);
+    ctx.globalAlpha = 1;
+  }
+}
 function pxPerTick() { return view.pxq / song.ppq; }
 function draw() {
   if (!song) return;
@@ -894,8 +908,7 @@ function draw() {
     return;
   }
   const ppt = pxPerTick();
-  const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
-  const barTicks = beatsPerBar * song.ppq;
+  const bt = barTicks();
   const rowH = view.rowH;
 
   // pitch row banding (black-key rows darker)
@@ -912,28 +925,7 @@ function draw() {
     }
   }
 
-  // annotation range tints (under everything else) — sections live in the ruler,
-  // key directives display as staff signatures, so neither tints
-  for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined) continue;
-    const x = RULER_W + n.start * ppt - view.x;
-    const w = (n.end - n.start) * ppt;
-    if (x + w < RULER_W || x > W) continue;
-    ctx.fillStyle = css("--gold");
-    ctx.globalAlpha = 0.045;
-    ctx.fillRect(x, RULER_H, w, H);
-    ctx.globalAlpha = 1;
-  }
-
-  // ruler-drag range selection
-  if (rangeSel) {
-    const x = RULER_W + rangeSel.a * ppt - view.x;
-    const w = (rangeSel.b - rangeSel.a) * ppt;
-    ctx.fillStyle = css("--accent");
-    ctx.globalAlpha = 0.12;
-    ctx.fillRect(x, RULER_H, w, H);
-    ctx.globalAlpha = 1;
-  }
+  drawRangeTints(W, H);
 
   // beat + bar lines
   const t0 = view.x / ppt, t1 = (view.x + W) / ppt;
@@ -942,7 +934,7 @@ function draw() {
   for (let t = Math.floor(t0 / beatT) * beatT; t < t1; t += beatT) {
     const x = RULER_W + t * ppt - view.x;
     if (x < RULER_W) continue;
-    const isBar = Math.round(t) % barTicks === 0;
+    const isBar = Math.round(t) % bt === 0;
     ctx.fillStyle = isBar ? css("--grid") : css("--grid-soft");
     ctx.fillRect(x, RULER_H, isBar ? 1.5 : 1, H);
   }
@@ -1150,7 +1142,7 @@ function drawRuler(W, H) {
     ctx.globalAlpha = 1;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(Math.max(x, RULER_W), y, w - 2, LANE_H);
+    ctx.rect(Math.max(x, RULER_W), y, w - 2 - Math.max(0, RULER_W - x), LANE_H);
     ctx.clip();
     ctx.fillStyle = css("--text");
     ctx.font = "10px " + css("--mono");
@@ -1204,10 +1196,9 @@ function beatLabel(beat) {
 }
 function noteLabel(ti, ni) {
   const n = song.tracks[ti].notes[ni];
-  const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
-  const barTicks = beatsPerBar * song.ppq;
-  const bar = Math.floor(n.t / barTicks) + 1;
-  const beat = (n.t % barTicks) / song.ppq + 1;
+  const bt = barTicks();
+  const bar = Math.floor(n.t / bt) + 1;
+  const beat = (n.t % bt) / song.ppq + 1;
   const name = pitchName(n.p, sfAt(n.t));
   const tname = song.tracks[ti].name || "tr" + (ti+1);
   return name + " · bar " + bar + " beat " + beatLabel(beat) + " · " +
@@ -1308,6 +1299,7 @@ function endPointer(e) {
   if (drag.lasso && drag.moved) finalizeLasso();
   else if (!drag.moved) tap(evtPos(e));
   drag = null;
+  if (viewMode === "score" && scoreModel && scoreZoom !== view.pxq) draw(); // re-engrave after pinch
 }
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", () => { drag = null; pinch = null; draw(); });
@@ -1851,33 +1843,19 @@ function drawScore(W, H) {
   const m = scoreModel;
   const ppt = pxPerTick();
   const mw = m.bt * ppt;
-  if (scoreZoom !== view.pxq) { scoreCache.clear(); scoreZoom = view.pxq; }
+  // during a pinch, keep the stale-zoom cache and blit it scaled — a full
+  // VexFlow re-engrave per pointermove melts the iPad; rebuild once at gesture end
+  if (scoreZoom !== view.pxq && !pinch) { scoreCache.clear(); scoreZoom = view.pxq; }
   const first = Math.max(0, Math.floor(view.x / mw) - 1);
   const last = Math.min(m.nMeasures - 1, Math.ceil((view.x + W) / mw) + 1);
-  // annotation range tints under the score
-  for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined) continue;
-    const x = RULER_W + n.start * ppt - view.x;
-    const w = (n.end - n.start) * ppt;
-    if (x + w < RULER_W || x > W) continue;
-    ctx.fillStyle = css("--gold");
-    ctx.globalAlpha = 0.045;
-    ctx.fillRect(x, RULER_H, w, H);
-    ctx.globalAlpha = 1;
-  }
-  if (rangeSel) {
-    const x = RULER_W + rangeSel.a * ppt - view.x;
-    ctx.fillStyle = css("--accent");
-    ctx.globalAlpha = 0.12;
-    ctx.fillRect(x, RULER_H, (rangeSel.b - rangeSel.a) * ppt, H);
-    ctx.globalAlpha = 1;
-  }
+  drawRangeTints(W, H);
   const dpr = window.devicePixelRatio || 1;
   for (let mi = first; mi <= last; mi++) {
     const entry = renderMeasure(mi);
-    const x = RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD;
+    const s = (m.bt * ppt) / entry.mw; // ≠1 only mid-pinch (entry from old zoom)
+    const x = RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD * s;
     ctx.drawImage(entry.canvas, 0, 0, entry.canvas.width, entry.canvas.height,
-                  x, RULER_H + 4 - (view.y || 0), entry.canvas.width / dpr, entry.canvas.height / dpr);
+                  x, RULER_H + 4 - (view.y || 0), entry.canvas.width / dpr * s, entry.canvas.height / dpr);
   }
   { // intro column (clef/key/time) lives just left of bar 1
     const intro = renderIntro();
@@ -1980,8 +1958,10 @@ sel.addEventListener("change", () => {
   localStorage.setItem("ff1roll-lastsong", sel.value);
   loadSong(sel.value).catch(e => setInfo(e.message));
 });
-document.getElementById("playbtn").addEventListener("click", () =>
-  playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0));
+document.getElementById("playbtn").addEventListener("click", () => {
+  if (!song) return; // first song still fetching
+  playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0);
+});
 document.getElementById("rwbtn").addEventListener("click", () => {
   const startX = viewMode === "score" ? -SCORE_INTRO_W : 0;
   if (playing) { stop(); playCursor = 0; view.x = startX; play(0); return; }
@@ -1995,10 +1975,8 @@ const keysel = document.getElementById("keysel");
 const keysetBtn = document.getElementById("keyset");
 {
   const SIGS = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
-  const MINOR_OF = sf => { // relative minor name for the label
-    const majPc = ((sf * 7) % 12 + 12) % 12;
-    return spellFor(sf)[(majPc + 9) % 12] ? (() => { const s = spellFor(sf)[(majPc + 9) % 12]; return s.letter + (s.acc || ""); })() : "";
-  };
+  // relative minor name for the label: major tonic pc + 9 semitones
+  const MINOR_OF = sf => spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf);
   const o0 = document.createElement("option");
   o0.value = "0"; o0.textContent = "0 — C / Am";
   keysel.appendChild(o0);
@@ -2032,8 +2010,7 @@ keysetBtn.addEventListener("click", () => {
   const bt = barTicks();
   const bar = Math.floor(playCursor / bt) + 1;
   const name = SF_MAJOR[previewSf] || "C";
-  // replace any locally-set key marker at this bar instead of stacking
-  rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === bar));
+  dropLocalKeyAt(bar);
   rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
                               keydir: previewSf, added: true}));
   previewSf = null;
@@ -2282,8 +2259,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   let fresh;
   if (type === "key") {
     const sf = parseInt(document.getElementById("nkeysel").value, 10);
-    // a key change replaces any other local key marker at the same bar
-    rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === b1));
+    dropLocalKeyAt(b1);
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
   } else if (type === "section") {
