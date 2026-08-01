@@ -1787,7 +1787,7 @@ function renderMeasure(mi) {
     }
   });
   timeMap.sort((a, b) => a.tick - b.tick);
-  const entry = {canvas: c, geo, timeMap, mw, noteStartX: noteStartXc};
+  const entry = {canvas: c, geo, timeMap, mw, noteStartX: noteStartXc, keyChanged};
   scoreCache.set(key, entry);
   if (scoreCache.size > 60) scoreCache.delete(scoreCache.keys().next().value);
   return entry;
@@ -1825,7 +1825,9 @@ function scoreTickToX(tick) { // piecewise-linear via engraved note positions
   const mOriginX = RULER_W + mi * m.bt * pxPerTick() - view.x - SCORE_PAD;
   if (!entry || entry.timeMap.length < 1) return RULER_W + tick * pxPerTick() - view.x;
   const tm = entry.timeMap;
-  let a = {tick: mi * m.bt, x: entry.noteStartX || SCORE_PAD}, b = null;
+  // sweep origin: hop signature glyphs only where they exist (key changes);
+  // plain measures start at the pad so barline crossings are continuous
+  let a = {tick: mi * m.bt, x: entry.keyChanged ? entry.noteStartX : SCORE_PAD}, b = null;
   for (const p of tm) {
     if (p.tick <= tick) a = p;
     else { b = p; break; }
@@ -1893,7 +1895,9 @@ function drawScore(W, H) {
     if (entry) {
       const frac = (tick - mi2 * m.bt) / m.bt;
       const blitX = RULER_W + mi2 * m.bt * ppt - view.x - SCORE_PAD;
-      const xStart = blitX + entry.noteStartX;
+      // hop only actual signature glyphs (key changes); plain measures sweep
+      // from the pad, making every ordinary barline crossing continuous
+      const xStart = blitX + (entry.keyChanged ? entry.noteStartX : SCORE_PAD);
       const xEnd = blitX + SCORE_PAD + entry.mw;
       x = xStart + frac * (xEnd - xStart);
     }
