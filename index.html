@@ -250,7 +250,8 @@
   <button id="helpbtn" aria-label="Help">?</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
-  <div class="meta" id="songmeta"></div>
+  <select id="bpmsel" aria-label="Tempo" style="margin-left:auto"></select>
+  <div class="meta" id="songmeta" style="margin-left:0"></div>
 </header>
 <div id="trackbar"></div>
 <div id="rollwrap"><canvas id="roll"></canvas></div>
@@ -346,6 +347,7 @@
     <dl>
       <dt>▶ Play / ■ Stop</dt><dd>NES-style voices; drum tracks get a real kit. Songs loop at their final bar forever.</dd>
       <dt>⏮</dt><dd>Back to bar 1.</dd>
+      <dt>Tempo dropdown</dt><dd>Slow the song down (native bpm to a quarter, steps of 10) for close listening or instrument practice — pitch stays true; only time stretches. Resets to native on song change.</dd>
       <dt>Blue cursor</dt><dd>Play starts here. Tap the bar ruler to place it, or drag its handle (triangle under the ruler). Tapping any note also moves it there.</dd>
     </dl>
 
@@ -524,13 +526,15 @@ function parseMidi(buf) {
   }
   return {ppq, tracks, tempos, timesig, keysig};
 }
+let playRate = 1; // practice-tempo multiplier (chosen bpm / native); 1 = native
 function tickToSec(song, tick) {
   const ts = song.tempos;
   let lo = 0, hi = ts.length - 1;
   while (lo < hi) { const m = (lo+hi+1) >> 1; if (ts[m].tick <= tick) lo = m; else hi = m-1; }
-  return ts[lo].sec + (tick - ts[lo].tick) / song.ppq * ts[lo].usq / 1e6;
+  return (ts[lo].sec + (tick - ts[lo].tick) / song.ppq * ts[lo].usq / 1e6) / playRate;
 }
 function secToTick(song, sec) {
+  sec *= playRate; // tempo map stores native-rate seconds
   const ts = song.tempos;
   let lo = 0, hi = ts.length - 1;
   while (lo < hi) { const m = (lo+hi+1) >> 1; if (ts[m].sec <= sec) lo = m; else hi = m-1; }
@@ -818,9 +822,11 @@ function setSong(parsed, key) {
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
-  const bpm = Math.round(6e7 / song.tempos[0].usq);
+  nativeBpm = Math.round(6e7 / song.tempos[0].usq);
+  playRate = 1;
+  fillBpmSel();
   document.getElementById("songmeta").textContent =
-    song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm · " + song.tracks.length + "trk";
+    song.timesig[0] + "/" + song.timesig[1] + " · " + song.tracks.length + "trk";
   playCursor = 0;
   lastSubtitle = undefined;
   {
@@ -2079,6 +2085,27 @@ document.getElementById("rwbtn").addEventListener("click", () => {
   updateSubtitle();
   draw();
 });
+// practice tempo: native bpm down to a quarter (guitar practice), steps of 10
+let nativeBpm = 120;
+const bpmsel = document.getElementById("bpmsel");
+function fillBpmSel() {
+  bpmsel.innerHTML = "";
+  for (let v = nativeBpm; v >= nativeBpm / 4 - 0.01; v -= 10) {
+    const o = document.createElement("option");
+    o.value = String(v);
+    o.textContent = v + "bpm";
+    bpmsel.appendChild(o);
+  }
+}
+bpmsel.addEventListener("change", () => {
+  const tk = curTick(); // keep the musical position across the rate change
+  const wasPlaying = playing;
+  if (wasPlaying) stop();
+  playRate = +bpmsel.value / nativeBpm;
+  if (wasPlaying) play(tickToSec(song, tk));
+  else { playCursor = tk; updateSubtitle(); draw(); }
+});
+
 // key dial: preview any signature live; Set writes "key: X" at the cursor bar
 const keysel = document.getElementById("keysel");
 const keysetBtn = document.getElementById("keyset");
