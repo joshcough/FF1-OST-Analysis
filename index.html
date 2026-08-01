@@ -584,7 +584,10 @@ function serializeRollnotes() {
 }
 function activeNoteAt(tick) {
   let best = null;
-  for (const n of rollnotes) if (!n.section && tick >= n.start && tick < n.end) best = n;
+  for (const n of rollnotes) {
+    if (n.section || n.keydir !== undefined) continue; // key directives show as staff signatures
+    if (tick >= n.start && tick < n.end) best = n;
+  }
   return best;
 }
 function sectionPathAt(tick) {
@@ -600,6 +603,7 @@ function curTick() {
 }
 let lastSubtitle = null;
 function updateSubtitle() {
+  if (typeof refreshKeysetLabel === "function") refreshKeysetLabel(); // cursor moved: keep "Set @ bar N" honest
   const el = document.getElementById("subtitle");
   const n = song ? activeNoteAt(curTick()) : null;
   if (n === lastSubtitle) return;
@@ -750,9 +754,10 @@ function draw() {
     }
   }
 
-  // annotation range tints (under everything else) — sections live in the ruler instead
+  // annotation range tints (under everything else) — sections live in the ruler,
+  // key directives display as staff signatures, so neither tints
   for (const n of rollnotes) {
-    if (n.section) continue;
+    if (n.section || n.keydir !== undefined) continue;
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
     if (x + w < RULER_W || x > W) continue;
@@ -1680,7 +1685,7 @@ function drawScore(W, H) {
   const last = Math.min(m.nMeasures - 1, Math.ceil((view.x + W) / mw) + 1);
   // annotation range tints under the score
   for (const n of rollnotes) {
-    if (n.section) continue;
+    if (n.section || n.keydir !== undefined) continue;
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
     if (x + w < RULER_W || x > W) continue;
@@ -1822,15 +1827,18 @@ const keysetBtn = document.getElementById("keyset");
     keysel.appendChild(o);
   }
 }
+function refreshKeysetLabel() {
+  if (previewSf === null || !song) return;
+  keysetBtn.textContent = "Set @ bar " + (Math.floor(playCursor / barTicks()) + 1);
+}
 keysel.addEventListener("change", () => {
   previewSf = keysel.value === "" ? null : parseInt(keysel.value, 10);
   keysetBtn.style.display = previewSf === null ? "none" : "";
-  spellMemoReset();
+  refreshKeysetLabel();
   buildScoreModel();
   clampView();
   draw();
 });
-function spellMemoReset() { /* spellings are pure per-sf; nothing to reset */ }
 keysetBtn.addEventListener("click", () => {
   if (previewSf === null || !song || !songKey) return;
   const bt = barTicks();

@@ -48,10 +48,14 @@ session start alongside the quiz.)
   request); later maybe: dim-but-visible, and audio-mute-only toggles.
 - **Lasso later ideas** — cross-staff chord naming conventions, remembering
   reveals per song, maybe a "quiz me" mode built on lasso selections.
-- **Mid-song key signature changes** — the score uses one home-key signature;
-  departures render as accidentals (also standard engraving for short
-  tonicizations). For pieces with a sustained modulation, detect windowed
-  key shifts and insert a new signature at the barline. Not built.
+- **Mid-song key signature changes** — DONE 2026-07-31: `key:` directives in
+  .rollnotes, set from the key dial at the cursor bar; signature drawn at
+  change barlines.
+- **Enharmonic respelling** (idea, Josh undecided): tap a score note to flip
+  G#↔Ab — notehead moves line↔space, choice stored in rollnotes. Maybe
+  moot if direction-aware spelling (raise ascending, flatten descending)
+  is built first; the static heuristic currently misspells Baseball's Ab
+  as G#.
 - **Loop passes:** rollnotes anchors cover the first loop pass only; FF1
   MIDIs repeat. Decide whether annotations should apply to every pass.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,
