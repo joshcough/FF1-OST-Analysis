@@ -196,6 +196,46 @@
   .sheet.help dl { margin: 0; }
   .sheet.help dt { font-family: var(--mono); font-size: 12px; color: var(--text); margin-top: 7px; }
   .sheet.help dd { font-size: 12px; color: var(--dim); margin: 1px 0 0 0; line-height: 1.45; }
+
+  .noterow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    background: var(--panel2);
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .noterow .where {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--gold);
+    white-space: nowrap;
+    min-width: 72px;
+  }
+  .noterow .kind {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 9px;
+    border: 1px solid var(--grid);
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .noterow .kind.sec { color: var(--text); }
+  .noterow .kind.key { color: var(--accent); border-color: var(--accent); }
+  .noterow .body {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .noterow .unsynced { font-family: var(--mono); font-size: 10px; color: var(--dim); }
 </style>
 </head>
 <body>
@@ -233,6 +273,7 @@
   </select>
   <button id="keyset" style="display:none">Set</button>
   <div id="noteinfo">tap a note</div>
+  <button id="listbtn">☰ Notes</button>
   <button id="notebtn">+ Note</button>
   <button id="syncbtn">Sync</button>
   <button id="clearbtn" style="display:none">Clear edits</button>
@@ -259,6 +300,18 @@
       <button id="ncancel">Cancel</button>
     </div>
     <div class="status" id="nstatus"></div>
+  </div>
+</div>
+
+<div class="overlay" id="notelistsheet">
+  <div class="sheet help">
+    <h2>ALL NOTES</h2>
+    <div class="status" id="notelistStatus"></div>
+    <div id="notelistrows" style="display:flex;flex-direction:column;gap:7px"></div>
+    <div class="row">
+      <button class="primary" id="notelistAdd">+ Add note</button>
+      <button id="notelistClose">Close</button>
+    </div>
   </div>
 </div>
 
@@ -297,6 +350,7 @@
       <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat. Fill "to bar/beat" to span a range. Ranges glow faint gold in the timeline.</dd>
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
+      <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
       <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
     </dl>
 
@@ -1945,6 +1999,57 @@ keysetBtn.addEventListener("click", () => {
   setInfo("key set to " + name + " at bar " + bar + " (unsynced — Sync to commit)");
 });
 
+// ---------------------------------------------------------------- notes list
+const notelistSheet = document.getElementById("notelistsheet");
+function renderNoteList() {
+  const rows = document.getElementById("notelistrows");
+  rows.innerHTML = "";
+  const sorted = [...rollnotes].sort((a, b) => a.start - b.start || (a.section ? -1 : 1));
+  document.getElementById("notelistStatus").textContent = sorted.length
+    ? sorted.length + " notes · tap one to edit or delete · synced-note changes need Sync to stick"
+    : "No notes yet — add the first one.";
+  for (const n of sorted) {
+    const row = document.createElement("div");
+    row.className = "noterow";
+    row.setAttribute("role", "button");
+    const where = document.createElement("span");
+    where.className = "where";
+    where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "");
+    const kind = document.createElement("span");
+    kind.className = "kind" + (n.section ? " sec" : n.keydir !== undefined ? " key" : "");
+    kind.textContent = n.section ? "section" : n.keydir !== undefined ? "key" : "note";
+    if (n.section && sectionColors[n.text]) kind.style.borderColor = sectionColors[n.text];
+    const body = document.createElement("span");
+    body.className = "body";
+    body.textContent = n.text;
+    row.append(where, kind, body);
+    if (n.added) {
+      const u = document.createElement("span");
+      u.className = "unsynced";
+      u.textContent = "unsynced";
+      row.append(u);
+    }
+    row.addEventListener("click", () => {
+      notelistSheet.classList.remove("on");
+      playCursor = n.start;
+      updateSubtitle();
+      draw();
+      openEditor(n);
+    });
+    rows.appendChild(row);
+  }
+}
+document.getElementById("listbtn").addEventListener("click", () => {
+  if (!song) return;
+  renderNoteList();
+  notelistSheet.classList.add("on");
+});
+document.getElementById("notelistClose").addEventListener("click", () => notelistSheet.classList.remove("on"));
+document.getElementById("notelistAdd").addEventListener("click", () => {
+  notelistSheet.classList.remove("on");
+  openEditor(null);
+});
+
 document.getElementById("helpbtn").addEventListener("click", () =>
   document.getElementById("helpsheet").classList.add("on"));
 document.getElementById("helpclose").addEventListener("click", () =>
@@ -2051,9 +2156,9 @@ function openEditor(note) {
   document.getElementById("nq2").value = note ? (note.q2 || "") : q2;
   document.getElementById("ntext").value = note ? note.text : "";
   document.getElementById("nsec").checked = !!(note && note.section);
-  document.getElementById("ndelete").style.display = note && note.added ? "" : "none";
+  document.getElementById("ndelete").style.display = note ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
-    ? "Synced note — edits create an unsynced copy until you Sync." : "";
+    ? "Synced note — edits and deletes become permanent when you Sync." : "";
   editor.classList.add("on");
   document.getElementById("ntext").focus();
 }
@@ -2070,7 +2175,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
   const b2raw = +document.getElementById("nb2").value || 0;
   const q2raw = +document.getElementById("nq2").value || 0;
-  if (editingNote && editingNote.added) rollnotes = rollnotes.filter(n => n !== editingNote);
+  if (editingNote) rollnotes = rollnotes.filter(n => n !== editingNote);
   const isSec = document.getElementById("nsec").checked;
   const fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
                  text: isSec ? text.split("\n")[0] : text, section: isSec || undefined, added: true};
