@@ -290,6 +290,7 @@
         <option value="note">Text note</option>
         <option value="section">Section</option>
         <option value="key">Key change</option>
+        <option value="loop">Loop point</option>
       </select>
     </div>
     <div class="row">
@@ -304,6 +305,10 @@
     <div class="row" id="nkeyrow" style="display:none">
       <span class="lbl">new key</span>
       <select id="nkeysel"></select>
+    </div>
+    <div class="row" id="nlooprow" style="display:none">
+      <span class="lbl">returns to bar</span><select id="nlb"></select>
+      <span class="lbl">beat</span><select id="nlq"></select>
     </div>
     <div class="row">
       <button class="primary" id="nsave">Save</button>
@@ -2249,19 +2254,22 @@ function fillBarBeatSelects() {
       }
     }
   };
-  mkBars("nb1", false); mkBars("nb2", true);
-  mkBeats("nq1"); mkBeats("nq2");
+  mkBars("nb1", false); mkBars("nb2", true); mkBars("nlb", false);
+  mkBeats("nq1"); mkBeats("nq2"); mkBeats("nlq");
 }
 function editorType() { return document.getElementById("ntype").value; }
 function applyEditorType() {
   const t = editorType();
-  document.getElementById("ntext").style.display = t === "key" ? "none" : "";
+  document.getElementById("ntext").style.display = t === "key" || t === "loop" ? "none" : "";
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
+  document.getElementById("nlooprow").style.display = t === "loop" ? "" : "none";
+  document.getElementById("ntorow").style.display = t === "loop" ? "none" : "";
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
                     : "What's happening at this beat?";
   document.getElementById("nstatus").textContent =
     t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
+    t === "loop" ? "At the end of the song, playback returns to this bar/beat instead of the top." :
     document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
@@ -2282,8 +2290,14 @@ function openEditor(note) {
       q2 = snapBeat((last % bt) / song.ppq + 1);
     }
   }
-  const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key" : "note") : "note";
+  const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key"
+                       : note.loopTo !== undefined ? "loop" : "note") : "note";
   document.getElementById("ntype").value = type;
+  if (type === "loop" && note) {
+    const lbt = barTicks();
+    document.getElementById("nlb").value = String(Math.floor(note.loopTo / lbt) + 1);
+    document.getElementById("nlq").value = String(snapBeat((note.loopTo % lbt) / song.ppq + 1));
+  }
   document.getElementById("nb1").value = String(note ? note.b1 : b1);
   document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
@@ -2306,7 +2320,7 @@ document.getElementById("ncancel").addEventListener("click", () => editor.classL
 document.getElementById("nsave").addEventListener("click", () => {
   const type = editorType();
   const text = document.getElementById("ntext").value.trim();
-  if (type !== "key" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  if (type !== "key" && type !== "loop" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
   const b2raw = +document.getElementById("nb2").value || 0;
@@ -2318,6 +2332,12 @@ document.getElementById("nsave").addEventListener("click", () => {
     dropLocalKeyAt(b1);
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
+  } else if (type === "loop") {
+    const lb = Math.max(1, +document.getElementById("nlb").value || 1);
+    const lq = +document.getElementById("nlq").value || 1;
+    // one loop point per song: a new one replaces any local one
+    rollnotes = rollnotes.filter(n => !(n.added && n.loopTo !== undefined));
+    fresh = {b1, q1, b2: null, q2: null, text: "loop: " + lb + "." + lq, added: true};
   } else if (type === "section") {
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: text.split("\n")[0], section: true, added: true};
