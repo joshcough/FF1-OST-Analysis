@@ -2,6 +2,15 @@
   "title": "Final Fantasy I",
   "order": 1,
   "songs": {
+    "prologue": "Opening Theme",
+    "overworld": "Main Theme",
+    "cave": "Dungeon",
+    "chaos-temple": "Temple of Chaos",
+    "underwater-palace": "Undersea Shrine",
+    "battle": "Battle Scene",
+    "menu": "Menu Screen",
+    "epilogue": "Ending Theme",
+    "game-over": "Dead Music",
     "matoyas-cave": "Matoya's Cave"
   }
 }

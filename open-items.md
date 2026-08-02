@@ -69,6 +69,11 @@ session start alongside the quiz.)
   elfland (absent from the NSF — likely not FF1 at all) were deleted with
   Josh's sign-off; no annotations existed on either.
 
+- **"Save Music" missing (2026-08-02):** the canonical album (All Sounds
+  of FF I·II) lists a Save Music track we never captured. NSF tracks
+  20–23 probed: 21/23 are sub-second sfx blips, 20/22 long+sparse —
+  none obviously it. Candidates could be captured for Josh to identify
+  by ear if he wants the complete album.
 - **Adding music — the standing workflow (Josh, 2026-08-02):** hand files
   to Claude (new Logic compositions as .mid, new soundtracks as .nsf, e.g.
   Mega Man 2 → its own albums/ dir); Claude runs the pipeline/dump tools,

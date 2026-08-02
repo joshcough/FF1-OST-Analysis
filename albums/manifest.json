@@ -7,23 +7,23 @@
     "path": "albums/final-fantasy-i/songs/airship.mid"
    },
    {
-    "title": "Battle",
+    "title": "Battle Scene",
     "path": "albums/final-fantasy-i/songs/battle.mid"
-   },
-   {
-    "title": "Cave",
-    "path": "albums/final-fantasy-i/songs/cave.mid"
-   },
-   {
-    "title": "Chaos Temple",
-    "path": "albums/final-fantasy-i/songs/chaos-temple.mid"
    },
    {
     "title": "Cornelia Castle",
     "path": "albums/final-fantasy-i/songs/cornelia-castle.mid"
    },
    {
-    "title": "Epilogue",
+    "title": "Dead Music",
+    "path": "albums/final-fantasy-i/songs/game-over.mid"
+   },
+   {
+    "title": "Dungeon",
+    "path": "albums/final-fantasy-i/songs/cave.mid"
+   },
+   {
+    "title": "Ending Theme",
     "path": "albums/final-fantasy-i/songs/epilogue.mid"
    },
    {
@@ -31,32 +31,28 @@
     "path": "albums/final-fantasy-i/songs/floating-castle.mid"
    },
    {
-    "title": "Game Over",
-    "path": "albums/final-fantasy-i/songs/game-over.mid"
-   },
-   {
     "title": "Gurgu Volcano",
     "path": "albums/final-fantasy-i/songs/gurgu-volcano.mid"
+   },
+   {
+    "title": "Main Theme",
+    "path": "albums/final-fantasy-i/songs/overworld.mid"
    },
    {
     "title": "Matoya's Cave",
     "path": "albums/final-fantasy-i/songs/matoyas-cave.mid"
    },
    {
-    "title": "Menu",
+    "title": "Menu Screen",
     "path": "albums/final-fantasy-i/songs/menu.mid"
    },
    {
-    "title": "Overworld",
-    "path": "albums/final-fantasy-i/songs/overworld.mid"
+    "title": "Opening Theme",
+    "path": "albums/final-fantasy-i/songs/prologue.mid"
    },
    {
     "title": "Prelude",
     "path": "albums/final-fantasy-i/songs/prelude.mid"
-   },
-   {
-    "title": "Prologue",
-    "path": "albums/final-fantasy-i/songs/prologue.mid"
    },
    {
     "title": "Ship",
@@ -67,11 +63,15 @@
     "path": "albums/final-fantasy-i/songs/shop.mid"
    },
    {
+    "title": "Temple of Chaos",
+    "path": "albums/final-fantasy-i/songs/chaos-temple.mid"
+   },
+   {
     "title": "Town",
     "path": "albums/final-fantasy-i/songs/town.mid"
    },
    {
-    "title": "Underwater Palace",
+    "title": "Undersea Shrine",
     "path": "albums/final-fantasy-i/songs/underwater-palace.mid"
    },
    {
