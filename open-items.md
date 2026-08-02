@@ -68,6 +68,16 @@ session start alongside the quiz.)
   caught by accident; check remaining pairs (bar counts × tempo × length,
   then diff melodies).
 
+- **Browser "Load .nsf" in Night Roll** (idea 2026-08-02, Josh: to-do for
+  now): the NSF pipeline core (6502 + APU logger + note reconstruction +
+  MIDI writer, tools/nsf/) is pure JS with no Node dependencies, so it
+  can run in the page: file input → pick a track → capture + auto
+  loop-trim → straight into the roll, with .mid export. Would open any
+  plain-2A03 NSF (e.g. Mega Man 2). Caveats noted: cold NSFs have no
+  transcription reference, so tempo/bar labels start grid-fitted until
+  bars are counted by ear; track numbers are discovered by listening;
+  new sound drivers may expose new trimmer edge cases.
+
 - **In-app Claude chat — built but parked on the `claude-chat` branch,
   decision pending** (2026-08-01): a complete chat feature (💬 button,
   per-song conversations, streaming, context injection of
