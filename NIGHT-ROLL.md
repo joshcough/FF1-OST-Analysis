@@ -24,16 +24,23 @@ lines — splitting adds Pages cache-skew risk for no payoff at this size.)
 cached canvases), toggled in the header, persisted. On song load the roll
 auto-fits the whole song and its pitch range to the screen (fitView). Both share one
 time-linear x-axis, the bar ruler, sections, markers, cursor, playhead,
-subtitles, and gestures. Score extras: intro column (clef/key/time) left of
-bar 1; signatures redraw at key changes with cancellation naturals; playhead
-sweeps from each measure's note-start x (hops signature glyphs).
+subtitles, and gestures. Pinch zooms per axis (horizontal = time; vertical
+= pitch rows, roll only). Score extras: intro column (clef/key/time) left
+of bar 1; signatures redraw at key changes with cancellation naturals;
+rests break beams; playhead/cursor interpolate notehead-to-notehead
+(scoreTickToX), hopping glyphs only at key changes; zoom-out floor
+computed from the densest measure (scoreModel.pxqMin — relaxes when dense
+tracks are muted).
 
 **Playback:** WebAudio. Pulse/pulse/triangle voices by track index; drum
 tracks (name match or channel 10) get a synthesized kit. Per-track gain
 nodes make mute/solo instant mid-playback. Songs loop at the final bar
 (`songEndTick`) or per a "loop:" directive. Rewind ⏮. Speed slider
-(25–200%, applies on release) scales tickToSec/secToTick via playRate;
-persists across songs. Persistent AudioContext, declick ramps.
+(25–200%, applies on release, snap-back button when off 100%) scales
+tickToSec/secToTick via playRate; persists across songs. Persistent
+AudioContext warmed on first touch, declick ramps, notes straddling the
+cursor play their remainder (chase). Manual scroll during playback
+suspends auto-follow until the playhead re-enters the view.
 
 **Tracks:** chips mute (= fully hide, roll and score) and solo. Score model
 rebuilds on toggle.
@@ -45,7 +52,7 @@ reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
 inversions; missing-5th tolerance).
 
 **Annotations:** see format below. + Note editor is type-first (Text note /
-Section / Key change) with bar/beat dropdowns. ☰ Notes lists everything,
+Section / Key change / Loop point) with bar/beat dropdowns. ☰ Notes lists everything,
 rows open the editor, Delete works on synced notes too (permanent on Sync).
 Gold ruler flags; range tints; subtitle strip follows playback.
 
