@@ -464,6 +464,7 @@
       <button id="dlfile">Download</button>
       <button id="synccancel">Close</button>
     </div>
+    <div class="status" id="syncpending" style="max-height:38vh;overflow-y:auto;white-space:pre-wrap"></div>
     <div class="status" id="syncstatus">Token: Settings → Developer settings → Fine-grained tokens → this repo only, Contents read/write.</div>
   </div>
 </div>
@@ -2728,9 +2729,59 @@ document.getElementById("ndelete").addEventListener("click", () => {
 const syncsheet = document.getElementById("syncsheet");
 const REPO_API = "https://api.github.com/repos/joshcough/FF1-OST-Analysis/contents/";
 let syncReturnToList = false; // sync opened from the notes list → return there after commit
+// review pane: every unsynced note on this device, grouped by song, so a
+// commit is never a blind dialog — you see exactly what's outstanding
+function renderSyncPending() {
+  const box = document.getElementById("syncpending");
+  box.textContent = "";
+  let any = false;
+  for (const key of dirtySongs()) {
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem("ff1roll-notes-" + key) || "[]"); }
+    catch (err) { continue; }
+    if (!notes.length) continue;
+    any = true;
+    const h = document.createElement("div");
+    h.textContent = songTitleOf(key) + " — " + notes.length + " unsynced:";
+    box.appendChild(h);
+    notes.forEach((n, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:6px;margin:2px 0 2px 10px";
+      const x = document.createElement("button");
+      x.textContent = "✕";
+      x.title = "Discard this note (this device only — it was never synced)";
+      x.style.cssText = "min-width:26px;padding:2px 6px;flex:none";
+      x.addEventListener("click", () => discardPending(key, i));
+      const at = "[" + n.b1 + "." + n.q1 + (n.b2 ? " - " + n.b2 + "." + (n.q2 || "") : "") + "]";
+      const text = n.text.length > 60 ? n.text.slice(0, 57) + "…" : n.text;
+      const span = document.createElement("span");
+      // loop:/key: texts already carry their prefix; only label the others
+      span.textContent = at + " " + (n.section ? "section: " : "") + text;
+      row.appendChild(x); row.appendChild(span);
+      box.appendChild(row);
+    });
+  }
+  if (!any) box.textContent = "Nothing unsynced on this device.";
+}
+function discardPending(key, idx) { // drop one never-synced note from the stash
+  let notes = [];
+  try { notes = JSON.parse(localStorage.getItem("ff1roll-notes-" + key) || "[]"); }
+  catch (err) {}
+  const [gone] = notes.splice(idx, 1);
+  if (notes.length) localStorage.setItem("ff1roll-notes-" + key, JSON.stringify(notes));
+  else localStorage.removeItem("ff1roll-notes-" + key);
+  if (gone && key === songKey) { // it may be live in the open song — drop there too
+    const k = rollnotes.findIndex(n => n.added && n.b1 === gone.b1 &&
+      n.q1 === gone.q1 && n.text === gone.text);
+    if (k >= 0) { rollnotes.splice(k, 1); finalizeNotes(); draw(); }
+  }
+  updateSyncBtn();
+  renderSyncPending();
+}
 document.getElementById("syncbtn").addEventListener("click", () => {
   if (!song) return;
   syncReturnToList = false; // notelistSync sets it true right after this handler runs
+  renderSyncPending();
   document.getElementById("ghtoken").value = localStorage.getItem("ff1roll-ghtoken") || "";
   document.getElementById("syncstatus").textContent = songKey
     ? "Token: Settings → Developer settings → Fine-grained tokens → this repo only, Contents read/write."
