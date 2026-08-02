@@ -2047,6 +2047,11 @@ function renderMeasure(mi) {
     }
   });
   timeMap.sort((a, b) => a.tick - b.tick);
+  // clamp x monotonic: noteheads from different staves/voices at nearby ticks
+  // (16ths vs triplet slots) can engrave a few px out of order — the playhead
+  // must never glide backwards through a measure
+  let hx = -Infinity;
+  for (const tm of timeMap) { if (tm.x < hx) tm.x = hx; else hx = tm.x; }
   const entry = {canvas: c, geo, timeMap, mw, noteStartX: noteStartXc, keyChanged};
   scoreCache.set(key, entry);
   if (scoreCache.size > 60) scoreCache.delete(scoreCache.keys().next().value);
