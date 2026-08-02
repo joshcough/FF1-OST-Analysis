@@ -4,7 +4,7 @@ The complete map of the player (`index.html`) for anyone (especially future
 Claude sessions) continuing work. User-facing feature list also lives in the
 in-app help sheet (? button). History: git log tells the build story.
 
-Live: https://joshcough.github.io/FF1-OST-Analysis/ (GitHub Pages, main
+Live: https://joshcough.github.io/night-roll/ (GitHub Pages, main
 branch, root). Single file app + `vendor/vexflow.js`. No build step —
 git push is deployment (~1 min propagation; iPad may need a hard reload).
 
@@ -120,12 +120,11 @@ loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the
   whole file on Sync). Never store important info in comments.
 - Key names: C G D A E B F# C# F Bb Eb Ab Db Gb Cb, plus minor as "Em",
   "Bbm" (minor maps to its relative major's signature).
-- Most MIDIs are trimmed to their first pass (2026-08-01, via
-  tools/trim_loops.py at detected exact-repeat points), so anchors cover
-  the whole file and the app's loop replays only unique material. Nine
-  with varied (non-exact) repeats still contain them, pending Josh's
-  by-ear cut points: battle, corneliacastle, dungeon, elfland, epilogue,
-  floatingcastle, prelude, ship, victory.
+- Every FF song is a chip capture (2026-08-02, extracted from the NSF via
+  tools/nsf/), trimmed to intro + one loop pass at the frame-exact repeat
+  point — see chip/CUTS.md for the verified cut/loop table. Songs whose
+  loop returns past a once-only intro carry a measured `loop:` directive
+  in their rollnotes (battle, gameover, overworld, ship, victory).
 
 ## Code map (index.html, section comments mark these)
 
