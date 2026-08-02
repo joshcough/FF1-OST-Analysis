@@ -940,9 +940,7 @@ function setSong(parsed, key) {
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
-  const bpm = Math.round(6e7 / song.tempos[0].usq);
-  document.getElementById("songmeta").textContent =
-    song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm";
+  updateSongMeta();
   if (songKey) // stash meter so Sync-all can serialize this song without reloading it
     localStorage.setItem("ff1roll-ts-" + songKey, song.timesig[0] + "/" + song.timesig[1]);
   playCursor = 0;
@@ -2293,6 +2291,14 @@ document.getElementById("rwbtn").addEventListener("click", () => {
   draw();
 });
 // playback speed slider: 25–200% of the song's own tempo, persists across songs
+function updateSongMeta() { // bpm label shows what you actually hear
+  if (!song) return;
+  const native = Math.round(6e7 / song.tempos[0].usq);
+  const eff = Math.round(native * playRate);
+  document.getElementById("songmeta").textContent =
+    (playRate === 1 ? native + "bpm" : eff + "bpm (native " + native + ")") +
+    " · " + song.timesig[0] + "/" + song.timesig[1];
+}
 const speedsl = document.getElementById("speedsl");
 const speedlbl = document.getElementById("speedlbl");
 const speedreset = document.getElementById("speedreset");
@@ -2305,6 +2311,7 @@ function applySpeed(pct) {
   const wasPlaying = playing;
   if (wasPlaying) stop();
   playRate = pct / 100;
+  updateSongMeta();
   if (wasPlaying) play(tickToSec(song, tk));
   else { playCursor = tk; updateSubtitle(); draw(); }
 }
