@@ -93,25 +93,28 @@ export function detectLoop(events, frames, hint = null) {
   if (evs.length < 8) return null;
   const byKey = new Map(); // channel:midi:startFrame -> event
   for (const e of evs) byKey.set(e.channel + ":" + e.midi + ":" + e.startFrame, e);
+  // fuzzy: driver tempo-accumulator jitter shifts a repeat by ±1 frame (and
+  // first-pass init latency up to ~3) — exact-frame matching misclassifies
+  const findAt = (e, frame) => {
+    for (const off of [0, -1, 1, -2, 2, -3, 3]) {
+      const hit = byKey.get(e.channel + ":" + e.midi + ":" + (frame + off));
+      if (hit) return hit;
+    }
+    return null;
+  };
   const partnerOk = (e, P) => {
-    const partner = byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame - P));
+    const partner = findAt(e, e.startFrame - P);
     return partner && (Math.abs((partner.endFrame - partner.startFrame) -
-           (e.endFrame - e.startFrame)) <= 2 || e.endFrame >= frames - 2);
+           (e.endFrame - e.startFrame)) <= 4 || e.endFrame >= frames - 2);
   };
   // cheap pre-filter: sample a handful of late events before the full scan
   const samples = evs.filter((_, i) => i % Math.ceil(evs.length / 12) === 0);
   const TOL = 3; // loop-boundary artifacts (restart attack vs shifted song start)
-  // a hint (approx period in frames, from a verified by-ear analysis) narrows
-  // the search and relaxes the mismatch bound — some songs vary articulation
-  // per pass more than the blind threshold tolerates
   const [pLo, pHi, maxBadRatio] = hint
     ? [hint - 8, hint + 8, 0.25]
     : [120, frames * 0.6, 0.15];
-  let best = null;
-  for (let P = pLo; P <= pHi; P++) {
-    let quickBad = 0;
-    for (const s of samples) if (s.startFrame >= P && !partnerOk(s, P)) quickBad++;
-    if (quickBad > samples.length / 2) continue;
+
+  const evaluate = (P) => { // full trim metrics at one candidate period
     const bad = [];
     let testable = 0;
     for (const e of evs) {
@@ -119,45 +122,80 @@ export function detectLoop(events, frames, hint = null) {
       testable++;
       if (!partnerOk(e, P)) bad.push(e);
     }
-    if (testable < 20 || bad.length > testable * maxBadRatio) continue;
+    if (testable < 20 || bad.length > testable * maxBadRatio) return null;
     bad.sort((a, b) => a.startFrame - b.startFrame);
     let cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1].startFrame + 1; // allow TOL stragglers
     // a tight trailing cluster of "stragglers" is a loop-seam overlap (ship's
     // pickup replayed under sustained accompaniment, battle's turnaround run)
-    // — real once-only material, so keep through it INCLUDING note tails:
-    // cutting at the last onset chops the seam notes mid-sound
+    // — real once-only material, so keep through it INCLUDING note tails
     if (cut && bad[bad.length - 1].startFrame - cut < 100) {
       cut = Math.max(...bad.filter(e => e.startFrame >= cut - 100)
                         .map(e => e.endFrame));
     }
     // the backward check is blind to a non-repeating intro SHORTER than P
-    // (its events sit at t < P, where nothing is tested — gameover's 2-beat
-    // pickup). Forward pass: early events that never recur one period later
-    // are intro material, played once; keep = intro + one full period.
-    // intro is a PREFIX: stop at the first event that does recur, so per-pass
-    // variation deeper in the body can't masquerade as intro
+    // (gameover's 2-beat pickup) — forward prefix walk finds it
     const badF = [];
     for (const e of evs) {
       if (e.startFrame >= P || e.startFrame >= frames - P - 2) break;
-      if (byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame + P))) break;
+      if (findAt(e, e.startFrame + P)) break;
       badF.push(e);
     }
     const introEnd = badF.length
       ? Math.max(...badF.map(e => Math.min(e.endFrame, e.startFrame + P)))
       : 0;
-    let keep = Math.max(P + introEnd, cut); // repetition can't begin before one period has elapsed
-    // let notes straddling the boundary ring out (ship's full-beat A#4 under
-    // the seam) — otherwise the last sounds of the pass are chopped mid-note
-    keep = Math.max(keep, ...evs.filter(e =>
-      e.startFrame < keep && e.startFrame >= keep - 100 && e.endFrame > keep)
+    const onsets = Math.max(P + introEnd, cut); // no repetition before one full period
+    // let notes straddling the boundary ring out — tails only, no new onsets
+    const keep = Math.max(onsets, ...evs.filter(e =>
+      e.startFrame < onsets && e.startFrame >= onsets - 100 && e.endFrame > onsets)
       .map(e => Math.min(e.endFrame, frames)));
-    // demand a full clean period observed after the repeat point
-    if (frames - keep >= P) {
-      if (!hint) return {keep, period: P};
-      if (!best || bad.length < best.bad) best = {keep, period: P, bad: bad.length};
+    if (frames - keep < P) return null; // demand a full clean period after the cut
+    return {keep, onsets, period: P, bad: bad.length};
+  };
+  // fuzzy matching lets the minimal-P scan land up to 3 frames short of the
+  // true period — the true one has the most EXACT-frame twins; pick it
+  const refine = (P0) => {
+    let best = P0, hits = -1;
+    for (let P = Math.max(120, P0 - 3); P <= P0 + 6; P++) {
+      let exact = 0;
+      for (const e of evs)
+        if (e.startFrame >= P && byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame - P))) exact++;
+      if (exact > hits) { hits = exact; best = P; }
     }
+    return best;
+  };
+
+  let best = null;
+  for (let P = pLo; P <= pHi; P++) {
+    let quickBad = 0;
+    for (const s of samples) if (s.startFrame >= P && !partnerOk(s, P)) quickBad++;
+    if (quickBad > samples.length / 2) continue;
+    const r0 = evaluate(P);
+    if (!r0) continue;
+    const r = evaluate(refine(P)) || r0;
+    if (!hint) return r;
+    if (!best || r.bad < best.bad) best = r;
   }
-  return best ? {keep: best.keep, period: best.period} : null;
+  return best;
+}
+
+// Backport steady-state timing: the first pass carries init latency (shop's
+// bar-1 chord staggers ~2 frames) and jitter; the second pass is the driver
+// in steady state. Every event with a twin one period later adopts the
+// twin's timing shifted back — once-only material (intros, seams) keeps raw.
+export function backportTiming(events, period) {
+  const byKey = new Map();
+  for (const e of events) byKey.set(e.channel + ":" + e.midi + ":" + e.startFrame, e);
+  return events.map(e => {
+    for (const off of [0, -1, 1, -2, 2, -3, 3]) {
+      const twin = byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame + period + off));
+      if (twin) {
+        const s2 = twin.startFrame - period;
+        return s2 === e.startFrame ? e
+          : {...e, startFrame: s2, endFrame: twin.endFrame - period};
+      }
+    }
+    return e;
+  });
 }
 
 // Seeded ±15% around the transcription's bpm — an open sweep locks onto

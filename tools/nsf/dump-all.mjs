@@ -5,7 +5,7 @@
 // Run: node tools/nsf/dump-all.mjs reference/ff1.nsf
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
-import { reconstruct, toNotesTxt, fitBpm, detectLoop } from "./notes.mjs";
+import { reconstruct, toNotesTxt, fitBpm, detectLoop, backportTiming } from "./notes.mjs";
 import { makeMidi } from "./midi-write.mjs";
 import { createApp } from "../../tests/harness.mjs";
 
@@ -86,8 +86,11 @@ for (const [track, name, seconds] of TRACKS) {
   const loop = detectLoop(events, frames - t0, HINTS[name] || null);
   let keptFrames = frames - t0;
   if (loop) {
+    events = backportTiming(events, loop.period);
     keptFrames = loop.keep;
-    events = events.filter(e => e.startFrame < keptFrames)
+    // no pass-2 onsets — the guard absorbs accumulator jitter (a pass-2
+    // downbeat can land a frame before the exact period boundary)
+    events = events.filter(e => e.startFrame < loop.onsets - 3)
       .map(e => ({...e, endFrame: Math.min(e.endFrame, keptFrames)}));
   }
 

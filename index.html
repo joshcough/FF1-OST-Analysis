@@ -2534,7 +2534,7 @@ const editor = document.getElementById("noteeditor");
 function fillBarBeatSelects() {
   const bars = Math.max(1, Math.round(songEndTick / barTicks()));
   const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
-  const mkBars = (id, noneOption) => {
+  const mkBars = (id, noneOption, pastEnd) => {
     const s = document.getElementById(id);
     s.innerHTML = "";
     if (noneOption) {
@@ -2542,7 +2542,9 @@ function fillBarBeatSelects() {
       o.value = ""; o.textContent = "—";
       s.appendChild(o);
     }
-    for (let b = 1; b <= bars; b++) {
+    // pastEnd: one extra bar so a loop's "from" can name the absolute end
+    // of the song — bar N+1 beat 1 IS the end of bar N
+    for (let b = 1; b <= bars + (pastEnd ? 1 : 0); b++) {
       const o = document.createElement("option");
       o.value = String(b); o.textContent = String(b);
       s.appendChild(o);
@@ -2559,7 +2561,7 @@ function fillBarBeatSelects() {
       }
     }
   };
-  mkBars("nb1", false); mkBars("nb2", true); mkBars("nlb", false);
+  mkBars("nb1", false, true); mkBars("nb2", true); mkBars("nlb", false);
   mkBeats("nq1"); mkBeats("nq2"); mkBeats("nlq");
 }
 function editorType() { return document.getElementById("ntype").value; }

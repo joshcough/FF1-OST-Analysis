@@ -2,6 +2,17 @@
 
 Scoped 2026-08-01 (Josh + Claude session). A build task, not analysis.
 
+**Status 2026-08-02 (FINAL: originals REPLACED):** Josh verified every
+capture in-app ("everything is working now 100%") and the chip captures
+now ARE the songs: each midi/<song>.mid holds the chip capture (same
+path, so all rollnotes/annotations stayed attached), chip loop
+directives merged into the songs' rollnotes, notes.txt dumps
+regenerated. The transcriptions live on only in git history; the chip/
+group stays in the menu for A/B reference. Also fixed en route:
+first-pass driver latency (steady-state backport), pass-2 ghost onsets,
+fuzzy loop matching with exact-period refinement, quantization to
+16th/triplet grid with per-song no-snap (epilogue).
+
 **Status 2026-08-02 (loop trim + tempo calibration):** captures are trimmed
 to intro + one pass by frame-exact loop detection, and where the
 transcription's bar count is verified, the loop length calibrates the TRUE
