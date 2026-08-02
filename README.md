@@ -29,7 +29,7 @@ is deployment. Built for iPad-in-bed ergonomics, works anywhere.
 - **[albums/final-fantasy-i/](albums/final-fantasy-i/)** — the FF1 (NES)
   soundtrack, extracted from the NSF, with the analysis work: song docs,
   chord charts, the key sweep, and the verified loop-cut table
-  ([CUTS.md](albums/final-fantasy-i/chip/CUTS.md)).
+  ([CUTS.md](albums/final-fantasy-i/CUTS.md)).
 - **[albums/compositions/](albums/compositions/)** — original pieces written
   during the study.
 

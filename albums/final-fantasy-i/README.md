@@ -8,7 +8,7 @@ All 19 songs in `songs/` are **chip-true captures**, extracted from the NSF
 (the cartridge's actual sound code) by `tools/nsf/` at the repo root:
 real channel identity (pulse1 / pulse2 / triangle / noise), true driver
 tempos, and frame-exact loop cuts — verified twice, by ear and against the
-APU register log. The cut/loop table lives in [chip/CUTS.md](chip/CUTS.md).
+APU register log. The cut/loop table lives in [CUTS.md](CUTS.md).
 Earlier MIDI transcriptions (arrangements, up to 17 simultaneous voices
 against the NES's ceiling of three) are gone from the tree; git history
 keeps them.
@@ -24,9 +24,12 @@ spoil the discovery process.
 ## Layout
 
 - `songs/` — `<song>.mid` (chip capture) + `<song>.rollnotes` (in-app
-  annotations) + `<song>.notes.txt` (plain-text note dump for LLM reading)
+  annotations) + `<song>.notes.txt` (plain-text note dump for LLM reading).
+  The .mid and .notes.txt are written directly by the NSF pipeline
+  (`node tools/nsf/dump-all.mjs`); rollnotes are never overwritten.
 - `analysis/` — the song docs and cross-song references
-- `chip/` — the capture pipeline's output as reference data, incl. CUTS.md
+- `CUTS.md` — the verified cut/loop table; check every regeneration
+  against it
 - `reference/` — the NSF pipeline plan and spoiler-quarantined material
 
 ## Analysis status

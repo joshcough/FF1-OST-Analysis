@@ -1,7 +1,10 @@
-// Dump every FF1 song from the NSF into albums/final-fantasy-i/chip/: <song>.notes.txt (analysis)
-// and <song>.mid (playable in Night Roll, for verification against the
-// transcriptions). Track numbers from the Zophar m3u; meter per song from
-// the corresponding MIDI; tempo auto-fitted to the chip's own timing.
+// Dump every FF1 song from the NSF into albums/final-fantasy-i/songs/:
+// <song>.mid (the album Night Roll plays), <song>.notes.txt (text dump for
+// LLM reading), and a measured loop: directive when a song's rollnotes file
+// doesn't exist yet (existing rollnotes are NEVER touched — they hold
+// Josh's analysis). Compare each run's printout against ../CUTS.md.
+// Track numbers from the Zophar m3u; meter read from the existing song file;
+// tempo loop-calibrated from verified PERIOD_BARS (or grid-fitted).
 // Run: node tools/nsf/dump-all.mjs albums/final-fantasy-i/reference/ff1.nsf
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
@@ -135,20 +138,20 @@ for (const [track, name, seconds] of TRACKS) {
     frames: keptFrames, frameSec, bpm, tsNum, tsDen, snap,
     title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm; " + cutInfo + (snap ? "" : "; raw timing, grid approximate") + ")",
   });
-  writeFileSync("albums/final-fantasy-i/chip/" + name + ".notes.txt", txt);
-  writeFileSync("albums/final-fantasy-i/chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec, snap}));
+  writeFileSync("albums/final-fantasy-i/songs/" + name + ".notes.txt", txt);
+  writeFileSync("albums/final-fantasy-i/songs/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec, snap}));
 
   // when the loop returns somewhere other than the top, that's hardware fact:
   // record it as a loop: directive in the chip song's rollnotes (never
   // overwrite a file Josh may have edited)
-  if (loop && !existsSync("albums/final-fantasy-i/chip/" + name + ".rollnotes")) {
+  if (loop && !existsSync("albums/final-fantasy-i/songs/" + name + ".rollnotes")) {
     const backBeats = (loop.keep - loop.period) * frameSec / beatSec;
     if (backBeats > 0.4) {
       // anchor = the jump point (capture end), value = the jump target —
       // the player fires the loop at the anchor when it sits past the target
       const anchor = bq(loop.keep * frameSec / beatSec);
       const target = "loop: " + bq(backBeats);
-      writeFileSync("albums/final-fantasy-i/chip/" + name + ".rollnotes",
+      writeFileSync("albums/final-fantasy-i/songs/" + name + ".rollnotes",
         "# " + name + ".rollnotes — chip capture\n\n[" + anchor + "]\n" + target + "\n");
       console.log("   wrote loop directive: [" + anchor + "] " + target);
     }
