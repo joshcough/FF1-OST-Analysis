@@ -109,6 +109,7 @@
     flex-shrink: 0;
   }
   .chip {
+    touch-action: manipulation; /* iOS ignores the viewport no-zoom meta; without this two quick taps zoom the page */
     display: flex;
     align-items: center;
     gap: 7px;
@@ -360,8 +361,13 @@
       <span class="lbl">new key</span>
       <select id="nkeysel"></select>
       <select id="nkeymode">
-        <option value="maj">major</option>
-        <option value="min">minor</option>
+        <option value="major">major</option>
+        <option value="minor">minor</option>
+        <option value="dorian">dorian</option>
+        <option value="phrygian">phrygian</option>
+        <option value="lydian">lydian</option>
+        <option value="mixolydian">mixolydian</option>
+        <option value="locrian">locrian</option>
       </select>
     </div>
     <div class="row" id="nlooprow" style="display:none">
@@ -673,22 +679,28 @@ function parseRollnotes(text) {
     n.text = n.text.trim();
     const m = n.text.match(/^section:\s*(.+)/s);
     if (m) { n.section = true; n.text = m[1].split("\n")[0].trim(); }
-    const km = n.text.match(/^key:\s*(\S+)/);
+    const km = n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i); // "Gm" or "D dorian"
     if (km) {
-      const sf = keyNameToSf(km[1]);
-      if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1]; }
+      const sf = keyNameToSf(km[1].trim());
+      if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1].trim(); }
     }
   });
   return out.filter(n => n.text);
 }
+// modes: semitones from the relative major up to the tonic — the signature
+// engraved is always the relative major's; the stored name keeps tonic+mode
+const MODE_OFFSET = {major: 0, ionian: 0, dorian: 2, phrygian: 4, lydian: 5,
+                     mixolydian: 7, minor: 9, aeolian: 9, locrian: 11};
 function keyNameToSf(name) {
-  const minor = /m$/.test(name) && name.length > 1;
-  const base = minor ? name.slice(0, -1) : name;
+  let mode = "major", base = name;
+  const m = name.match(/^(\S+)\s+([a-z]+)$/i); // "D dorian" style
+  if (m && m[2].toLowerCase() in MODE_OFFSET) { base = m[1]; mode = m[2].toLowerCase(); }
+  else if (/m$/.test(name) && name.length > 1) { base = name.slice(0, -1); mode = "minor"; }
   const L = base[0] ? base[0].toUpperCase() : "";
   if (!(L in LETTER_PC)) return null;
   let pc = LETTER_PC[L] + (base[1] === "#" ? 1 : base[1] === "b" ? -1 : 0);
   pc = ((pc % 12) + 12) % 12;
-  if (minor) pc = (pc + 3) % 12; // relative major carries the signature
+  pc = (pc - MODE_OFFSET[mode] + 12) % 12; // down to the relative major
   let sf = (pc * 7) % 12;
   if (sf > 6) sf -= 12;
   return sf;
@@ -733,7 +745,7 @@ function finalizeNotes() {
   }
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir,
-                name: (n.text.match(/^key:\s*(\S+)/) || [, SF_MAJOR[n.keydir]])[1], // "Gm" shows as Gm, not Bb
+                name: (n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [, SF_MAJOR[n.keydir]])[1], // "Gm"/"D dorian" show as recorded
                 end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null,
                 b1: n.b1, b2: n.b2}))
     .sort((a, b) => a.start - b.start);
@@ -773,9 +785,9 @@ async function loadNotes() {
       for (const n of local) {
         const dup = rollnotes.some(r => r.b1 === n.b1 && r.q1 === n.q1 && r.text === n.text);
         if (dup) continue;
-        const km = (n.text || "").match(/^key:\s*(\S+)/); // re-derive flag (older saves lack it)
+        const km = (n.text || "").match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i); // re-derive flag (older saves lack it)
         if (km && n.keydir === undefined) {
-          const sf = keyNameToSf(km[1]);
+          const sf = keyNameToSf(km[1].trim());
           if (sf !== null) n.keydir = sf;
         }
         rollnotes.push(resolveNote({...n, added: true}));
@@ -982,9 +994,19 @@ function renderTrackbar() {
       trackState[ti].solo = !trackState[ti].solo;
       renderTrackbar(); buildScoreModel(); updateTrackGains(); clampView(); draw();
     });
-    chip.append(dot, label, solo);
+    // dedicated mute: one tap, any selection state — hides the track AND
+    // silences it together (trackAudible gates both). The old gesture (tap a
+    // selected chip) made mute depend on invisible state; chip body = select only
+    const mute = document.createElement("span");
+    mute.className = "solo" + (trackState[ti].muted ? " on" : "");
+    mute.textContent = "M";
+    mute.addEventListener("click", e => {
+      e.stopPropagation();
+      trackState[ti].muted = !trackState[ti].muted;
+      renderTrackbar(); buildScoreModel(); updateTrackGains(); clampView(); draw();
+    });
+    chip.append(dot, label, mute, solo);
     chip.addEventListener("click", () => {
-      if (ti === selTrack) trackState[ti].muted = !trackState[ti].muted;
       selTrack = ti;
       renderTrackbar(); buildScoreModel(); updateTrackGains(); clampView(); draw();
     });
@@ -1586,9 +1608,21 @@ function ensureAudio() { // one context for the app's lifetime — iOS Safari
 }
 // resume unconditionally: iOS Safari parks backgrounded contexts in the
 // non-standard "interrupted" state, which a `state === "suspended"` guard
-// misses — resume() is a no-op when already running, so just always call it
-function resumeAudio() {
-  return audio ? audio.resume().catch(() => {}) : Promise.resolve();
+// misses. And on iOS resume() can RESOLVE while the clock stays dead — so
+// verify state, retry, and rebuild the context as a last resort; a dead
+// clock freezes the whole transport (playhead derives from audio.currentTime)
+async function resumeAudio() {
+  if (!audio) return;
+  await audio.resume().catch(() => {});
+  if (audio.state !== "running") await audio.resume().catch(() => {});
+  if (audio.state !== "running") {
+    try { await audio.close(); } catch (err) {}
+    audio = null; master = null; pulse25 = null; trackGains = [];
+    ensureAudio(); // rebuilds + re-warms (covers the first-quantum glitch)
+    await audio.resume().catch(() => {});
+  }
+  if (audio.state !== "running")
+    setInfo("audio asleep — tap ▶ again"); // surfaced: consoles don't exist on an iPad
 }
 // coming back from another app: revive audio without waiting for a Play tap
 document.addEventListener("visibilitychange", () => {
@@ -2060,12 +2094,20 @@ function renderMeasure(mi) {
     }
   });
   timeMap.sort((a, b) => a.tick - b.tick);
-  // clamp x monotonic: noteheads from different staves/voices at nearby ticks
-  // (16ths vs triplet slots) can engrave a few px out of order — the playhead
-  // must never glide backwards through a measure
+  // noteheads from different staves/voices at nearby ticks can engrave a few
+  // px out of order. The old fix clamped x flat, which froze the playhead
+  // across the zero-width segment (Josh caught it stalling at dotted eighths).
+  // Instead: dedupe same-tick anchors (leading stave's x), then force x
+  // STRICTLY increasing — never backwards, never flat
+  const dedup = [];
+  for (const tm of timeMap) {
+    const last = dedup[dedup.length - 1];
+    if (last && last.tick === tm.tick) last.x = Math.min(last.x, tm.x);
+    else dedup.push(tm);
+  }
   let hx = -Infinity;
-  for (const tm of timeMap) { if (tm.x < hx) tm.x = hx; else hx = tm.x; }
-  const entry = {canvas: c, geo, timeMap, mw, noteStartX: noteStartXc, keyChanged};
+  for (const tm of dedup) { tm.x = Math.max(tm.x, hx + 0.5); hx = tm.x; }
+  const entry = {canvas: c, geo, timeMap: dedup, mw, noteStartX: noteStartXc, keyChanged};
   scoreCache.set(key, entry);
   if (scoreCache.size > 60) scoreCache.delete(scoreCache.keys().next().value);
   return entry;
@@ -2326,10 +2368,16 @@ speedreset.addEventListener("click", () => applySpeed(100));
 const keysel = document.getElementById("keysel");
 const keysetBtn = document.getElementById("keyset");
 const keymodeBtn = document.getElementById("keymode");
-let keyMinor = false;
+const MODE_ORDER = ["major", "minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian"];
+let keyModeIdx = 0; // index into MODE_ORDER, cycled by the footer button
 function minorNameOf(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf); }
-function chosenKeyName(sf, minor) {
-  return minor ? minorNameOf(sf) + "m" : (SF_MAJOR[sf] || "C");
+function modalNameOf(sf, mode) { // tonic of `mode` within signature sf, spelled for sf
+  return spellPc((((sf * 7) % 12 + 12) % 12 + MODE_OFFSET[mode]) % 12, sf);
+}
+function chosenKeyName(sf, mode) {
+  if (mode === "major") return SF_MAJOR[sf] || "C";
+  if (mode === "minor") return minorNameOf(sf) + "m";
+  return modalNameOf(sf, mode) + " " + mode;
 }
 {
   const SIGS = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
@@ -2351,8 +2399,8 @@ function chosenKeyName(sf, minor) {
 }
 function refreshKeysetLabel() {
   if (previewSf === null || !song) return;
-  keymodeBtn.textContent = keyMinor ? "minor" : "major";
-  keysetBtn.textContent = "Set " + chosenKeyName(previewSf, keyMinor) +
+  keymodeBtn.textContent = MODE_ORDER[keyModeIdx];
+  keysetBtn.textContent = "Set " + chosenKeyName(previewSf, MODE_ORDER[keyModeIdx]) +
                           " @ bar " + (Math.floor(playCursor / barTicks()) + 1);
 }
 keysel.addEventListener("change", () => {
@@ -2365,14 +2413,14 @@ keysel.addEventListener("change", () => {
   draw();
 });
 keymodeBtn.addEventListener("click", () => {
-  keyMinor = !keyMinor;
+  keyModeIdx = (keyModeIdx + 1) % MODE_ORDER.length;
   refreshKeysetLabel();
 });
 keysetBtn.addEventListener("click", () => {
   if (previewSf === null || !song || !songKey) return;
   const bt = barTicks();
   const bar = Math.floor(playCursor / bt) + 1;
-  const name = chosenKeyName(previewSf, keyMinor);
+  const name = chosenKeyName(previewSf, MODE_ORDER[keyModeIdx]);
   dropLocalKeyAt(bar);
   rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
                               keydir: previewSf, added: true}));
@@ -2657,8 +2705,11 @@ function openEditor(note) {
   document.getElementById("ntext").value = note && type !== "key" ? note.text : "";
   if (type === "key" && note) {
     document.getElementById("nkeysel").value = String(note.keydir);
-    const nm = (note.text.match(/^key:\s*(\S+)/) || [])[1] || "";
-    document.getElementById("nkeymode").value = /m$/.test(nm) && nm.length > 1 ? "min" : "maj";
+    const nm = (note.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [])[1] || "";
+    const modeMatch = nm.match(/\s([a-z]+)$/i);
+    document.getElementById("nkeymode").value =
+      modeMatch && modeMatch[1].toLowerCase() in MODE_OFFSET ? modeMatch[1].toLowerCase()
+      : /m$/.test(nm) && nm.length > 1 ? "minor" : "major";
   }
   document.getElementById("ndelete").style.display = note ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
@@ -2686,10 +2737,10 @@ document.getElementById("nsave").addEventListener("click", () => {
   let fresh;
   if (type === "key") {
     const sf = parseInt(document.getElementById("nkeysel").value, 10);
-    const minor = document.getElementById("nkeymode").value === "min";
+    const mode = document.getElementById("nkeymode").value;
     dropLocalKeyAt(b1);
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
-             text: "key: " + chosenKeyName(sf, minor), keydir: sf, added: true};
+             text: "key: " + chosenKeyName(sf, mode), keydir: sf, added: true};
   } else if (type === "loop") {
     const lb = Math.max(1, +document.getElementById("nlb").value || 1);
     const lq = +document.getElementById("nlq").value || 1;

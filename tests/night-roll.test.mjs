@@ -83,6 +83,24 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
   assert.equal(run(`rollnotes.find(n => n.text === "key: Gm").keydir`), -2); // Gm = 2 flats
 });
 
+test("modal keys: tonic + mode names map to the relative major's signature", () => {
+  installSong();
+  assert.equal(run(`keyNameToSf("D dorian")`), 0);   // D dorian shares C major's signature
+  assert.equal(run(`keyNameToSf("F dorian")`), -3);  // F dorian shares Eb major's
+  assert.equal(run(`keyNameToSf("Bb lydian")`), -1); // Bb lydian shares F major's
+  assert.equal(run(`keyNameToSf("E phrygian")`), 0);
+  assert.equal(run(`keyNameToSf("G mixolydian")`), 0);
+  assert.equal(run(`keyNameToSf("Gm")`), -2);        // legacy minor suffix still works
+  assert.equal(run(`chosenKeyName(0, "dorian")`), "D dorian");
+  assert.equal(run(`chosenKeyName(-3, "dorian")`), "F dorian");
+  assert.equal(run(`chosenKeyName(-2, "minor")`), "Gm");
+  assert.equal(run(`chosenKeyName(1, "major")`), "G");
+  // round-trip through rollnotes: the modal name survives and carries its signature
+  run(`rollnotes = parseRollnotes("[1.1]\\nkey: D dorian\\n").map(resolveNote); finalizeNotes();`);
+  assert.equal(run(`rollnotes[0].keydir`), 0);
+  assert.match(run(`serializeRollnotes()`), /key: D dorian\n/);
+});
+
 test("tickToSec/secToTick: piecewise tempo map, mutual inverses", () => {
   installSong();
   assert.equal(run(`tickToSec(song, 480)`), 0.5);
