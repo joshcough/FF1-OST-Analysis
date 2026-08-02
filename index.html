@@ -1760,6 +1760,15 @@ async function play(fromSec = 0) {
         if (wrapIdx < 0 || schedEvents[wrapIdx].sec >= loopSeg.end) break; // nothing inside the segment
         loopPass++;
         schedIdx = wrapIdx;
+        // chase across the wrap: a note straddling the loop target plays its
+        // remainder (chip-capture ticks derive from real seconds, so ship's
+        // C5 starts a hair before the 1.3 target and vanished on loop)
+        const passAbs = loopSeg.end + (loopPass - 1) * segLen - playOffset;
+        for (let k = 0; k < wrapIdx; k++) {
+          const e = schedEvents[k];
+          if (e.sec + e.dur > loopSeg.start + 0.02 && !(e.n.ch === 9 || trackIsDrums(e.ti)))
+            scheduleNote(e.ti, e.n, playT0 + passAbs, e.sec + e.dur - loopSeg.start);
+        }
       }
       const e = schedEvents[schedIdx];
       const abs = (loopPass === 0 ? e.sec
