@@ -6,6 +6,13 @@ session start alongside the quiz.)
 
 ## Questions awaiting Josh
 
+0. **Josh's overnight key experiment (2026-08-01):** he set out to determine
+   the key of every song, testing his hypothesis that the first bass note
+   is the tonic (mode ambiguous). Protocol: predict from bass note →
+   analyze the notes and annotate the *why* → verify with the dial. Next
+   session: review his hit rate and reasoning annotations (synced key:
+   directives + notes), quiz from the misses — they're the teachers.
+
 1. **Baseball/Beach song:** where did the B–D–F–Ab voicing come from — ear,
    hands, or something you read? Did you know it forms a diminished 7th?
 2. **Baseball/Beach song:** the bass never sits on G under the "G7♭9" — it
