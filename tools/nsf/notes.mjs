@@ -116,15 +116,19 @@ export function detectLoop(events, frames, hint = null) {
     for (const e of evs) {
       if (e.startFrame < P) continue;
       testable++;
-      if (!partnerOk(e, P)) bad.push(e.startFrame);
+      if (!partnerOk(e, P)) bad.push(e);
     }
     if (testable < 20 || bad.length > testable * maxBadRatio) continue;
-    bad.sort((a, b) => a - b);
-    let cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1] + 1; // allow TOL stragglers
+    bad.sort((a, b) => a.startFrame - b.startFrame);
+    let cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1].startFrame + 1; // allow TOL stragglers
     // a tight trailing cluster of "stragglers" is a loop-seam overlap (ship's
     // pickup replayed under sustained accompaniment, battle's turnaround run)
-    // — real once-only material, so keep through it, don't slice mid-cluster
-    if (cut && bad[bad.length - 1] - cut < 100) cut = bad[bad.length - 1] + 1;
+    // — real once-only material, so keep through it INCLUDING note tails:
+    // cutting at the last onset chops the seam notes mid-sound
+    if (cut && bad[bad.length - 1].startFrame - cut < 100) {
+      cut = Math.max(...bad.filter(e => e.startFrame >= cut - 100)
+                        .map(e => e.endFrame));
+    }
     // the backward check is blind to a non-repeating intro SHORTER than P
     // (its events sit at t < P, where nothing is tested — gameover's 2-beat
     // pickup). Forward pass: early events that never recur one period later
@@ -140,7 +144,12 @@ export function detectLoop(events, frames, hint = null) {
     const introEnd = badF.length
       ? Math.max(...badF.map(e => Math.min(e.endFrame, e.startFrame + P)))
       : 0;
-    const keep = Math.max(P + introEnd, cut); // repetition can't begin before one period has elapsed
+    let keep = Math.max(P + introEnd, cut); // repetition can't begin before one period has elapsed
+    // let notes straddling the boundary ring out (ship's full-beat A#4 under
+    // the seam) — otherwise the last sounds of the pass are chopped mid-note
+    keep = Math.max(keep, ...evs.filter(e =>
+      e.startFrame < keep && e.startFrame >= keep - 100 && e.endFrame > keep)
+      .map(e => Math.min(e.endFrame, frames)));
     // demand a full clean period observed after the repeat point
     if (frames - keep >= P) {
       if (!hint) return {keep, period: P};
