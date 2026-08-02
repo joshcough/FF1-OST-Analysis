@@ -1,7 +1,17 @@
 // Chip note events -> a type-1 MIDI file so Night Roll can play captures.
-// Tick times derive from real capture seconds, so playback timing is exact
-// even where the fitted bpm label is approximate (bpm only affects bars).
+// Onsets/durations are QUANTIZED to the beat grid (nearest 16th or triplet
+// third): the driver counts frames and a beat is a non-integer number of
+// frames, so raw times sit ±1 frame off the grid — hardware clock jitter,
+// not music. Musical analysis wants notes on the beats they mean. Raw frame
+// data stays intact upstream (events/.notes internals) if ever needed.
 const PPQ = 480;
+
+// snap a beat position to the nearest 16th (0.25) or triplet third (1/3)
+export function snapBeat(b) {
+  const s16 = Math.round(b * 4) / 4;
+  const s12 = Math.round(b * 3) / 3;
+  return Math.abs(b - s16) <= Math.abs(b - s12) ? s16 : s12;
+}
 
 function vl(v) {
   const out = [v & 0x7F];
@@ -31,11 +41,11 @@ function noiseDrum(idx) { return idx < 6 ? 42 : idx < 12 ? 38 : 35; } // hat / s
 
 export function makeMidi(events, {bpm, tsNum = 4, tsDen = 4, frameSec}) {
   const usq = Math.round(6e7 / bpm);
-  const toTick = frames => Math.round(frames * frameSec / (60 / bpm) * PPQ);
+  const toTick = frames => Math.round(snapBeat(frames * frameSec / (60 / bpm)) * PPQ);
   const byCh = {pulse1: [], pulse2: [], triangle: [], noise: []};
   for (const e of events) {
     const t = toTick(e.startFrame);
-    const d = Math.max(30, toTick(e.endFrame) - t);
+    const d = Math.max(40, toTick(e.endFrame) - t); // min = a quantized 12th
     const p = e.channel === "noise" ? noiseDrum(e.midi) : e.midi;
     if (p < 0 || p > 127) continue;
     byCh[e.channel].push({t, d, p, v: 96});

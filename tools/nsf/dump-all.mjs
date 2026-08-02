@@ -97,10 +97,24 @@ for (const [track, name, seconds] of TRACKS) {
     tempoSrc = "grid-fitted";
   }
   const chipBars = keptFrames * frameSec / (60 / bpm * (tsNum * 4 / tsDen));
+  const beatSec = 60 / bpm;
+  const bpb = tsNum * 4 / tsDen;
+  const q = x => Math.round(x * 4) / 4;
+  const bq = beats => { // beats-from-zero -> "bar.beat" on the 16th grid
+    const bar = Math.floor(q(beats) / bpb) + 1;
+    const beat = q(beats) - (bar - 1) * bpb + 1;
+    return bar + "." + beat;
+  };
+  // record the cut so it's never a mystery: where this capture ends and
+  // where the loop returns (frame-exact repeat points, Josh-verified rules)
+  const cutInfo = loop
+    ? "cut at " + bq(loop.keep * frameSec / beatSec) +
+      ", loops to " + bq((loop.keep - loop.period) * frameSec / beatSec)
+    : "through-composed, no cut";
 
   const txt = toNotesTxt(events, {
     frames: keptFrames, frameSec, bpm, tsNum, tsDen,
-    title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm)",
+    title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm; " + cutInfo + ")",
   });
   writeFileSync("chip/" + name + ".notes.txt", txt);
   writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec}));
@@ -109,16 +123,8 @@ for (const [track, name, seconds] of TRACKS) {
   // record it as a loop: directive in the chip song's rollnotes (never
   // overwrite a file Josh may have edited)
   if (loop && !existsSync("chip/" + name + ".rollnotes")) {
-    const beatSec = 60 / bpm;
     const backBeats = (loop.keep - loop.period) * frameSec / beatSec;
     if (backBeats > 0.4) {
-      const bpb = tsNum * 4 / tsDen;
-      const q = x => Math.round(x * 4) / 4;
-      const bq = beats => { // beats-from-zero -> "bar.beat" on the 16th grid
-        const bar = Math.floor(q(beats) / bpb) + 1;
-        const beat = q(beats) - (bar - 1) * bpb + 1;
-        return bar + "." + beat;
-      };
       // anchor = the jump point (capture end), value = the jump target —
       // the player fires the loop at the anchor when it sits past the target
       const anchor = bq(loop.keep * frameSec / beatSec);

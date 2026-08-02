@@ -1,5 +1,6 @@
 // Stage 2: APU register log -> note events, channel identity intact.
 // Discovery-mode rules: pitch, time, duration, channel. Nothing interpretive.
+import { snapBeat } from "./midi-write.mjs";
 const CLOCK = 1_789_773; // NTSC CPU Hz
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -183,7 +184,7 @@ export function fitBpm(events, frameSec, seedBpm) {
 export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4, title = "nsf"}) {
   const beatSec = 60 / bpm;
   const beatsPerBar = tsNum * 4 / tsDen;
-  const q = x => Math.round(x * 4) / 4; // 16th-note grid
+  const q = snapBeat; // 16th or triplet-third grid, same as the MIDI writer
   const byChannel = {};
   for (const e of events) (byChannel[e.channel] = byChannel[e.channel] || []).push(e);
   const L = [];
@@ -195,11 +196,11 @@ export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4,
     L.push(`## channel ${name}`);
     const rows = {};
     for (const e of evs) {
-      const startBeat = e.startFrame * frameSec / beatSec;
+      const qb = q(e.startFrame * frameSec / beatSec); // quantize FIRST, then
       const durBeats = q((e.endFrame - e.startFrame) * frameSec / beatSec);
       if (durBeats <= 0) continue;
-      const bar = Math.floor(startBeat / beatsPerBar) + 1;
-      const beat = q(startBeat - (bar - 1) * beatsPerBar) + 1;
+      const bar = Math.floor(qb / beatsPerBar + 1e-9) + 1; // ...assign the bar,
+      const beat = qb - (bar - 1) * beatsPerBar + 1; // so no "beat 5" in 4/4
       const label = name === "noise" ? "N" + e.midi : pitchName(e.midi);
       (rows[bar] = rows[bar] || []).push(
         (+beat.toFixed(2)) + " " + label + " " + (+durBeats.toFixed(2)));
