@@ -17,7 +17,7 @@ Verified 2026-08-02 (Josh by ear + frame-exact register data agreeing).
 | prologue | 25.1 | 1.1 | 24 bars | 150 |
 | epilogue | — through-composed, no cut (~256s of music) | — | — | ~112 (grid-fitted) |
 | overworld | 17.2 | 1.2 | 16 bars | 150 |
-| ship | 25.3 | 1.3 | 24 bars | 150 |
+| ship | 25.3 | 1.3 | 24 bars | 150 | ✓ Josh: "100% perfect" (2026-08-02, in-app) |
 | airship | 17.1 | 1.1 | 16 bars | 180 |
 | town | 9.1 | 1.1 | 8 bars | 90 |
 | corneliacastle | 9.1 | 1.1 | 8 bars | 100 |
