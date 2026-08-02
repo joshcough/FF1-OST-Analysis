@@ -278,6 +278,40 @@
     text-overflow: ellipsis;
   }
   .noterow .unsynced { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+  .sheet.chat { height: 88dvh; width: min(680px, 100%); }
+  #chatlog {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .chatmsg {
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 9px 12px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    max-width: 92%;
+  }
+  .chatmsg.user { background: var(--panel2); border: 1px solid var(--grid); align-self: flex-end; }
+  .chatmsg.claude { background: var(--bg); border: 1px solid var(--grid); align-self: flex-start; }
+  #chatinput {
+    font-family: var(--sans);
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    padding: 10px;
+    flex: 1;
+    min-height: 44px;
+    max-height: 120px;
+    resize: none;
+  }
 </style>
 </head>
 <body>
@@ -288,6 +322,7 @@
   <button class="primary" id="playbtn">▶ Play</button>
   <button id="viewbtn" aria-label="Toggle score view">𝄞 Score</button>
   <button id="helpbtn" aria-label="Help">?</button>
+  <button id="chatbtn" aria-label="Ask Claude">💬</button>
   <label class="filebtn" for="fileinput">Load .mid</label>
   <input type="file" id="fileinput" accept=".mid,.midi">
   <input type="range" id="speedsl" min="25" max="200" step="5" value="100"
@@ -433,6 +468,26 @@
     </dl>
 
     <div class="row"><button class="primary" id="helpclose">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="chatsheet">
+  <div class="sheet chat">
+    <h2>ASK CLAUDE</h2>
+    <div id="chatlog"></div>
+    <div class="row" id="chatkeyrow" style="display:none">
+      <input type="password" id="chatkey" placeholder="Anthropic API key (stays on this device)" autocomplete="off">
+      <button id="chatkeysave">Save</button>
+    </div>
+    <div class="row">
+      <textarea id="chatinput" placeholder="Ask about what you're looking at…"></textarea>
+      <button class="primary" id="chatsend">Send</button>
+    </div>
+    <div class="row">
+      <span class="status" id="chatstatus"></span>
+      <button id="chatclear">Clear chat</button>
+      <button id="chatclose" style="margin-left:auto">Close</button>
+    </div>
   </div>
 </div>
 
@@ -2513,6 +2568,164 @@ document.getElementById("ndelete").addEventListener("click", () => {
   updateSubtitle();
   editor.classList.remove("on");
   draw();
+});
+
+// ---------------------------------------------------------------- claude chat
+// In-app tutor: talks to the Anthropic API straight from the browser (same
+// trust model as the GitHub token — key lives in localStorage, never the
+// repo). One conversation per song; a fresh <context> snapshot rides along
+// with every message, so Claude always sees the current song and cursor.
+const CHAT_MODEL = "claude-opus-5";
+const CHAT_SYS = `You are the resident music-theory tutor inside Night Roll, a piano-roll + engraved-score web app Josh built to study the Final Fantasy 1 soundtrack (NES, Uematsu) and learn composition. He usually chats from bed on an iPad — keep replies short and warm, a few sentences unless he asks for depth. Plain text only, no markdown headers.
+
+THE PRIME RULE: discoveries are Josh's. Never state a song's key, name the chord of selected notes, or hand over an analysis he hasn't made yet. Guide with hints and questions instead (what does the bass outline? which accidental keeps appearing?). When he has made a guess, confirm or refine it honestly. If he explicitly asks to be told, give one strong hint first; give the answer only if he insists again. General theory concepts (what is a secondary dominant? how do sevenths resolve?) are fair game to answer directly — concepts aren't spoilers, per-song conclusions are.
+
+Each of his messages carries a <context> block describing what he is looking at: song, cursor bar/beat, his own annotations (.rollnotes), any lasso-selected pitches, sections, and key directives he has set. His annotations are his established discoveries — build on them freely. The key-state line tells you whether he has discovered the key; if it is unset, the key is unknown to him and must not be revealed. Refer to locations as bar and beat.
+
+He is comfortable with: Roman numerals, secondary dominants, tonicization vs modulation, borrowing/mode mixture, deceptive resolution, pickup bars and loop points. Known weak spot: interval direction arithmetic (up a fourth = down a fifth). Stretch him a little past where he is.`;
+
+const chatsheet = document.getElementById("chatsheet");
+const chatlog = document.getElementById("chatlog");
+const chatinput = document.getElementById("chatinput");
+const chatstatus = document.getElementById("chatstatus");
+let chatBusy = false;
+
+function chatStoreKey() { return songKey ? "ff1roll-chat-" + songKey : null; }
+function loadChat() {
+  try { return JSON.parse(localStorage.getItem(chatStoreKey()) || "[]"); }
+  catch (err) { return []; }
+}
+function saveChat(msgs) {
+  if (chatStoreKey()) localStorage.setItem(chatStoreKey(), JSON.stringify(msgs.slice(-30)));
+}
+function chatContext() {
+  if (!song) return "no song loaded";
+  const bt = barTicks();
+  const tick = curTick();
+  const opt = sel.options[sel.selectedIndex];
+  const L = [];
+  L.push("song: " + (opt ? opt.textContent : songKey || "local file"));
+  L.push("meter/tempo: " + song.timesig[0] + "/" + song.timesig[1] + " at " +
+         Math.round(6e7 / song.tempos[0].usq) + "bpm, " + Math.round(songEndTick / bt) + " bars");
+  L.push("tracks: " + song.tracks.map((t, i) =>
+         (t.name || "tr" + (i + 1)) + (trackAudible(i) ? "" : " (hidden)")).join(", "));
+  L.push("view: " + viewMode + (playing ? ", playing" : ", paused") +
+         (playRate !== 1 ? " at " + Math.round(playRate * 100) + "% speed" : ""));
+  L.push("cursor: bar " + (Math.floor(tick / bt) + 1) + " beat " + beatLabel(tick % bt / song.ppq + 1));
+  L.push("key state: " + document.getElementById("keyunset").textContent +
+         " — 'not set' means Josh has NOT discovered the key; do not reveal it");
+  if (multiSel.length) {
+    const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
+    L.push("lasso-selected notes: " + pitches.map(p => pitchName(p, multiSelSf)).join(" ") +
+           " — do not name this chord unless he has guessed or insists");
+  }
+  L.push("his annotations (.rollnotes):\n" + serializeRollnotes());
+  return L.join("\n");
+}
+function stripContext(text) { return text.replace(/^<context>[\s\S]*?<\/context>\s*/, ""); }
+function chatBubble(role, text) {
+  const div = document.createElement("div");
+  div.className = "chatmsg " + role;
+  div.textContent = text;
+  chatlog.appendChild(div);
+  chatlog.scrollTop = chatlog.scrollHeight;
+  return div;
+}
+function renderChat() {
+  chatlog.innerHTML = "";
+  const msgs = loadChat();
+  if (!msgs.length) chatBubble("claude", "Ask me about what you're looking at — I can see the song, your cursor, and your notes. I won't spoil keys or chords you haven't found yet.");
+  for (const m of msgs) chatBubble(m.role === "user" ? "user" : "claude", stripContext(m.content));
+}
+async function chatSend() {
+  const key = localStorage.getItem("ff1roll-anthropic-key");
+  if (!key) { document.getElementById("chatkeyrow").style.display = ""; return; }
+  const text = chatinput.value.trim();
+  if (!text || chatBusy || !song) return;
+  chatBusy = true;
+  chatinput.value = "";
+  chatstatus.textContent = "thinking…";
+  const msgs = loadChat();
+  msgs.push({role: "user", content: "<context>\n" + chatContext() + "\n</context>\n\n" + text});
+  saveChat(msgs);
+  chatBubble("user", text);
+  const live = chatBubble("claude", "");
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        max_tokens: 8000,
+        stream: true,
+        system: [{type: "text", text: CHAT_SYS, cache_control: {type: "ephemeral"}}],
+        messages: msgs.map(m => ({role: m.role, content: m.content})),
+      }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status + (res.status === 401 ? " — check the API key" : ""));
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", out = "";
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const events = buf.split("\n\n");
+      buf = events.pop();
+      for (const ev of events) {
+        const line = ev.split("\n").find(l => l.startsWith("data: "));
+        if (!line) continue;
+        let data;
+        try { data = JSON.parse(line.slice(6)); } catch (err) { continue; }
+        if (data.type === "content_block_delta" && data.delta.type === "text_delta") {
+          out += data.delta.text;
+          live.textContent = out;
+          chatlog.scrollTop = chatlog.scrollHeight;
+        }
+      }
+    }
+    if (!out) { out = "(no reply — the request may have been declined; try rephrasing)"; live.textContent = out; }
+    msgs.push({role: "assistant", content: out});
+    saveChat(msgs);
+    chatstatus.textContent = "";
+  } catch (err) {
+    live.textContent = "⚠ " + err.message;
+    msgs.pop(); // failed turn: don't keep the unanswered user message in history
+    saveChat(msgs);
+    chatstatus.textContent = "";
+  } finally {
+    chatBusy = false;
+  }
+}
+document.getElementById("chatbtn").addEventListener("click", () => {
+  if (!song) return;
+  renderChat();
+  document.getElementById("chatkeyrow").style.display =
+    localStorage.getItem("ff1roll-anthropic-key") ? "none" : "";
+  chatsheet.classList.add("on");
+  if (localStorage.getItem("ff1roll-anthropic-key")) chatinput.focus();
+});
+document.getElementById("chatclose").addEventListener("click", () => chatsheet.classList.remove("on"));
+document.getElementById("chatkeysave").addEventListener("click", () => {
+  const v = document.getElementById("chatkey").value.trim();
+  if (!v) return;
+  localStorage.setItem("ff1roll-anthropic-key", v);
+  document.getElementById("chatkey").value = "";
+  document.getElementById("chatkeyrow").style.display = "none";
+  chatinput.focus();
+});
+document.getElementById("chatclear").addEventListener("click", () => {
+  if (chatStoreKey()) localStorage.removeItem(chatStoreKey());
+  renderChat();
+});
+document.getElementById("chatsend").addEventListener("click", chatSend);
+chatinput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chatSend(); }
 });
 
 // ---------------------------------------------------------------- sync
