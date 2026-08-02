@@ -6,7 +6,7 @@ session start alongside the quiz.)
 
 ## Questions awaiting Josh
 
-0. **Key sweep in progress — see [key-sweep.md](key-sweep.md).** 6 songs
+0. **Key sweep in progress — see [key-sweep.md](albums/final-fantasy-i/analysis/key-sweep.md).** 6 songs
    done (6/6 for the first-bass-note rule), ~14 to go, dungeon excluded as
    a duplicate of cave. Open sweep-wide questions live there (the "first
    bass note" definition; the "unclear" outcome category; duplicate audit).
@@ -51,7 +51,7 @@ session start alongside the quiz.)
 
 - **NSF pipeline** (scoped 2026-08-01, **built 2026-08-02**): extract
   analysis-grade note data from the actual chip — see
-  [reference/nsf-pipeline-plan.md](reference/nsf-pipeline-plan.md).
+  [reference/nsf-pipeline-plan.md](albums/final-fantasy-i/reference/nsf-pipeline-plan.md).
   Emulator + logger + reconstruction + CLI all working, tested against a
   synthetic NSF. **Blocked on Josh supplying the FF1 NSF file** (archive
   or own-cartridge dump — his call). Motivation confirmed by audit: only
@@ -88,7 +88,7 @@ session start alongside the quiz.)
   Max subscription can't fund direct API calls, which frustrated him.
   Options discussed: downgrade Max $200→$100 and fund the API from the
   difference; use the Claude iPad app pointed at this repo (chosen for
-  now — midi/*.notes.txt dumps exist so the app can read actual notes);
+  now — albums/final-fantasy-i/songs/*.notes.txt dumps exist so the app can read actual notes);
   or drop the feature. Revisit with Josh; merge the branch if he funds a
   key (it will need a rebase over main's later changes).
 

@@ -478,29 +478,29 @@
 // ---------------------------------------------------------------- catalog
 const CATALOG = { // alphabetical within each group
   "Final Fantasy I": [
-    ["Airship", "midi/ff1airship.mid"],
-    ["Battle", "midi/ff1battle.mid"],
-    ["Cave", "midi/ff1cave.mid"],
-    ["Chaos Temple", "midi/ff1chaostemple.mid"],
-    ["Cornelia Castle", "midi/ff1corneliacastle.mid"],
-    ["Epilogue", "midi/ff1epilogue.mid"],
-    ["Floating Castle", "midi/ff1floatingcastle.mid"],
-    ["Game Over", "midi/ff1gameover.mid"],
-    ["Gurgu Volcano", "midi/ff1gurguvolcano.mid"],
-    ["Matoya's Cave", "midi/ff1matouyascave.mid"],
-    ["Menu", "midi/ff1menu.mid"],
-    ["Overworld", "midi/ff1overworld.mid"],
-    ["Prelude", "midi/ff1prelude.mid"],
-    ["Prologue", "midi/ff1prologue.mid"],
-    ["Ship", "midi/ff1ship.mid"],
-    ["Shop", "midi/ff1shop.mid"],
-    ["Town", "midi/ff1town.mid"],
-    ["Underwater Palace", "midi/ff1underwaterpalace.mid"],
-    ["Victory", "midi/ff1victory.mid"],
+    ["Airship", "albums/final-fantasy-i/songs/ff1airship.mid"],
+    ["Battle", "albums/final-fantasy-i/songs/ff1battle.mid"],
+    ["Cave", "albums/final-fantasy-i/songs/ff1cave.mid"],
+    ["Chaos Temple", "albums/final-fantasy-i/songs/ff1chaostemple.mid"],
+    ["Cornelia Castle", "albums/final-fantasy-i/songs/ff1corneliacastle.mid"],
+    ["Epilogue", "albums/final-fantasy-i/songs/ff1epilogue.mid"],
+    ["Floating Castle", "albums/final-fantasy-i/songs/ff1floatingcastle.mid"],
+    ["Game Over", "albums/final-fantasy-i/songs/ff1gameover.mid"],
+    ["Gurgu Volcano", "albums/final-fantasy-i/songs/ff1gurguvolcano.mid"],
+    ["Matoya's Cave", "albums/final-fantasy-i/songs/ff1matouyascave.mid"],
+    ["Menu", "albums/final-fantasy-i/songs/ff1menu.mid"],
+    ["Overworld", "albums/final-fantasy-i/songs/ff1overworld.mid"],
+    ["Prelude", "albums/final-fantasy-i/songs/ff1prelude.mid"],
+    ["Prologue", "albums/final-fantasy-i/songs/ff1prologue.mid"],
+    ["Ship", "albums/final-fantasy-i/songs/ff1ship.mid"],
+    ["Shop", "albums/final-fantasy-i/songs/ff1shop.mid"],
+    ["Town", "albums/final-fantasy-i/songs/ff1town.mid"],
+    ["Underwater Palace", "albums/final-fantasy-i/songs/ff1underwaterpalace.mid"],
+    ["Victory", "albums/final-fantasy-i/songs/ff1victory.mid"],
   ],
   "My Compositions": [
-    ["Baseball / Beach Song", "compositions/CM6-G7b9.mid"],
-    ["Key Change Test (07-26)", "compositions/KeyChangeTest-07-26.mid"],
+    ["Baseball / Beach Song", "albums/compositions/CM6-G7b9.mid"],
+    ["Key Change Test (07-26)", "albums/compositions/KeyChangeTest-07-26.mid"],
   ],
 };
 const TRACK_COLORS = ["#d95926","#3987e5","#199e70","#c98500","#d55181","#9085e9","#008300","#e66767",
@@ -877,6 +877,21 @@ function curTick() {
   return playing ? secToTick(song, playSec()) : playCursor;
 }
 let lastSubtitle = null;
+// 2026-08-02 repo reorg: song files moved into albums/ — carry this
+// device's per-song localStorage (notes, edits, meter stash, last song) along
+(function migrateAlbumPaths() {
+  const remap = v => v.replace(/^(ff1roll-(?:notes|edits|ts)-)?midi\//, "$1albums/final-fantasy-i/songs/")
+                     .replace(/^(ff1roll-(?:notes|edits|ts)-)?compositions\//, "$1albums/compositions/");
+  for (const k of Object.keys(localStorage)) {
+    if (!/^ff1roll-(notes|edits|ts)-(midi|compositions)\//.test(k)) continue;
+    const nk = remap(k);
+    if (!localStorage.getItem(nk)) localStorage.setItem(nk, localStorage.getItem(k));
+    localStorage.removeItem(k);
+  }
+  const last = localStorage.getItem("ff1roll-lastsong");
+  if (last && /^(midi|compositions)\//.test(last))
+    localStorage.setItem("ff1roll-lastsong", remap(last));
+})();
 let hlOn = localStorage.getItem("ff1roll-hl") === "1"; // ⊙ highlight toggle
 function toggleHl() {
   hlOn = !hlOn;
@@ -2216,7 +2231,7 @@ const songsheet = document.getElementById("songsheet");
 const ALL_PATHS = Object.values(CATALOG).flat().map(([, p]) => p);
 let currentPath = (() => {
   const last = localStorage.getItem("ff1roll-lastsong");
-  return ALL_PATHS.includes(last) ? last : "midi/ff1overworld.mid";
+  return ALL_PATHS.includes(last) ? last : "albums/final-fantasy-i/songs/ff1overworld.mid";
 })();
 function songTitleOf(path) {
   for (const songs of Object.values(CATALOG)) {

@@ -1,8 +1,8 @@
-// Dump every FF1 song from the NSF into chip/: <song>.notes.txt (analysis)
+// Dump every FF1 song from the NSF into albums/final-fantasy-i/chip/: <song>.notes.txt (analysis)
 // and <song>.mid (playable in Night Roll, for verification against the
 // transcriptions). Track numbers from the Zophar m3u; meter per song from
 // the corresponding MIDI; tempo auto-fitted to the chip's own timing.
-// Run: node tools/nsf/dump-all.mjs reference/ff1.nsf
+// Run: node tools/nsf/dump-all.mjs albums/final-fantasy-i/reference/ff1.nsf
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
 import { reconstruct, toNotesTxt, fitBpm, detectLoop, backportTiming } from "./notes.mjs";
@@ -57,7 +57,7 @@ const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 
 function meterOf(repoName) { // meter + bpm seed + bar count from the transcription MIDI
   try {
     const app = createApp();
-    app.context.midiBytes = [...readFileSync("midi/" + repoName + ".mid")];
+    app.context.midiBytes = [...readFileSync("albums/final-fantasy-i/songs/" + repoName + ".mid")];
     const info = JSON.parse(app.run(
       "JSON.stringify((() => { const r = parseMidi(new Uint8Array(midiBytes).buffer); const bt = r.timesig[0] * 4 / r.timesig[1] * r.ppq; let end = 0; r.tracks.forEach(t => t.notes.forEach(n => end = Math.max(end, n.t + n.d))); return {ts: r.timesig, bpm: Math.round(6e7 / r.tempos[0].usq), bars: Math.ceil(end / bt - 0.05)}; })())"));
     return {tsNum: info.ts[0], tsDen: info.ts[1], seedBpm: info.bpm, midiBars: info.bars};
@@ -66,7 +66,7 @@ function meterOf(repoName) { // meter + bpm seed + bar count from the transcript
   }
 }
 
-const nsfPath = process.argv[2] || "reference/ff1.nsf";
+const nsfPath = process.argv[2] || "albums/final-fantasy-i/reference/ff1.nsf";
 const nsf = parseNSF(readFileSync(nsfPath));
 console.log(`${nsf.name} — ${nsf.artist}; ${nsf.songs} tracks in file`);
 
@@ -135,20 +135,20 @@ for (const [track, name, seconds] of TRACKS) {
     frames: keptFrames, frameSec, bpm, tsNum, tsDen, snap,
     title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm; " + cutInfo + (snap ? "" : "; raw timing, grid approximate") + ")",
   });
-  writeFileSync("chip/" + name + ".notes.txt", txt);
-  writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec, snap}));
+  writeFileSync("albums/final-fantasy-i/chip/" + name + ".notes.txt", txt);
+  writeFileSync("albums/final-fantasy-i/chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec, snap}));
 
   // when the loop returns somewhere other than the top, that's hardware fact:
   // record it as a loop: directive in the chip song's rollnotes (never
   // overwrite a file Josh may have edited)
-  if (loop && !existsSync("chip/" + name + ".rollnotes")) {
+  if (loop && !existsSync("albums/final-fantasy-i/chip/" + name + ".rollnotes")) {
     const backBeats = (loop.keep - loop.period) * frameSec / beatSec;
     if (backBeats > 0.4) {
       // anchor = the jump point (capture end), value = the jump target —
       // the player fires the loop at the anchor when it sits past the target
       const anchor = bq(loop.keep * frameSec / beatSec);
       const target = "loop: " + bq(backBeats);
-      writeFileSync("chip/" + name + ".rollnotes",
+      writeFileSync("albums/final-fantasy-i/chip/" + name + ".rollnotes",
         "# " + name + ".rollnotes — chip capture\n\n[" + anchor + "]\n" + target + "\n");
       console.log("   wrote loop directive: [" + anchor + "] " + target);
     }

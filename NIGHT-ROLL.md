@@ -122,7 +122,7 @@ loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the
   "Bbm" (minor maps to its relative major's signature).
 - Every FF song is a chip capture (2026-08-02, extracted from the NSF via
   tools/nsf/), trimmed to intro + one loop pass at the frame-exact repeat
-  point — see chip/CUTS.md for the verified cut/loop table. Songs whose
+  point — see albums/final-fantasy-i/chip/CUTS.md for the verified cut/loop table. Songs whose
   loop returns past a once-only intro carry a measured `loop:` directive
   in their rollnotes (battle, gameover, overworld, ship, victory).
 

@@ -1,4 +1,4 @@
-// Generate midi/<song>.notes.txt — plain-text note dumps so LLMs (e.g. the
+// Generate songs/<song>.notes.txt — plain-text note dumps so LLMs (e.g. the
 // Claude app reading this repo) can analyze songs whose .mid binaries they
 // can't parse. Uses the app's own parser via the test harness.
 // Run: node tools/dump_notes.mjs
@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const MIDI = path.join(ROOT, "midi");
+const MIDI = path.join(ROOT, "albums/final-fantasy-i/songs");
 
 for (const f of readdirSync(MIDI).filter(f => f.endsWith(".mid")).sort()) {
   const app = createApp();

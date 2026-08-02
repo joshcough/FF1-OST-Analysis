@@ -1,39 +1,47 @@
-# FF1 OST Analysis
+# Night Roll
 
-Track-by-track harmonic and melodic analysis of the Final Fantasy 1 (NES) soundtrack by Nobuo Uematsu. Goal: extract reusable composition devices — how melody, arpeggio, and bass share three monophonic channels, and the harmonic moves that make these loops work.
+A single-file web app for studying game soundtracks: piano roll + engraved
+score over one shared timeline, NES-voiced playback, and a beat-anchored
+annotation system for writing analysis directly onto the music.
 
-## Method
+**Live:** https://joshcough.github.io/night-roll/ — no build step; `git push`
+is deployment. Built for iPad-in-bed ergonomics, works anywhere.
 
-**The goal is learning composition, not producing documents.** Analyses are built through conversation: Josh listens (Logic, guitar, piano), makes observations, and the doc grows from that dialogue. `reference/` holds material kept aside so it doesn't spoil the discovery process.
+## What it does
 
-Cross-song references:
-- [chord-charts.md](chord-charts.md) — bar-by-bar chord grids for every analyzed song, plus recurring templates shared across songs
-- [supplemental-learning.md](supplemental-learning.md) — theory practice plan around the analyses
+- **Two views, one timeline** — canvas piano roll and VexFlow-engraved score,
+  sharing the bar ruler, sections, cursor, playhead, and pinch gestures.
+- **Playback** — WebAudio NES voices (pulse/pulse/triangle + drum kit),
+  per-track mute/solo, loop directives with mid-song jump points, 25–200%
+  speed, smooth notehead-to-notehead score playhead.
+- **Annotations (`.rollnotes`)** — plain-text sidecar per song: beat-anchored
+  notes, section bands, key changes, loop points. Edited in-app (with
+  dictation), synced to this repo via the GitHub Contents API.
+- **Analysis-first design** — the app never reveals keys or chords on its
+  own; signatures and spellings render only what the analyst has recorded.
+  Discovery is the point.
+- **Chip-true data** — the NSF pipeline in `tools/nsf/` (a 6502 emulator +
+  APU register logger + note reconstruction) extracts songs from the actual
+  cartridge sound data: real channels, real tempos, frame-exact loops.
 
-Each song gets:
-- A MIDI transcription (`<song>.mid`) as the source of truth
-- An analysis doc (`<song>.md`): chord progression with Roman numerals, note-by-note melody analysis, arpeggio and bass track breakdowns, form summary
-- New devices appended to the **Devices Log** in the analysis (running list of steal-able techniques across the OST)
+## The music
 
-## Tracks
+- **[albums/final-fantasy-i/](albums/final-fantasy-i/)** — the FF1 (NES)
+  soundtrack, extracted from the NSF, with the analysis work: song docs,
+  chord charts, the key sweep, and the verified loop-cut table
+  ([CUTS.md](albums/final-fantasy-i/chip/CUTS.md)).
+- **[albums/compositions/](albums/compositions/)** — original pieces written
+  during the study.
 
-| Song | MIDI | Analysis | Status |
-|------|------|----------|--------|
-| Cornelia Castle | [cornelia-castle.mid](cornelia-castle.mid) | [cornelia-castle.md](cornelia-castle.md) | ✅ Done |
-| Prelude | — | — | Planned |
-| Opening Theme | — | — | Planned |
-| Town | — | — | Planned |
-| Matoya's Cave | — | — | Planned |
-| Chaos Shrine (Temple of Fiends) | — | — | Planned |
-| Overworld | [midi/ff1overworld.mid](midi/ff1overworld.mid) | in progress ([reference draft](reference/overworld-claude-draft.md)) | 🔜 In progress |
-| Battle Theme | — | — | Planned |
+## The learning workflow
 
-## Key findings so far (Cornelia Castle)
+Analysis happens in dialogue, not in bulk — see each album's README. Working
+docs at the root: [open-items.md](open-items.md) (questions and owed
+exercises), [quizzes.md](quizzes.md) (spaced-recall bank),
+[supplemental-learning.md](supplemental-learning.md) (session log).
 
-- Melody lands a chord tone on every chord-arrival downbeat — zero exceptions; 3rd is the favorite landing note
-- Bass is line-first: chromatic descent chosen before the chords; inversions exist to serve the line
-- Complementary motion: at any moment exactly one voice does stepwise motion while the other holds
-- Chromatic events are isolated: one voice carries the out-of-key note prominently, others vacate
-- Skeleton is the Pachelbel/romanesca schema with every joint upgraded (secondary dominants, borrowed iv, inversions)
+## Development
 
-Full devices log at the bottom of [cornelia-castle.md](cornelia-castle.md).
+`make serve` → http://localhost:8000 · `make test` → Node's built-in runner
+over `tests/` (the harness runs the app's inline script in a vm, so the app
+stays one file). Technical reference: [NIGHT-ROLL.md](NIGHT-ROLL.md).
