@@ -1894,7 +1894,11 @@ function renderMeasure(mi) {
     VF.Accidental.applyAccidentals([voice], SF_MAJOR[sfM] || "C");
     new VF.Formatter().joinVoices([voice]).format([voice], mw - (stave.getNoteStartX() - SCORE_PAD) - 14);
     voice.draw(ctx2, stave);
-    const beams = VF.Beam.generateBeams(vnotes.filter(v => !v.isRest()));
+    // rests must break beams — beaming only the notes bridges beams straight
+    // across rest gaps (spaghetti in syncopated 16th patterns)
+    let beams;
+    try { beams = VF.Beam.generateBeams(vnotes, {beam_rests: false}); }
+    catch (e) { beams = VF.Beam.generateBeams(vnotes.filter(v => !v.isRest())); }
     beams.forEach(b => {
       b.setStyle({fillStyle: st.color, strokeStyle: st.color});
       b.setContext(ctx2).draw();
