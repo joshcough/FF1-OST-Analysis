@@ -159,3 +159,15 @@ Testable prediction on the table: if compound lines are a workaround for the
 three-voice ceiling, they should thin out as channels become available; if
 they don't, it was style, not workaround. Confound: fifteen years also means
 a composer improving, different teams, different game scale.
+
+## Source file provenance
+
+The exact NSF every capture derives from (Zophar's Domain FF1 NSF,
+downloaded 2026-08-02; kept out of the public tree — `*.nsf` is
+gitignored; archived in the private repo `joshcough/nsf-archive`):
+
+    SHA-256 467861797013f4d48e1a645b82c3cec6b11d7a1840e0cd3e1ae820ad2b695124  ff1.nsf (32,896 bytes; 23 tracks)
+
+Any future copy that matches this hash is byte-identical to the one used.
+A copy that doesn't match is a different revision — recheck CUTS.md
+against a fresh dump before trusting it.
