@@ -128,7 +128,7 @@ loop: 2.1          ← "loop:" prefix = loop directive. At the end of the
 
 ## Code map (index.html, section comments mark these)
 
-catalog → CATALOG (grouped dropdown; songs addressed by repo path) ·
+catalog → CATALOG + two-level song picker (groups sheet → songs; opens into the current song's group) ·
 midi parse → parseMidi + tempo maps · rollnotes → parse/serialize/regions/
 sfAt/subtitle · lasso/chord id · load song → setSong (computes songEndTick;
 loadGen guards stale async loads) · track chips · drawing → draw/drawRuler (roll) ·

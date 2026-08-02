@@ -61,6 +61,7 @@
     cursor: pointer;
   }
   select { max-width: 44vw; }
+  #songbtn { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; min-width: 74px; }
   button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -283,7 +284,7 @@
 <body>
 <header>
   <div class="brand">NIGHT <span>//</span> ROLL</div>
-  <select id="songsel" aria-label="Song"></select>
+  <button id="songbtn" aria-label="Song">Songs ▾</button>
   <button id="rwbtn" aria-label="Back to start">⏮</button>
   <button class="primary" id="playbtn">▶ Play</button>
   <button id="viewbtn" aria-label="Toggle score view">𝄞 Score</button>
@@ -325,6 +326,14 @@
   <button id="syncbtn">Sync</button>
   <button id="clearbtn" style="display:none">Clear edits</button>
 </footer>
+
+<div class="overlay" id="songsheet">
+  <div class="sheet help">
+    <h2 id="songsheettitle">SONGS</h2>
+    <div id="songrows" style="display:flex;flex-direction:column;gap:7px"></div>
+    <div class="row"><button id="songsheetclose">Close</button></div>
+  </div>
+</div>
 
 <div class="overlay" id="noteeditor">
   <div class="sheet">
@@ -2204,24 +2213,66 @@ function scoreTap(pos) {
 }
 
 // ---------------------------------------------------------------- ui wiring
-const sel = document.getElementById("songsel");
-for (const [group, songs] of Object.entries(CATALOG)) {
-  const og = document.createElement("optgroup");
-  og.label = group;
-  for (const [title, path] of songs) {
-    const o = document.createElement("option");
-    o.value = path; o.textContent = title;
-    og.appendChild(o);
-  }
-  sel.appendChild(og);
-}
+// two-level song picker: groups first, then that group's songs — a flat
+// 43-entry dropdown got unusable once chip captures joined the catalog
+const songbtn = document.getElementById("songbtn");
+const songsheet = document.getElementById("songsheet");
 const ALL_PATHS = Object.values(CATALOG).flat().map(([, p]) => p);
-const lastSong = localStorage.getItem("ff1roll-lastsong");
-sel.value = ALL_PATHS.includes(lastSong) ? lastSong : "midi/ff1overworld.mid";
-sel.addEventListener("change", () => {
-  localStorage.setItem("ff1roll-lastsong", sel.value);
-  loadSong(sel.value).catch(e => setInfo(e.message));
+let currentPath = (() => {
+  const last = localStorage.getItem("ff1roll-lastsong");
+  return ALL_PATHS.includes(last) ? last : "midi/ff1overworld.mid";
+})();
+function songTitleOf(path) {
+  for (const songs of Object.values(CATALOG)) {
+    const hit = songs.find(([, p]) => p === path);
+    if (hit) return hit[0];
+  }
+  return path.split("/").pop();
+}
+function updateSongBtn() { songbtn.textContent = songTitleOf(currentPath) + " ▾"; }
+function songRow(label, onTap, dim) {
+  const row = document.createElement("div");
+  row.className = "noterow";
+  row.setAttribute("role", "button");
+  const body = document.createElement("span");
+  body.className = "body";
+  if (dim) body.style.color = "var(--dim)";
+  body.textContent = label;
+  row.appendChild(body);
+  row.addEventListener("click", onTap);
+  return row;
+}
+function renderSongGroups() {
+  document.getElementById("songsheettitle").textContent = "SONGS";
+  const rows = document.getElementById("songrows");
+  rows.innerHTML = "";
+  for (const [group, songs] of Object.entries(CATALOG)) {
+    rows.appendChild(songRow(group + "  (" + songs.length + ") ›", () => renderSongList(group)));
+  }
+}
+function renderSongList(group) {
+  document.getElementById("songsheettitle").textContent = group.toUpperCase();
+  const rows = document.getElementById("songrows");
+  rows.innerHTML = "";
+  rows.appendChild(songRow("‹ Back", renderSongGroups, true));
+  for (const [title, path] of CATALOG[group]) {
+    const row = songRow(title + (path === currentPath ? "   ✓" : ""), () => {
+      currentPath = path;
+      localStorage.setItem("ff1roll-lastsong", path);
+      updateSongBtn();
+      songsheet.classList.remove("on");
+      loadSong(path).catch(e => setInfo(e.message));
+    });
+    rows.appendChild(row);
+  }
+}
+songbtn.addEventListener("click", () => {
+  // open straight into the current song's group — one less tap for the sweep
+  const group = Object.entries(CATALOG).find(([, songs]) => songs.some(([, p]) => p === currentPath));
+  if (group) renderSongList(group[0]); else renderSongGroups();
+  songsheet.classList.add("on");
 });
+document.getElementById("songsheetclose").addEventListener("click", () => songsheet.classList.remove("on"));
 document.getElementById("playbtn").addEventListener("click", () => {
   if (!song) return; // first song still fetching
   playing ? stop() : play(playCursor > 0 ? tickToSec(song, playCursor) : 0);
@@ -2440,6 +2491,7 @@ document.getElementById("fileinput").addEventListener("change", async e => {
   try {
     setSong(parseMidi(await f.arrayBuffer()), null);
     setInfo(f.name + " loaded (edits not saved for local files)");
+    songbtn.textContent = f.name + " ▾";
   } catch (err) { setInfo("could not parse: " + err.message); }
 });
 document.getElementById("modeseg").addEventListener("click", e => {
@@ -2770,7 +2822,8 @@ document.getElementById("ghsaveall").addEventListener("click", async e => {
 applyViewMode();
 resize();
 updateSyncBtn();
-loadSong(sel.value).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
+updateSongBtn();
+loadSong(currentPath).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
 </script>
 </body>
 </html>
