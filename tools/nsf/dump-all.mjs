@@ -20,7 +20,9 @@ const PERIOD_BARS = {
                        // 21st MIDI bar was the arranger's, like gameover's
   ff1matouyascave: 20, ff1cave: 30, ff1chaostemple: 16,
   ff1underwaterpalace: 16, ff1shop: 21, ff1battle: 26, ff1menu: 8,
-  ff1gameover: 8, ff1victory: 6,
+  ff1gameover: 8,
+  ff1victory: 8, // NOT 6 — snap-residual audit picks 150bpm (8 bars) over
+                 // 112.5 (6 bars) decisively; same driver family as the rest
 };
 
 // no loop to calibrate from (through-composed), but the blind grid fit lands

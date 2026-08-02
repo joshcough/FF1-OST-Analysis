@@ -31,7 +31,7 @@ Verified 2026-08-02 (Josh by ear + frame-exact register data agreeing).
 | battle | 29.3.5 | 3.3.5 | 26 bars | 150 |
 | menu | 9.1 | 1.1 | 8 bars | 90 |
 | gameover | 9.3 | 1.3 | 8 bars | 90 |
-| victory | 8.4.5 | 2.4.5 | 6 bars | 112.5 |
+| victory | 11.3 | 3.3 | 8 bars | 150 |
 
 Notes:
 
@@ -41,8 +41,10 @@ Notes:
 - **battle** — bars 1–3.3 are a once-only intro; the descending run before
   the seam is the body's turnaround, played every pass.
 - **gameover** — 2-beat once-only pickup, then a clean 8-bar loop.
-- **victory** — 1.5-bar intro; articulation varies per pass (detector
-  needs its period hint in dump-all.mjs HINTS).
+- **victory** — 2.5-bar intro; articulation varies per pass (detector
+  needs its period hint in dump-all.mjs HINTS). Tempo is 150 with an
+  8-bar loop — the earlier 6-bar/112.5 reading mislabeled the same
+  frame-exact seam (snap-residual audit settled it, 2026-08-02).
 - **gurguvolcano** — the transcription has 21 bars but the chip loop is
   exactly 20 at 150; the 21st MIDI bar was the arranger's (same as
   gameover's extra bar).
