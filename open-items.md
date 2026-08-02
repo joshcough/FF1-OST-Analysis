@@ -49,12 +49,15 @@ session start alongside the quiz.)
 
 ## Tooling to-do
 
-- **NSF pipeline** (scoped 2026-08-01): extract analysis-grade note data
-  from the actual chip — see [reference/nsf-pipeline-plan.md](reference/nsf-pipeline-plan.md)
-  for the full plan and the critical keep-the-intermediate-dumb constraint.
-  Motivation confirmed by audit: only 3 of 21 MIDIs (prelude, shop,
-  victory) stay within the NES's 3-pitched-voice ceiling; the rest are
-  arrangements, so voice-leading analysis on them measures the arranger.
+- **NSF pipeline** (scoped 2026-08-01, **built 2026-08-02**): extract
+  analysis-grade note data from the actual chip — see
+  [reference/nsf-pipeline-plan.md](reference/nsf-pipeline-plan.md).
+  Emulator + logger + reconstruction + CLI all working, tested against a
+  synthetic NSF. **Blocked on Josh supplying the FF1 NSF file** (archive
+  or own-cartridge dump — his call). Motivation confirmed by audit: only
+  3 of 21 MIDIs (prelude, shop, victory) stay within the NES's
+  3-pitched-voice ceiling; the rest are arrangements, so voice-leading
+  analysis on them measures the arranger.
 - **Fixed 2026-08-02 from Josh's session notes:** key writer now records
   mode (major/minor toggle; `key: Gm` not `key: Bb`) and the three
   affected rollnotes were corrected; "Commit all changed" syncs every

@@ -2,6 +2,16 @@
 
 Scoped 2026-08-01 (Josh + Claude session). A build task, not analysis.
 
+**Status 2026-08-02: stages 1–3 BUILT and tested.** `tools/nsf/` holds a
+6502 core (instruction-accurate; register-write order is what matters, not
+cycles), an NSF loader/driver (banked + non-banked), note reconstruction
+with channel identity, and a CLI (`node tools/nsf/dump.mjs song.nsf --bpm N
+[--song N] [--seconds N] [--ts N/D]`). Verified end-to-end against a
+synthetic, self-assembled NSF (tests/nsf.test.mjs) — no copyrighted data
+involved. **Waiting on: the actual FF1 NSF file, Josh's to obtain** (archive
+download or own-cartridge dump). Expect note-on/off heuristics to need
+iteration against the real driver's register habits once it arrives.
+
 ## Why
 
 The MIDIs in `midi/` are arrangements, not captures. Confirmed on
