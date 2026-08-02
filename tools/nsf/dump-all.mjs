@@ -5,16 +5,27 @@
 // Run: node tools/nsf/dump-all.mjs reference/ff1.nsf
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
-import { reconstruct, toNotesTxt, fitBpm } from "./notes.mjs";
+import { reconstruct, toNotesTxt, fitBpm, detectLoop } from "./notes.mjs";
 import { makeMidi } from "./midi-write.mjs";
 import { createApp } from "../../tests/harness.mjs";
 
-const TRACKS = [ // [nsf track, repo name, seconds to capture]
-  [1,  "ff1prelude", 80],
-  [2,  "ff1prologue", 80],
+// Songs whose midi/ transcription is already loop-trimmed to a verified bar
+// count: the chip's exact loop length ÷ that count gives the TRUE tempo,
+// fixing the fitted-bpm drift. The rest (untrimmed transcriptions) fall
+// back to the grid fit.
+const TRUSTED_BARS = new Set([
+  "ff1airship", "ff1battle", "ff1cave", "ff1chaostemple", "ff1corneliacastle",
+  "ff1gameover", "ff1gurguvolcano", "ff1matouyascave", "ff1menu",
+  "ff1overworld", "ff1prologue", "ff1ship", "ff1shop", "ff1town",
+  "ff1underwaterpalace",
+]);
+
+const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 loops]
+  [1,  "ff1prelude", 170],
+  [2,  "ff1prologue", 85],
   [3,  "ff1epilogue", 120],
-  [4,  "ff1overworld", 55],
-  [5,  "ff1ship", 80],
+  [4,  "ff1overworld", 60],
+  [5,  "ff1ship", 90],
   [6,  "ff1airship", 45],
   [7,  "ff1town", 45],
   [8,  "ff1corneliacastle", 40],
@@ -31,15 +42,15 @@ const TRACKS = [ // [nsf track, repo name, seconds to capture]
   [19, "ff1victory", 30],
 ];
 
-function meterOf(repoName) { // meter + bpm seed from the transcription MIDI
+function meterOf(repoName) { // meter + bpm seed + bar count from the transcription MIDI
   try {
     const app = createApp();
     app.context.midiBytes = [...readFileSync("midi/" + repoName + ".mid")];
     const info = JSON.parse(app.run(
-      "JSON.stringify((() => { const r = parseMidi(new Uint8Array(midiBytes).buffer); return {ts: r.timesig, bpm: Math.round(6e7 / r.tempos[0].usq)}; })())"));
-    return {tsNum: info.ts[0], tsDen: info.ts[1], seedBpm: info.bpm};
+      "JSON.stringify((() => { const r = parseMidi(new Uint8Array(midiBytes).buffer); const bt = r.timesig[0] * 4 / r.timesig[1] * r.ppq; let end = 0; r.tracks.forEach(t => t.notes.forEach(n => end = Math.max(end, n.t + n.d))); return {ts: r.timesig, bpm: Math.round(6e7 / r.tempos[0].usq), bars: Math.ceil(end / bt - 0.05)}; })())"));
+    return {tsNum: info.ts[0], tsDen: info.ts[1], seedBpm: info.bpm, midiBars: info.bars};
   } catch (err) {
-    return {tsNum: 4, tsDen: 4, seedBpm: 120};
+    return {tsNum: 4, tsDen: 4, seedBpm: 120, midiBars: null};
   }
 }
 
@@ -54,14 +65,45 @@ for (const [track, name, seconds] of TRACKS) {
   // (caveat: a pickup-intro song like ship starts its pickup at bar 1 beat 1)
   const t0 = Math.min(...events.map(e => e.startFrame));
   events = events.map(e => ({...e, startFrame: e.startFrame - t0, endFrame: e.endFrame - t0}));
-  const {tsNum, tsDen, seedBpm} = meterOf(name);
-  const bpm = fitBpm(events, frameSec, seedBpm);
+  const {tsNum, tsDen, seedBpm, midiBars} = meterOf(name);
+
+  // trim to intro + one loop pass, exactly as the transcriptions were
+  const loop = detectLoop(events, frames - t0);
+  let keptFrames = frames - t0;
+  if (loop) {
+    keptFrames = loop.keep;
+    events = events.filter(e => e.startFrame < keptFrames)
+      .map(e => ({...e, endFrame: Math.min(e.endFrame, keptFrames)}));
+  }
+
+  // tempo: exact from the loop length when the transcription's bar count is
+  // verified; otherwise fall back to the grid fit
+  let bpm, tempoSrc;
+  if (loop && midiBars && TRUSTED_BARS.has(name)) {
+    const barSec = keptFrames * frameSec / midiBars;
+    bpm = +(60 * (tsNum * 4 / tsDen) / barSec).toFixed(2);
+    tempoSrc = "loop-calibrated";
+    // sanity: a calibrated tempo wildly off the MIDI's means the trim itself
+    // is wrong (e.g. a doubled pass) — fall back and flag rather than lie
+    if (bpm < seedBpm * 0.8 || bpm > seedBpm * 1.25) {
+      bpm = fitBpm(events, frameSec, seedBpm);
+      tempoSrc = "grid-fitted (calibration REJECTED — check trim)";
+    }
+  } else {
+    bpm = fitBpm(events, frameSec, seedBpm);
+    tempoSrc = "grid-fitted";
+  }
+  const chipBars = keptFrames * frameSec / (60 / bpm * (tsNum * 4 / tsDen));
+
   const txt = toNotesTxt(events, {
-    frames, frameSec, bpm, tsNum, tsDen,
-    title: name + " (chip capture, NSF track " + track + ", tempo fitted " + bpm + "bpm)",
+    frames: keptFrames, frameSec, bpm, tsNum, tsDen,
+    title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm)",
   });
   writeFileSync("chip/" + name + ".notes.txt", txt);
   writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec}));
   console.log(name.padEnd(22) + "track " + String(track).padEnd(3) +
-              bpm + "bpm  " + events.length + " notes");
+              (loop ? "keep " + (loop.keep * frameSec).toFixed(1) + "s (P=" +
+                      (loop.period * frameSec).toFixed(1) + "s)" : "no-loop").padEnd(24) +
+              bpm + "bpm (" + tempoSrc + ")  bars " + chipBars.toFixed(2) +
+              (midiBars ? " vs midi " + midiBars : ""));
 }

@@ -1,4 +1,4 @@
-# ff1gameover (chip capture, NSF track 18, tempo fitted 90.05bpm) — 4/4, 90.05bpm, 17 bars (from NSF capture)
+# ff1gameover (chip capture, NSF track 18, grid-fitted (calibration REJECTED — check trim) 90.05bpm) — 4/4, 90.05bpm, 16 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 
@@ -18,8 +18,7 @@ bar 12: 2 B4 0.5, 2.5 D5 0.5, 3 D5 0.5, 3.5 C#5 0.5, 4 E5 1.5
 bar 13: 1.5 C#5 0.5, 2 D5 0.5, 2.5 E5 0.5, 3 F5 1.5, 4.5 A4 0.5
 bar 14: 1 A#4 1, 2 G5 0.5, 2.5 F5 0.5, 3 E5 0.5, 3.5 F5 0.5, 4 E5 0.5, 4.5 G4 0.5
 bar 15: 1 A4 1, 2 A#4 0.5, 2.5 C5 0.5, 3 D5 1.5, 4.5 E5 0.5
-bar 16: 1 D5 1, 2 C#5 1, 3 D5 4
-bar 17: 3 F5 1.5
+bar 16: 1 D5 1, 2 C#5 1, 3 D5 0.5
 
 ## channel pulse2
 bar 1: 3 A4 1, 4 F4 1, 5 G4 1
@@ -37,8 +36,7 @@ bar 12: 2 G#4 1, 3 A4 2, 5 G4 2
 bar 13: 3 A4 1, 4 F4 1
 bar 14: 1 G4 1, 2 A#4 1, 3 G4 1, 4 E4 1
 bar 15: 1 F4 1, 2 C4 1, 3 F4 1, 4 A4 1
-bar 16: 1 G4 1, 2 E4 1, 3 F4 4
-bar 17: 3 A4 1, 4 F4 0.5
+bar 16: 1 G4 1, 2 E4 1, 3 F4 0.5
 
 ## channel triangle
 bar 1: 3 D4 2, 5 G4 2
@@ -56,5 +54,4 @@ bar 12: 3 A3 2, 5 A4 1
 bar 13: 2 E4 1, 3 D4 2
 bar 14: 1 G4 2, 3 C4 2
 bar 15: 1 F4 2, 3 B3 2
-bar 16: 1 A3 2, 3 D5 0.5, 3.5 A4 0.5, 4 G4 0.5, 4.5 A4 0.5
-bar 17: 1 D4 1.5, 3 D4 1.5
+bar 16: 1 A3 2, 3 D5 0.5

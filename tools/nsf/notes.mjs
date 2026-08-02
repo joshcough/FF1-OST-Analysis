@@ -81,6 +81,58 @@ export function reconstruct(apuLog, frames, frameSec) {
 // The chip's true tempo rarely equals the MIDI transcription's round number
 // (drivers count frames, not bpm). Fit it: sweep candidates, score how well
 // note onsets snap to a 16th-note grid, keep the best.
+// Chip loops are frame-exact (identical register writes each pass), so the
+// loop is detectable precisely. For a candidate period P, find R = the first
+// frame from which everything is pure repetition (every event at t ≥ R has an
+// identical partner at t−P). Keep [0, R): intro + one full pass — the same
+// cut rule used to trim the transcriptions. Returns {keep: R, period: P} in
+// frames, or null (non-looping jingles like the epilogue).
+export function detectLoop(events, frames) {
+  const evs = [...events].sort((a, b) => a.startFrame - b.startFrame);
+  if (evs.length < 8) return null;
+  const byKey = new Map(); // channel:midi:startFrame -> event
+  for (const e of evs) byKey.set(e.channel + ":" + e.midi + ":" + e.startFrame, e);
+
+  // probe several events so intro-only material (which never recurs) can't
+  // blind the search: song start, each channel's start, and two loop-body spots
+  const probes = [evs[0]];
+  for (const c of ["pulse1", "pulse2", "triangle", "noise"]) {
+    const p = evs.find(e => e.channel === c);
+    if (p) probes.push(p);
+  }
+  for (const frac of [0.3, 0.45]) {
+    const p = evs.find(e => e.startFrame >= frames * frac);
+    if (p) probes.push(p);
+  }
+  const candidates = [...new Set(probes.flatMap(pr =>
+    evs.filter(e => e !== pr && e.channel === pr.channel && e.midi === pr.midi &&
+                    e.startFrame > pr.startFrame + 60)
+       .map(e => e.startFrame - pr.startFrame)))].sort((a, b) => a - b);
+
+  const TOL = 3; // loop-boundary artifacts (restart attack vs shifted song start)
+  for (const P of candidates) {
+    const bad = [];
+    let matched = 0;
+    for (const e of evs) {
+      if (e.startFrame < P) continue;
+      const partner = byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame - P));
+      const durOk = partner && (Math.abs((partner.endFrame - partner.startFrame) -
+                    (e.endFrame - e.startFrame)) <= 2 || e.endFrame >= frames - 2);
+      if (durOk) matched++;
+      else bad.push(e.startFrame);
+    }
+    if (matched < 8) continue;
+    bad.sort((a, b) => a - b);
+    const cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1] + 1; // allow TOL stragglers
+    const keep = Math.max(P, cut); // repetition can't begin before one period has elapsed
+    // require some post-R evidence that it really repeats (≥ ~3 seconds)
+    if (keep <= frames - 180 || (keep <= frames - 60 && matched > evs.length / 3)) {
+      return {keep, period: P};
+    }
+  }
+  return null;
+}
+
 // Seeded ±15% around the transcription's bpm — an open sweep locks onto
 // subharmonics (half tempo snaps the same grid), and matching the MIDI's
 // bar numbering is the point.
