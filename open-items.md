@@ -39,6 +39,17 @@ session start alongside the quiz.)
 
 ## Tooling to-do
 
+- **Two-regime score zoom** (parked 2026-08-01, low priority): pinch
+  compresses time down to the engraving floor (current behavior), then
+  keeps going by uniformly scaling the whole rendered page — staves,
+  glyphs, everything — like stepping back from paper. Discussed and
+  deemed workable: uniform scale preserves the shared linear x-axis, and
+  the floor-resolution measure cache downscales crisply for free. Cost:
+  plumbing a shrink factor through drawing, hit-testing, lasso bands,
+  playhead mapping (~an evening). Josh's verdict: not needed now — the
+  roll's unlimited zoom-out covers the overview job better anyway (lines
+  stay readable where tiny notes wouldn't).
+
 - **Synced-note edits don't survive reload before Sync** (found in 2026-07-31
   code review): editing/deleting a *synced* note then reloading the page
   resurrects the original (edits show as duplicates, deletes revert) because
