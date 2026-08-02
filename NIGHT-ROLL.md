@@ -54,7 +54,9 @@ inversions; missing-5th tolerance).
 **Annotations:** see format below. + Note editor is type-first (Text note /
 Section / Key change / Loop point) with bar/beat dropdowns. ☰ Notes lists everything,
 rows open the editor, Delete works on synced notes too (permanent on Sync).
-Gold ruler flags; range tints; subtitle strip follows playback.
+Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
+highlights the active note's span (ambient range tints removed — on a
+fully-annotated song they covered everything).
 
 **Keys:** display defaults to C until a `key:` annotation exists — key
 discovery is Josh's job, by design (the dial previews signatures live;

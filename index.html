@@ -161,7 +161,8 @@
 
   #subtitle {
     display: none;
-    padding: 10px 16px;
+    position: relative;
+    padding: 10px 96px 10px 16px;
     background: var(--panel2);
     border-top: 1px solid var(--grid);
     font-family: var(--mono);
@@ -174,6 +175,21 @@
   }
   #subtitle.on { display: block; }
   #subtitle .where { color: var(--dim); font-size: 11px; display: block; margin-bottom: 2px; }
+  #subtitle .hl {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 28px;
+    border-radius: 5px;
+    border: 1px solid var(--grid);
+    background: var(--panel);
+    color: var(--dim);
+    cursor: pointer;
+  }
+  #subtitle .hl.on { color: var(--gold); border-color: var(--gold); }
 
   .overlay {
     display: none;
@@ -395,7 +411,7 @@
 
     <h3>ANNOTATIONS (.rollnotes)</h3>
     <dl>
-      <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat. Fill "to bar/beat" to span a range. Ranges glow faint gold in the timeline.</dd>
+      <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat. Fill "to bar/beat" to span a range. The ⊙ highlight toggle in the note strip shades the current note's span in the timeline.</dd>
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
       <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
@@ -815,6 +831,14 @@ function curTick() {
   return playing ? secToTick(song, playSec()) : playCursor;
 }
 let lastSubtitle = null;
+let hlOn = localStorage.getItem("ff1roll-hl") === "1"; // ⊙ highlight toggle
+function toggleHl() {
+  hlOn = !hlOn;
+  localStorage.setItem("ff1roll-hl", hlOn ? "1" : "0");
+  lastSubtitle = undefined; // rerender the strip so the button state updates
+  updateSubtitle();
+  draw();
+}
 function updateSubtitle() {
   refreshKeysetLabel(); // cursor moved: keep "Set @ bar N" honest
   const el = document.getElementById("subtitle");
@@ -828,7 +852,11 @@ function updateSubtitle() {
   const sec = sectionPathAt(n.start);
   where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "") + (sec ? " · " + sec : "") +
                       (n.added ? " · unsynced" : "");
-  el.append(where, document.createTextNode(n.text));
+  const hl = document.createElement("button");
+  hl.className = "hl" + (hlOn ? " on" : "");
+  hl.textContent = "⊙ highlight";
+  hl.addEventListener("click", toggleHl);
+  el.append(where, document.createTextNode(n.text), hl);
   el.classList.add("on");
 }
 
@@ -919,20 +947,21 @@ const cssCache = {}; // theme is static — cache so 60fps draw() skips getCompu
 function css(name) {
   return cssCache[name] || (cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim());
 }
-// annotation range tints + ruler-drag selection (under everything else; both
-// views) — sections live in the ruler, key directives display as staff
-// signatures, so neither tints
+// on-demand highlight of the active note's span (⊙ in the subtitle strip)
+// + ruler-drag selection tint (both views). Always-on ambient tints are
+// gone: on a fully-annotated song they covered everything and meant nothing.
 function drawRangeTints(W, H) {
   const ppt = pxPerTick();
-  for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined || n.loopTo !== undefined) continue;
+  const n = hlOn && song ? activeNoteAt(curTick()) : null;
+  if (n && n.end > n.start) {
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
-    if (x + w < RULER_W || x > W) continue;
-    ctx.fillStyle = css("--gold");
-    ctx.globalAlpha = 0.045;
-    ctx.fillRect(x, RULER_H, w, H);
-    ctx.globalAlpha = 1;
+    if (x + w >= RULER_W && x <= W) {
+      ctx.fillStyle = css("--gold");
+      ctx.globalAlpha = 0.09;
+      ctx.fillRect(x, RULER_H, w, H);
+      ctx.globalAlpha = 1;
+    }
   }
   if (rangeSel) {
     const x = RULER_W + rangeSel.a * ppt - view.x;
