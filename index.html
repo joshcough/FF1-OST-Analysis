@@ -1254,6 +1254,9 @@ function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
 let drag = null, pinch = null;
 let followFree = false; // manual scroll during playback suspends auto-follow
                         // until the playhead walks back into view
+// score view can't zoom out as far as the roll: below ~36px/quarter VexFlow's
+// minimum glyph spacing overflows dense measures past their barlines
+function minPxq() { return viewMode === "score" ? 36 : 8; }
 function cursorHit(pos) {
   if (playing || !song || mode !== "select") return false;
   if (pos.y < RULER_H) return false; // ruler drags select a range instead
@@ -1309,7 +1312,7 @@ canvas.addEventListener("pointermove", e => {
     const PAD = 40;
     const sx = (Math.abs(pinch.a.x - pinch.b.x) + PAD) / (pinch.dx0 + PAD);
     const midX = (pinch.a.x + pinch.b.x) / 2 - RULER_W;
-    const newPxq = Math.min(400, Math.max(8, pinch.pxq * sx));
+    const newPxq = Math.min(400, Math.max(minPxq(), pinch.pxq * sx));
     view.x = (pinch.vx + midX) * (newPxq / pinch.pxq) - midX;
     view.pxq = newPxq;
     if (viewMode !== "score") { // score staves are fixed-height
@@ -1363,7 +1366,7 @@ canvas.addEventListener("wheel", e => {
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) {
     const mid = evtPos(e).x - RULER_W;
-    const newPxq = Math.min(400, Math.max(8, view.pxq * (e.deltaY < 0 ? 1.1 : 0.9)));
+    const newPxq = Math.min(400, Math.max(minPxq(), view.pxq * (e.deltaY < 0 ? 1.1 : 0.9)));
     view.x = (view.x + mid) * (newPxq / view.pxq) - mid;
     view.pxq = newPxq;
   } else { view.x += e.deltaX; view.y += e.deltaY; }
@@ -2272,6 +2275,7 @@ function applyViewMode() {
   if (viewMode === "score") {
     if (editOn) document.getElementById("editbtn").click(); // force-exit edit mode
     view.y = 0;
+    if (view.pxq < minPxq()) view.pxq = minPxq(); // roll zooms out further than engraving can
     if (view.x < 40) view.x = -SCORE_INTRO_W; // near the start: show clef/key column
   } else if (view.x < 0) view.x = 0;
   clampView();
