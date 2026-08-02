@@ -120,7 +120,11 @@ export function detectLoop(events, frames, hint = null) {
     }
     if (testable < 20 || bad.length > testable * maxBadRatio) continue;
     bad.sort((a, b) => a - b);
-    const cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1] + 1; // allow TOL stragglers
+    let cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1] + 1; // allow TOL stragglers
+    // a tight trailing cluster of "stragglers" is a loop-seam overlap (ship's
+    // pickup replayed under sustained accompaniment, battle's turnaround run)
+    // — real once-only material, so keep through it, don't slice mid-cluster
+    if (cut && bad[bad.length - 1] - cut < 100) cut = bad[bad.length - 1] + 1;
     // the backward check is blind to a non-repeating intro SHORTER than P
     // (its events sit at t < P, where nothing is tested — gameover's 2-beat
     // pickup). Forward pass: early events that never recur one period later

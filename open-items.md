@@ -157,10 +157,10 @@ session start alongside the quiz.)
   offer to auto-shift them if they look off.
   Dungeon trimmed to 16 by Josh's ear (2026-08-01). Awaiting cut bars
   for: elfland, epilogue, floatingcastle, prelude, ship, victory.
-- **Victory chip loop seam (2026-08-02):** register data confirms the
-  6-bar period into bar 2, but says the seam is at beat 3; Josh heard
-  beat 4&. Re-listen with the chip capture (chip/ff1victory) and settle
-  it. Chip rollnotes currently carry the data's answer (loop: 2.3).
+- **Victory chip loop seam — RESOLVED 2026-08-02:** the "beat 3" reading
+  was a trimmer artifact (it sliced mid-way through the loop-seam overlap
+  cluster). Fixed detector puts the seam at bar 2 beat 4 — Josh's by-ear
+  4& was right within a quarter-beat. Directive now loop: 2.4.
 - (Done recently, for orientation: Night Roll player, .rollnotes + sync,
   sections/arrangement lanes, range-select ruler drag, grouped dropdown
   with compositions/, CVD-safe track palette, rewind + Edit toggle.)
