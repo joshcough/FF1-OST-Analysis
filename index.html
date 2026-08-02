@@ -1224,14 +1224,31 @@ function finalizeLasso() {
   const t0 = (x0 - RULER_W + view.x) / ppt, t1 = (x1 - RULER_W + view.x) / ppt;
   multiSel = [];
   if (viewMode === "score" && scoreModel) {
+    // hit-test the engraved notehead boxes themselves — the roll's linear
+    // x->tick map doesn't hold on a score (noteheads aren't engraved
+    // proportionally), and selecting whole staff bands by time range grabbed
+    // notes far outside a narrow lasso (Josh, on Town's bass)
     const topY = RULER_H + 4 - (view.y || 0);
-    scoreModel.staves.forEach((st, si) => {
-      const bandTop = topY + SCORE_TOP + si * STAVE_H, bandBot = bandTop + STAVE_H;
-      if (bandBot <= y0 + 4 || bandTop >= y1 - 4) return;
-      song.tracks[st.ti].notes.forEach((n, ni) => {
-        if (!n.gone && n.t < t1 && n.t + n.d > t0) multiSel.push({ti: st.ti, ni});
-      });
-    });
+    const mbt = scoreModel.bt * ppt;
+    const mOrigin = k => RULER_W + k * mbt - view.x - SCORE_PAD;
+    const mLo = Math.max(0, Math.floor((x0 - RULER_W + view.x) / mbt) - 1);
+    const mHi = Math.min(scoreModel.nMeasures - 1, Math.ceil((x1 - RULER_W + view.x) / mbt) + 1);
+    const seen = new Set();
+    for (let k = mLo; k <= mHi; k++) {
+      const entry = scoreCache.get(k) || renderMeasure(k);
+      if (!entry) continue;
+      for (const g of entry.geo) {
+        const gx0 = mOrigin(k) + g.x0, gx1 = mOrigin(k) + g.x1;
+        const gy0 = topY + g.y0, gy1 = topY + g.y1;
+        if (gx1 < x0 || gx0 > x1 || gy1 < y0 || gy0 > y1) continue;
+        for (const ref of g.refs) {
+          const rk = ref.ti + ":" + ref.ni;
+          if (seen.has(rk) || song.tracks[ref.ti].notes[ref.ni].gone) continue;
+          seen.add(rk);
+          multiSel.push({ti: ref.ti, ni: ref.ni});
+        }
+      }
+    }
   } else {
     const pHi = PMAX - Math.floor((y0 - RULER_H + view.y) / view.rowH);
     const pLo = PMAX - Math.floor((y1 - RULER_H + view.y) / view.rowH);
@@ -2028,6 +2045,7 @@ function renderMeasure(mi) {
   const spell = spellFor(sfM);
   const sfPrev = mi > 0 ? sfAt((mi - 1) * m.bt) : sfM;
   const keyChanged = mi > 0 && sfM !== sfPrev;
+  const built = []; // per-stave build products, formatted together below
   m.staves.forEach((st, si) => {
     const y = SCORE_TOP + si * STAVE_H;
     const stave = new VF.Stave(SCORE_PAD, y, mw, {fill_style: "#3A4569"});
@@ -2059,7 +2077,21 @@ function renderMeasure(mi) {
     voice.setMode(VF.Voice.Mode.SOFT);
     voice.addTickables(vnotes);
     VF.Accidental.applyAccidentals([voice], SF_MAJOR[sfM] || "C");
-    new VF.Formatter().joinVoices([voice]).format([voice], mw - (stave.getNoteStartX() - SCORE_PAD) - 14);
+    built.push({st, si, stave, voice, vnotes, events});
+  });
+  // ONE formatter across every stave: shared tick contexts mean the same
+  // beat gets the same x column on all staves — simultaneous notes line up
+  // with each other, the playhead's anchors agree between staves, and note
+  // geometry stops interleaving (which also confused the lasso)
+  if (built.length) {
+    // softmaxFactor > default skews spacing toward duration-proportional,
+    // shrinking the playhead's crawl-then-sprint across dotted figures
+    const fmt = new VF.Formatter({softmaxFactor: 10});
+    for (const b of built) fmt.joinVoices([b.voice]);
+    fmt.format(built.map(b => b.voice),
+               mw - (built[0].stave.getNoteStartX() - SCORE_PAD) - 14);
+  }
+  for (const {st, si, stave, voice, vnotes, events} of built) {
     voice.draw(ctx2, stave);
     // rests must break beams — beaming only the notes bridges beams straight
     // across rest gaps (spaghetti in syncopated 16th patterns)
@@ -2092,7 +2124,7 @@ function renderMeasure(mi) {
       }
       delete e.vn;
     }
-  });
+  }
   timeMap.sort((a, b) => a.tick - b.tick);
   // noteheads from different staves/voices at nearby ticks can engrave a few
   // px out of order. The old fix clamped x flat, which froze the playhead
