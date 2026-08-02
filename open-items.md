@@ -80,8 +80,11 @@ session start alongside the quiz.)
   commits, and it appears in the dropdown. In-app upload UI deliberately
   skipped for now — optimize for analysis throughput, revisit if the tool
   grows beyond personal use.
-- **Browser "Load .nsf" in Night Roll** (idea 2026-08-02, Josh: to-do for
-  now): the NSF pipeline core (6502 + APU logger + note reconstruction +
+- **Browser "Load .nsf" in Night Roll** (idea 2026-08-02; decided
+  2026-08-02 over a separate converter tool — Night Roll is already the
+  player you need for auditioning a fresh NSF's numbered tracks). Shape:
+  button next to Load .mid → pick file → track list → audition instantly
+  → download any track's .mid / .notes.txt. the NSF pipeline core (6502 + APU logger + note reconstruction +
   MIDI writer, tools/nsf/) is pure JS with no Node dependencies, so it
   can run in the page: file input → pick a track → capture + auto
   loop-trim → straight into the roll, with .mid export. Would open any
