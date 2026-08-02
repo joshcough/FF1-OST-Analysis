@@ -69,6 +69,12 @@ session start alongside the quiz.)
   elfland (absent from the NSF — likely not FF1 at all) were deleted with
   Josh's sign-off; no annotations existed on either.
 
+- **Adding music — the standing workflow (Josh, 2026-08-02):** hand files
+  to Claude (new Logic compositions as .mid, new soundtracks as .nsf, e.g.
+  Mega Man 2 → its own albums/ dir); Claude runs the pipeline/dump tools,
+  commits, and it appears in the dropdown. In-app upload UI deliberately
+  skipped for now — optimize for analysis throughput, revisit if the tool
+  grows beyond personal use.
 - **Browser "Load .nsf" in Night Roll** (idea 2026-08-02, Josh: to-do for
   now): the NSF pipeline core (6502 + APU logger + note reconstruction +
   MIDI writer, tools/nsf/) is pure JS with no Node dependencies, so it

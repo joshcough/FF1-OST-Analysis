@@ -1,16 +1,22 @@
-// Generate songs/<song>.notes.txt — plain-text note dumps so LLMs (e.g. the
-// Claude app reading this repo) can analyze songs whose .mid binaries they
-// can't parse. Uses the app's own parser via the test harness.
-// Run: node tools/dump_notes.mjs
+// Generate <song>.notes.txt next to every .mid — plain-text note dumps so
+// LLMs (e.g. the Claude app reading this repo) can analyze songs whose .mid
+// binaries they can't parse. Uses the app's own parser via the test harness.
+// Run: node tools/dump_notes.mjs [dir ...]   (default: every album dir)
+// NB: the FF album's dumps are written by tools/nsf/dump-all.mjs with
+// channel identity — this tool is for MIDIs with no NSF source (compositions,
+// hand-me-down transcriptions).
 import { createApp } from "../tests/harness.mjs";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const MIDI = path.join(ROOT, "albums/final-fantasy-i/songs");
+const DIRS = process.argv.length > 2 ? process.argv.slice(2)
+  : ["albums/compositions"]; // FF songs come from the NSF pipeline instead
 
-for (const f of readdirSync(MIDI).filter(f => f.endsWith(".mid")).sort()) {
+for (const dir of DIRS)
+for (const f of readdirSync(path.join(ROOT, dir)).filter(f => f.endsWith(".mid")).sort()) {
+  const MIDI = path.join(ROOT, dir);
   const app = createApp();
   app.context.midiBytes = [...readFileSync(path.join(MIDI, f))];
   const text = app.run(`(() => {
