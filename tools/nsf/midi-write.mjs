@@ -6,11 +6,12 @@
 // data stays intact upstream (events/.notes internals) if ever needed.
 const PPQ = 480;
 
-// snap a beat position to the nearest 16th (0.25) or triplet third (1/3)
+// snap a beat position to the nearest 16th (k/4) or triplet slot (k/6 —
+// covers triplet 8ths AND triplet 16ths; the epilogue uses the latter)
 export function snapBeat(b) {
   const s16 = Math.round(b * 4) / 4;
-  const s12 = Math.round(b * 3) / 3;
-  return Math.abs(b - s16) <= Math.abs(b - s12) ? s16 : s12;
+  const s6 = Math.round(b * 6) / 6;
+  return Math.abs(b - s16) <= Math.abs(b - s6) ? s16 : s6;
 }
 
 function vl(v) {
@@ -39,9 +40,14 @@ function trackBytes(name, notes, ch, metas = []) {
 // NES noise has 16 period settings, not pitches; map to the app's drum kit
 function noiseDrum(idx) { return idx < 6 ? 42 : idx < 12 ? 38 : 35; } // hat / snare / kick
 
-export function makeMidi(events, {bpm, tsNum = 4, tsDen = 4, frameSec}) {
+export function makeMidi(events, {bpm, tsNum = 4, tsDen = 4, frameSec, snap = true}) {
   const usq = Math.round(6e7 / bpm);
-  const toTick = frames => Math.round(snapBeat(frames * frameSec / (60 / bpm)) * PPQ);
+  // snap:false keeps raw hardware timing — for through-composed pieces with
+  // tempo changes/fermatas (epilogue) that no single grid can follow
+  const toTick = frames => {
+    const b = frames * frameSec / (60 / bpm);
+    return Math.round((snap ? snapBeat(b) : b) * PPQ);
+  };
   const byCh = {pulse1: [], pulse2: [], triangle: [], noise: []};
   for (const e of events) {
     const t = toTick(e.startFrame);

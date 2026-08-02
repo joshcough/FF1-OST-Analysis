@@ -14,11 +14,21 @@ import { createApp } from "../../tests/harness.mjs";
 // here fall back to the grid fit.
 const PERIOD_BARS = {
   ff1prelude: 16, ff1prologue: 24, ff1overworld: 16, ff1ship: 24,
-  ff1airship: 16, ff1town: 8, ff1corneliacastle: 8, ff1gurguvolcano: 21,
+  ff1airship: 16, ff1town: 8, ff1corneliacastle: 8,
+  ff1gurguvolcano: 20, // NOT the transcription's 21 — at 20 the period gives
+                       // exactly 150bpm (the driver's tempo family); the
+                       // 21st MIDI bar was the arranger's, like gameover's
   ff1matouyascave: 20, ff1cave: 30, ff1chaostemple: 16,
   ff1underwaterpalace: 16, ff1shop: 21, ff1battle: 26, ff1menu: 8,
   ff1gameover: 8, ff1victory: 6,
 };
+
+// no loop to calibrate from (through-composed), but the blind grid fit lands
+// within a hair of a known driver tempo — snap to it (integer frames per 16th)
+const FIXED_BPM = { ff1epilogue: 112.5 };
+// don't grid-snap these: through-composed with tempo changes/fermatas a
+// single grid can't follow — keep raw hardware timing (bar labels approximate)
+const NO_SNAP = { ff1epilogue: true };
 
 const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 loops]
   [1,  "ff1prelude", 170],
@@ -92,6 +102,9 @@ for (const [track, name, seconds] of TRACKS) {
       bpm = fitBpm(events, frameSec, seedBpm);
       tempoSrc = "grid-fitted (calibration REJECTED — check period)";
     }
+  } else if (FIXED_BPM[name]) {
+    bpm = FIXED_BPM[name];
+    tempoSrc = "driver-tempo-family";
   } else {
     bpm = fitBpm(events, frameSec, seedBpm);
     tempoSrc = "grid-fitted";
@@ -112,12 +125,13 @@ for (const [track, name, seconds] of TRACKS) {
       ", loops to " + bq((loop.keep - loop.period) * frameSec / beatSec)
     : "through-composed, no cut";
 
+  const snap = !NO_SNAP[name];
   const txt = toNotesTxt(events, {
-    frames: keptFrames, frameSec, bpm, tsNum, tsDen,
-    title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm; " + cutInfo + ")",
+    frames: keptFrames, frameSec, bpm, tsNum, tsDen, snap,
+    title: name + " (chip capture, NSF track " + track + ", " + tempoSrc + " " + bpm + "bpm; " + cutInfo + (snap ? "" : "; raw timing, grid approximate") + ")",
   });
   writeFileSync("chip/" + name + ".notes.txt", txt);
-  writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec}));
+  writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec, snap}));
 
   // when the loop returns somewhere other than the top, that's hardware fact:
   // record it as a loop: directive in the chip song's rollnotes (never

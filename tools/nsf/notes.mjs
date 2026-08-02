@@ -181,10 +181,12 @@ export function fitBpm(events, frameSec, seedBpm) {
 
 // Stage 3: events -> the repo's .notes.txt format. Bars need a tempo the
 // chip doesn't carry — bpm/timesig come from the caller (known per song).
-export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4, title = "nsf"}) {
+export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4, title = "nsf", snap = true}) {
   const beatSec = 60 / bpm;
   const beatsPerBar = tsNum * 4 / tsDen;
-  const q = snapBeat; // 16th or triplet-third grid, same as the MIDI writer
+  // snapped to the grid like the MIDI writer — or, for snap:false songs
+  // (tempo changes the grid can't follow), raw time shown to 0.01 beat
+  const q = snap ? snapBeat : (x => Math.round(x * 100) / 100);
   const byChannel = {};
   for (const e of events) (byChannel[e.channel] = byChannel[e.channel] || []).push(e);
   const L = [];
