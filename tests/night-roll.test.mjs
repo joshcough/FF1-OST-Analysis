@@ -167,14 +167,19 @@ test("beatLabel: 1e&a counting with fractional fallback", () => {
   assert.equal(label(1.33), "1.33");
 });
 
-test("loop directive: at song end return to target; whole song without one", () => {
+test("loop directive: anchor past target = jump point; else song end; whole song without one", () => {
   installSong();
   run(`rollnotes = parseRollnotes("[25.1]\\nloop: 2.1\\n").map(resolveNote); finalizeNotes();`);
   assert.equal(run(`rollnotes[0].loopTo`), 1920); // bar 2 beat 1 at ppq 480
-  run(`songEndTick = 25 * 4 * 480;`);
+  run(`songEndTick = 26 * 4 * 480;`);
   const seg = val(`currentLoop()`);
   assert.ok(Math.abs(seg.start - run(`tickToSec(song, 1920)`)) < 1e-9);
-  assert.ok(Math.abs(seg.end - run(`tickToSec(song, 25 * 4 * 480)`)) < 1e-9);
+  // fires at the [25.1] anchor, not at the song end a bar later
+  assert.ok(Math.abs(seg.end - run(`tickToSec(song, 24 * 4 * 480)`)) < 1e-9);
+  // anchor at/before the target (auto-written [1.1] files): jump at song end
+  run(`rollnotes = parseRollnotes("[1.1]\\nloop: 2.1\\n").map(resolveNote); finalizeNotes();`);
+  const seg2 = val(`currentLoop()`);
+  assert.ok(Math.abs(seg2.end - run(`tickToSec(song, songEndTick)`)) < 1e-9);
   run(`rollnotes = []; finalizeNotes();`);
   const whole = val(`currentLoop()`);
   assert.equal(whole.start, 0);

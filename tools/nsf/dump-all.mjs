@@ -114,12 +114,18 @@ for (const [track, name, seconds] of TRACKS) {
     if (backBeats > 0.4) {
       const bpb = tsNum * 4 / tsDen;
       const q = x => Math.round(x * 4) / 4;
-      const bar = Math.floor(q(backBeats) / bpb) + 1;
-      const beat = q(backBeats) - (bar - 1) * bpb + 1;
-      const target = "loop: " + bar + "." + beat;
+      const bq = beats => { // beats-from-zero -> "bar.beat" on the 16th grid
+        const bar = Math.floor(q(beats) / bpb) + 1;
+        const beat = q(beats) - (bar - 1) * bpb + 1;
+        return bar + "." + beat;
+      };
+      // anchor = the jump point (capture end), value = the jump target —
+      // the player fires the loop at the anchor when it sits past the target
+      const anchor = bq(loop.keep * frameSec / beatSec);
+      const target = "loop: " + bq(backBeats);
       writeFileSync("chip/" + name + ".rollnotes",
-        "# " + name + ".rollnotes — chip capture\n\n[1.1]\n" + target + "\n");
-      console.log("   wrote loop directive: " + target);
+        "# " + name + ".rollnotes — chip capture\n\n[" + anchor + "]\n" + target + "\n");
+      console.log("   wrote loop directive: [" + anchor + "] " + target);
     }
   }
   console.log(name.padEnd(22) + "track " + String(track).padEnd(3) +

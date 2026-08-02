@@ -109,10 +109,11 @@ key: Db            ← ranged key: applies bars 2–4, then the surrounding
                      key resumes (score draws cancellation naturals).
 
 [25.1]
-loop: 2.1          ← "loop:" prefix = loop directive. At the end of the
-                     song, playback returns to the target (here bar 2,
-                     skipping ship's pickup-intro bar) instead of the
-                     top. Anchor it wherever reads best; one per song.
+loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the
+                     jump point: when playback reaches bar 25 beat 1 it
+                     returns to the target (here bar 2, skipping ship's
+                     pickup-intro bar). An anchor at/before the target
+                     means the jump fires at song end. One per song.
 ```
 
 - `#` lines are comments — **dropped on round-trip** (the app rewrites the

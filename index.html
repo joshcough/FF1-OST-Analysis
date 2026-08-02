@@ -430,7 +430,7 @@
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
       <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
-      <dt>Loop points</dt><dd>Some songs loop back past an intro (not to bar 1). When you discover one, write a note whose text is <b>loop: B.Q</b> (e.g. "loop: 2.1") — at the end of the song, playback returns there instead of to the top. Anchor the note wherever reads best.</dd>
+      <dt>Loop points</dt><dd>Some songs loop back past an intro (not to bar 1). When you discover one, write a note whose text is <b>loop: B.Q</b> (e.g. "loop: 2.1") — the note's anchor is the jump point: when playback reaches it, it returns to B.Q. If the anchor sits at/before the target, the jump happens at the song end instead.</dd>
       <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
     </dl>
 
@@ -1715,12 +1715,16 @@ function buildSchedule() {
   });
   schedEvents.sort((a, b) => a.sec - b.sec);
 }
-function currentLoop() { // "loop: B.Q" = at song end, return to B.Q (else to the top)
+function currentLoop() { // "loop: B.Q" = at the anchor (jump point), return to B.Q
   const whole = {start: 0, end: tickToSec(song, songEndTick)};
   const dir = rollnotes.find(n => n.loopTo !== undefined);
   if (!dir) return whole;
   const start = tickToSec(song, dir.loopTo);
-  return start < whole.end ? {start, end: whole.end} : whole;
+  // anchor past the target = the jump point; an anchor at/before the target
+  // (e.g. auto-written files anchored at [1.1]) means jump at song end
+  const end = dir.start > dir.loopTo
+    ? Math.min(tickToSec(song, dir.start), whole.end) : whole.end;
+  return start < end ? {start, end} : whole;
 }
 async function play(fromSec = 0) {
   ensureAudio();
@@ -2563,7 +2567,7 @@ function applyEditorType() {
                     : "What's happening at this beat?";
   document.getElementById("nstatus").textContent =
     t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
-    t === "loop" ? "At the end of the song, playback returns to this bar/beat instead of the top." :
+    t === "loop" ? "When playback reaches the 'from' point (or the song end, if 'from' is at/before the target), it jumps back to the target bar/beat." :
     document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
