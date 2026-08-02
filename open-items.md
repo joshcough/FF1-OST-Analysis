@@ -64,9 +64,10 @@ session start alongside the quiz.)
   dirty song; audio should now survive app-switching on iOS (resume
   unconditional + awaited, visibilitychange revival, closed-context
   rebuild) — **Josh should confirm on the iPad**.
-- **Duplicate-song audit** before sweeping further: dungeon=cave was
-  caught by accident; check remaining pairs (bar counts × tempo × length,
-  then diff melodies).
+- **Duplicate-song audit — RESOLVED 2026-08-02 by the chip migration:**
+  the NSF is the authoritative track list (19 songs). dungeon (=cave) and
+  elfland (absent from the NSF — likely not FF1 at all) were deleted with
+  Josh's sign-off; no annotations existed on either.
 
 - **Browser "Load .nsf" in Night Roll** (idea 2026-08-02, Josh: to-do for
   now): the NSF pipeline core (6502 + APU logger + note reconstruction +
