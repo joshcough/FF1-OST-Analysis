@@ -23,7 +23,7 @@ const PERIOD_BARS = {
 const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 loops]
   [1,  "ff1prelude", 170],
   [2,  "ff1prologue", 85],
-  [3,  "ff1epilogue", 120],
+  [3,  "ff1epilogue", 270], // through-composed, ~256s of music + final held chord — no loop to trim
   [4,  "ff1overworld", 60],
   [5,  "ff1ship", 90],
   [6,  "ff1airship", 45],
