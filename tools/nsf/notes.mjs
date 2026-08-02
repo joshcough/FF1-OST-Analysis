@@ -78,6 +78,28 @@ export function reconstruct(apuLog, frames, frameSec) {
   return events.filter(e => e.endFrame > e.startFrame);
 }
 
+// The chip's true tempo rarely equals the MIDI transcription's round number
+// (drivers count frames, not bpm). Fit it: sweep candidates, score how well
+// note onsets snap to a 16th-note grid, keep the best.
+// Seeded ±15% around the transcription's bpm — an open sweep locks onto
+// subharmonics (half tempo snaps the same grid), and matching the MIDI's
+// bar numbering is the point.
+export function fitBpm(events, frameSec, seedBpm) {
+  const onsets = events.filter(e => e.channel !== "noise").map(e => e.startFrame * frameSec);
+  if (onsets.length < 8) return seedBpm;
+  let best = null;
+  for (let bpm = seedBpm * 0.85; bpm <= seedBpm * 1.15; bpm += 0.02) {
+    const grid = 60 / bpm / 4; // a 16th
+    let err = 0;
+    for (const t of onsets) {
+      const ph = (t / grid) % 1;
+      err += Math.min(ph, 1 - ph);
+    }
+    if (!best || err < best.err) best = {bpm: +bpm.toFixed(2), err};
+  }
+  return best.bpm;
+}
+
 // Stage 3: events -> the repo's .notes.txt format. Bars need a tempo the
 // chip doesn't carry — bpm/timesig come from the caller (known per song).
 export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4, title = "nsf"}) {

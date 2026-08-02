@@ -2,6 +2,18 @@
 
 Scoped 2026-08-01 (Josh + Claude session). A build task, not analysis.
 
+**Status 2026-08-02 (later): REAL CAPTURES DONE.** All 19 songs dumped from
+the Zophar FF1 NSF (`midi/*.chip.notes.txt`, via `tools/nsf/dump-all.mjs`;
+the .nsf itself is gitignored). The chip confirms dungeon=cave at the
+source: one track, "Dungeon". Trust levels: **pitch, note order, durations,
+and channel identity are solid** (Overworld's triangle gallop matches
+Josh's bass analysis rhythm-for-rhythm). The **fitted bpm — and therefore
+bar numbering — is approximate on some songs**: the grid-snap fit can land
+on a rescaling (Overworld fitted 112.5 vs MIDI 130 with identical musical
+rhythm). Known fix, not yet built: calibrate tempo by matching chip onsets
+against the corresponding MIDI's onsets instead of a blind grid. Cornelia
+(100.00) and Ship (150.06) locked to their MIDI tempos exactly.
+
 **Status 2026-08-02: stages 1–3 BUILT and tested.** `tools/nsf/` holds a
 6502 core (instruction-accurate; register-write order is what matters, not
 cycles), an NSF loader/driver (banked + non-banked), note reconstruction
