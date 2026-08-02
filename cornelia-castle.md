@@ -242,3 +242,27 @@ Skeleton = Pachelbel's Canon / romanesca schema (D–A–Bm–F#(m)–G...), wit
 - Texture change marks section boundaries (arpeggio pattern → scale runs at the closing unit)
 - Loop seam welding: turnaround's resolution note = song's opening note; scale run delivers onto the restart downbeat
 - Trade-off maximized at cadence: busiest accompaniment under stillest melody
+
+## Open Questions
+
+**Is the bass an Andalusian cadence?** (Raised 2026-08-01, from memory,
+while tired — parked, not settled.)
+
+Josh recalled the bass as "D C# B A G#" and identified it as the Andalusian
+cadence. The actual bass (whole notes, one per bar) is **D – C# – B – A# –
+G**: the fourth note and the arrival differ from the recollection. Worth
+revisiting rather than just correcting, because:
+
+- A textbook Andalusian descent in D minor is D–C–Bb–A — *diatonic*,
+  arriving on the dominant.
+- The Cornelia line is chromatic and continues past the fifth.
+- This doc already calls it a chromatic staircase and lists "bass is
+  line-first" as a key finding.
+
+So: is the Andalusian schema the right ancestor, a partial resemblance, or a
+different device? The answer may largely be in this doc already.
+
+Related, possibly the more useful framing: descending chromatic bass lines
+have now appeared in **Cornelia** (the staircase), **Overworld** (G→F#,
+A→G# pairs), and **Cave** (both dances) — a candidate recurring device for a
+cross-song write-up once the key sweep is done.

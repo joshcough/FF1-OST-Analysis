@@ -96,10 +96,13 @@ G major, decided from the bass alone: the loop starts on G, ends by walking to G
 
 ---
 
-## Open questions for next session
+## Open Questions
 
 1. Bar 10's D chord: major or minor third? (Bass says only D+A.)
 2. Bar 12's E chord: is the predicted G# there, and in which track?
 3. Does tr2 add a C natural late in bar 4, making the V chord a D7?
 4. Josh's "melody sounds like E minor" instinct — what is the melody actually emphasizing?
 5. Then: melody track (tr1) and counter track (tr2) from the top.
+6. Reconstruct the key-derivation path from memory against the raw notes —
+   Josh found he'd forgotten how G was determined a week later (this is what
+   motivated the sweep-wide "record the path, not the verdict" rule).

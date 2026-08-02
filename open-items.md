@@ -6,12 +6,15 @@ session start alongside the quiz.)
 
 ## Questions awaiting Josh
 
-0. **Josh's overnight key experiment (2026-08-01):** he set out to determine
-   the key of every song, testing his hypothesis that the first bass note
-   is the tonic (mode ambiguous). Protocol: predict from bass note →
-   analyze the notes and annotate the *why* → verify with the dial. Next
-   session: review his hit rate and reasoning annotations (synced key:
-   directives + notes), quiz from the misses — they're the teachers.
+0. **Key sweep in progress — see [key-sweep.md](key-sweep.md).** 6 songs
+   done (6/6 for the first-bass-note rule), ~14 to go, dungeon excluded as
+   a duplicate of cave. Open sweep-wide questions live there (the "first
+   bass note" definition; the "unclear" outcome category; duplicate audit).
+   **Convention change (Josh, 2026-08-01): per-song open questions now live
+   in each song's own doc** (battle.md, airship.md, cave.md,
+   chaos-temple.md, overworld.md, cornelia-castle.md all have Open
+   Questions sections) — this global list keeps only cross-song and
+   tooling items.
 
 1. **Baseball/Beach song:** where did the B–D–F–Ab voicing come from — ear,
    hands, or something you read? Did you know it forms a diminished 7th?
@@ -45,6 +48,22 @@ session start alongside the quiz.)
   from bed), then joint session.
 
 ## Tooling to-do
+
+- **NSF pipeline** (scoped 2026-08-01): extract analysis-grade note data
+  from the actual chip — see [reference/nsf-pipeline-plan.md](reference/nsf-pipeline-plan.md)
+  for the full plan and the critical keep-the-intermediate-dumb constraint.
+  Motivation confirmed by audit: only 3 of 21 MIDIs (prelude, shop,
+  victory) stay within the NES's 3-pitched-voice ceiling; the rest are
+  arrangements, so voice-leading analysis on them measures the arranger.
+- **Fixed 2026-08-02 from Josh's session notes:** key writer now records
+  mode (major/minor toggle; `key: Gm` not `key: Bb`) and the three
+  affected rollnotes were corrected; "Commit all changed" syncs every
+  dirty song; audio should now survive app-switching on iOS (resume
+  unconditional + awaited, visibilitychange revival, closed-context
+  rebuild) — **Josh should confirm on the iPad**.
+- **Duplicate-song audit** before sweeping further: dungeon=cave was
+  caught by accident; check remaining pairs (bar counts × tempo × length,
+  then diff melodies).
 
 - **In-app Claude chat — built but parked on the `claude-chat` branch,
   decision pending** (2026-08-01): a complete chat feature (💬 button,

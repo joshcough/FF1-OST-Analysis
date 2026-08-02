@@ -58,6 +58,25 @@ hops glyphs); pivot-chord ambiguity (IV of G = V of F — answered instantly;
 the *why* re-banked for retrieval). Also: quizzes.md created (protocol +
 bank), notes manager, ranged key changes with automatic revert.
 
+**2026-08-01 late (key sweep, songs 1–6):** Josh swept opening keys solo
+(Claude iPad app as tutor, notes.txt dumps as data). Verdicts his own:
+Airship F, Battle Gm, Cave Cm, Chaos Temple Em (+ prior Overworld G,
+Cornelia D). Quiz-source concepts, all his: **bass → tonic, melody → mode**
+(root motion can't settle mode; the b3/b6/b7 collection can't settle tonic —
+two legs, different jobs); **compound/polyphonic lines** — one monophonic
+track carrying two interleaved strands (three sightings in one night: Cave
+bass dance, Cave melody pedal, Chaos Temple arpeggio) as a workaround for
+the 3-voice ceiling; **chromatic continuity licenses out-of-key notes** (a
+chromatic line's job is unbroken half-step motion, not key membership) — and
+its corollary, that the first note of a chromatic descent is the *least*
+able to testify about key; **conjunct approach** — a strand wants stepwise
+entry into its target; **emphasis as tonic evidence** (hammered vs visited);
+**genre priors aren't evidence** ("battle themes are minor" — correct here,
+logged as a prior); first-bass-note rule at 6/6 → usable weak evidence, with
+the evidence-vs-confirmation and genre-convention caveats. Open concept
+parked in battle.md: raised 7th as chord-byproduct vs scale. Sweep tracker:
+key-sweep.md.
+
 **2026-08-01 (catalog cleanup + ship loop discovery):** MIDIs trimmed to
 their first pass; GM arranger padding stripped so tracks ≈ NES voices
 (Shop turned out to be 3 real parts triplicated across 9 instrument
