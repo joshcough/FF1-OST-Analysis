@@ -1,0 +1,56 @@
+// Chip note events -> a type-1 MIDI file so Night Roll can play captures.
+// Tick times derive from real capture seconds, so playback timing is exact
+// even where the fitted bpm label is approximate (bpm only affects bars).
+const PPQ = 480;
+
+function vl(v) {
+  const out = [v & 0x7F];
+  v >>= 7;
+  while (v) { out.push((v & 0x7F) | 0x80); v >>= 7; }
+  return out.reverse();
+}
+
+function trackBytes(name, notes, ch, metas = []) {
+  const evs = [];
+  if (name) evs.push({t: 0, d: [0xFF, 0x03, name.length, ...[...name].map(c => c.charCodeAt(0))]});
+  for (const m of metas) evs.push(m);
+  for (const n of notes) {
+    evs.push({t: n.t, o: 1, d: [0x90 | ch, n.p, n.v]});
+    evs.push({t: n.t + n.d, o: 0, d: [0x80 | ch, n.p, 64]});
+  }
+  evs.sort((a, b) => a.t - b.t || (a.o || 0) - (b.o || 0));
+  const out = [];
+  let last = 0;
+  for (const e of evs) { out.push(...vl(e.t - last), ...e.d); last = e.t; }
+  out.push(0, 0xFF, 0x2F, 0);
+  return out;
+}
+
+// NES noise has 16 period settings, not pitches; map to the app's drum kit
+function noiseDrum(idx) { return idx < 6 ? 42 : idx < 12 ? 38 : 35; } // hat / snare / kick
+
+export function makeMidi(events, {bpm, tsNum = 4, tsDen = 4, frameSec}) {
+  const usq = Math.round(6e7 / bpm);
+  const toTick = frames => Math.round(frames * frameSec / (60 / bpm) * PPQ);
+  const byCh = {pulse1: [], pulse2: [], triangle: [], noise: []};
+  for (const e of events) {
+    const t = toTick(e.startFrame);
+    const d = Math.max(30, toTick(e.endFrame) - t);
+    const p = e.channel === "noise" ? noiseDrum(e.midi) : e.midi;
+    if (p < 0 || p > 127) continue;
+    byCh[e.channel].push({t, d, p, v: 96});
+  }
+  const metas = [
+    {t: 0, d: [0xFF, 0x58, 4, tsNum, Math.round(Math.log2(tsDen)), 24, 8]},
+    {t: 0, d: [0xFF, 0x51, 3, (usq >> 16) & 255, (usq >> 8) & 255, usq & 255]},
+  ];
+  const tracks = [trackBytes("conductor", [], 0, metas)];
+  const chans = {pulse1: 0, pulse2: 1, triangle: 2, noise: 9};
+  for (const [name, notes] of Object.entries(byCh)) {
+    if (notes.length) tracks.push(trackBytes(name, notes, chans[name]));
+  }
+  const u32 = v => [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
+  const bytes = [0x4D, 0x54, 0x68, 0x64, ...u32(6), 0, 1, 0, tracks.length, PPQ >> 8, PPQ & 255];
+  for (const t of tracks) bytes.push(0x4D, 0x54, 0x72, 0x6B, ...u32(t.length), ...t);
+  return new Uint8Array(bytes);
+}

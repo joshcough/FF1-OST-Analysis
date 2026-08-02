@@ -1,10 +1,12 @@
-// Dump every FF1 song from the NSF to midi/<song>.chip.notes.txt.
-// Track numbers and rough durations from the Zophar m3u; meter per song from
+// Dump every FF1 song from the NSF into chip/: <song>.notes.txt (analysis)
+// and <song>.mid (playable in Night Roll, for verification against the
+// transcriptions). Track numbers from the Zophar m3u; meter per song from
 // the corresponding MIDI; tempo auto-fitted to the chip's own timing.
 // Run: node tools/nsf/dump-all.mjs reference/ff1.nsf
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
 import { reconstruct, toNotesTxt, fitBpm } from "./notes.mjs";
+import { makeMidi } from "./midi-write.mjs";
 import { createApp } from "../../tests/harness.mjs";
 
 const TRACKS = [ // [nsf track, repo name, seconds to capture]
@@ -58,7 +60,8 @@ for (const [track, name, seconds] of TRACKS) {
     frames, frameSec, bpm, tsNum, tsDen,
     title: name + " (chip capture, NSF track " + track + ", tempo fitted " + bpm + "bpm)",
   });
-  writeFileSync("midi/" + name + ".chip.notes.txt", txt);
+  writeFileSync("chip/" + name + ".notes.txt", txt);
+  writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec}));
   console.log(name.padEnd(22) + "track " + String(track).padEnd(3) +
-              bpm + "bpm  " + events.length + " notes  " + txt.length + " bytes");
+              bpm + "bpm  " + events.length + " notes");
 }
