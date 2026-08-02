@@ -317,6 +317,7 @@
   <select id="keysel" aria-label="Key">
     <option value="" id="keyunset">key: not set (C)</option>
   </select>
+  <button id="keymode" style="display:none">major</button>
   <button id="keyset" style="display:none">Set</button>
   <div id="noteinfo">tap a note</div>
   <button id="listbtn">☰ Notes</button>
@@ -349,6 +350,10 @@
     <div class="row" id="nkeyrow" style="display:none">
       <span class="lbl">new key</span>
       <select id="nkeysel"></select>
+      <select id="nkeymode">
+        <option value="maj">major</option>
+        <option value="min">minor</option>
+      </select>
     </div>
     <div class="row" id="nlooprow" style="display:none">
       <span class="lbl">returns to bar</span><select id="nlb"></select>
@@ -422,14 +427,14 @@
 
     <h3>KEYS</h3>
     <dl>
-      <dt>key? dial</dt><dd>Songs display in C until YOU set the key. Preview any signature live — the right one makes most accidentals vanish.</dd>
-      <dt>Set @ bar N</dt><dd>Writes your key choice into the song's notes at the cursor's bar. Set a different key mid-song for key changes — the score draws the new signature there.</dd>
+      <dt>key? dial</dt><dd>Songs display in C until YOU set the key. Preview any signature live — the right one makes most accidentals vanish. Tap the major/minor toggle to record the true tonic (Gm, not Bb).</dd>
+      <dt>Set Gm @ bar N</dt><dd>Writes your key choice into the song's notes at the cursor's bar. Set a different key mid-song for key changes — the score draws the new signature there.</dd>
     </dl>
 
     <h3>EDITING &amp; SYNC</h3>
     <dl>
       <dt>Edit</dt><dd>Reveals Pencil (insert MIDI notes) and Erase. Tucked away so bedtime thumbs don't hit them.</dd>
-      <dt>Sync</dt><dd>Commit your annotations, sections, and keys to GitHub (needs your token, one-time), or Copy/Download the file. "Unsynced" = still only on this device.</dd>
+      <dt>Sync</dt><dd>Commit your annotations, sections, and keys to GitHub (needs your token, one-time), or Copy/Download the file. "Commit all changed" pushes every song you touched this session, not just the open one — the Sync button shows how many are waiting. "Unsynced" = still only on this device.</dd>
       <dt>Load .mid</dt><dd>Open any MIDI file from your device.</dd>
     </dl>
 
@@ -444,7 +449,8 @@
       <input type="password" id="ghtoken" placeholder="GitHub fine-grained token (stays on this device)" autocomplete="off">
     </div>
     <div class="row">
-      <button class="primary" id="ghsave">Commit to GitHub</button>
+      <button class="primary" id="ghsave">Commit this song</button>
+      <button id="ghsaveall">Commit all changed</button>
       <button id="copyfile">Copy file</button>
       <button id="dlfile">Download</button>
       <button id="synccancel">Close</button>
@@ -737,7 +743,8 @@ function finalizeNotes() {
     else delete n.loopTo;
   }
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
-    .map(n => ({start: n.start, sf: n.keydir, name: SF_MAJOR[n.keydir],
+    .map(n => ({start: n.start, sf: n.keydir,
+                name: (n.text.match(/^key:\s*(\S+)/) || [, SF_MAJOR[n.keydir]])[1], // "Gm" shows as Gm, not Bb
                 end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null,
                 b1: n.b1, b2: n.b2}))
     .sort((a, b) => a.start - b.start);
@@ -798,15 +805,45 @@ function saveLocalNotes() {
       section: n.section || undefined, keydir: n.keydir}));
   if (local.length) localStorage.setItem(notesStoreKey(), JSON.stringify(local));
   else localStorage.removeItem(notesStoreKey());
+  updateSyncBtn();
 }
-function serializeRollnotes() {
-  const lines = ["# " + baseName() + ".rollnotes — beat-anchored annotations", ""];
-  for (const n of rollnotes) {
+function dirtySongs() { // songs with unsynced local notes on this device
+  return Object.keys(localStorage)
+    .filter(k => k.startsWith("ff1roll-notes-"))
+    .map(k => k.slice("ff1roll-notes-".length));
+}
+function updateSyncBtn() {
+  const n = dirtySongs().length;
+  document.getElementById("syncbtn").textContent = n > 1 ? "Sync (" + n + ")" : "Sync";
+}
+function serializeNotesList(list, beatsPerBar, base) {
+  const lines = ["# " + base + ".rollnotes — beat-anchored annotations", ""];
+  for (const n of list) {
     const a = n.b1 + "." + n.q1;
-    const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || song.timesig[0]) : "";
+    const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || beatsPerBar) : "";
     lines.push("[" + a + b + "]", (n.section ? "section: " : "") + n.text, "");
   }
   return lines.join("\n");
+}
+function serializeRollnotes() { return serializeNotesList(rollnotes, song.timesig[0], baseName()); }
+// serialize another song's sidecar + this device's local additions, without
+// loading it: its meter was stashed in localStorage when it was last open
+async function buildRollnotesFor(key) {
+  const base = key.replace(/\.midi?$/i, "");
+  let notes = [];
+  try {
+    const res = await fetch(base + ".rollnotes", {cache: "no-cache"});
+    if (res.ok) notes = parseRollnotes(await res.text());
+  } catch (err) { /* no sidecar yet */ }
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem("ff1roll-notes-" + key) || "[]"); }
+  catch (err) { /* corrupted */ }
+  for (const n of local) {
+    if (!notes.some(r => r.b1 === n.b1 && r.q1 === n.q1 && r.text === n.text)) notes.push(n);
+  }
+  notes.sort((a, b) => (a.b1 - b.b1) || (a.q1 - b.q1));
+  const beats = +(localStorage.getItem("ff1roll-ts-" + key) || "4").split("/")[0] || 4;
+  return {path: base + ".rollnotes", content: serializeNotesList(notes, beats, base.split("/").pop())};
 }
 function dropLocalKeyAt(bar) { // a new key change replaces any local key marker at the same bar
   rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === bar));
@@ -883,6 +920,8 @@ function setSong(parsed, key) {
   const bpm = Math.round(6e7 / song.tempos[0].usq);
   document.getElementById("songmeta").textContent =
     song.timesig[0] + "/" + song.timesig[1] + " · " + bpm + "bpm";
+  if (songKey) // stash meter so Sync-all can serialize this song without reloading it
+    localStorage.setItem("ff1roll-ts-" + songKey, song.timesig[0] + "/" + song.timesig[1]);
   playCursor = 0;
   lastSubtitle = undefined;
   {
@@ -1505,30 +1544,46 @@ function tap(pos) {
 
 // ---------------------------------------------------------------- audio (NES-ish voices)
 const MASTER_VOL = 0.22;
+function warmContext() { // one silent sample: absorbs the fresh context's glitchy first quantum
+  const src = audio.createBufferSource();
+  src.buffer = audio.createBuffer(1, 1, audio.sampleRate);
+  src.connect(master);
+  src.start();
+}
 function ensureAudio() { // one context for the app's lifetime — iOS Safari
-  if (audio) return;    // glitches the first render quantum of a fresh context
+  // glitches the first render quantum of a fresh context. But a context iOS
+  // has killed (state "closed") can never come back: rebuild + re-warm.
+  if (audio && audio.state === "closed") { audio = null; master = null; pulse25 = null; trackGains = []; }
+  if (audio) return;
   audio = new (window.AudioContext || window.webkitAudioContext)();
+  audio.onstatechange = () => console.log("[audio] state:", audio && audio.state);
   master = audio.createGain();
   master.gain.value = MASTER_VOL;
   master.connect(audio.destination);
   trackGains = [];
+  warmContext();
 }
+// resume unconditionally: iOS Safari parks backgrounded contexts in the
+// non-standard "interrupted" state, which a `state === "suspended"` guard
+// misses — resume() is a no-op when already running, so just always call it
+function resumeAudio() {
+  return audio ? audio.resume().catch(() => {}) : Promise.resolve();
+}
+// coming back from another app: revive audio without waiting for a Play tap
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && audio) { ensureAudio(); resumeAudio(); }
+});
 function openMaster() { // declick: ramp the master up instead of snapping on
   const t = audio.currentTime;
   master.gain.cancelScheduledValues(t);
   master.gain.setValueAtTime(master.gain.value, t);
   master.gain.linearRampToValueAtTime(MASTER_VOL, t + 0.03);
 }
-// warm the context on the first touch, wherever it lands: the cold context's
-// first render quantum glitches, so let it happen in silence before Play
+// first touch anywhere: create + warm the context inside a user gesture
 document.addEventListener("pointerdown", function warm() {
   document.removeEventListener("pointerdown", warm);
   ensureAudio();
-  if (audio.state === "suspended") audio.resume();
-  const src = audio.createBufferSource();
-  src.buffer = audio.createBuffer(1, 1, audio.sampleRate); // one silent sample
-  src.connect(master);
-  src.start();
+  resumeAudio();
 }, {capture: true});
 function trackGain(ti) {
   if (!trackGains[ti]) {
@@ -1613,9 +1668,9 @@ function scheduleNote(ti, n, when, durSec) {
   o.start(when);
   o.stop(when + durSec + 0.05);
 }
-function previewNote(ti, pitch) {
+async function previewNote(ti, pitch) {
   ensureAudio();
-  if (audio.state === "suspended") audio.resume();
+  await resumeAudio(); // clock is frozen until the context actually runs
   openMaster(); // master may be faded out from the last stop
   scheduleNote(ti, {p: pitch, v: 90, ch: 0}, audio.currentTime + 0.01, 0.3);
 }
@@ -1637,9 +1692,9 @@ function currentLoop() { // "loop: B.Q" = at song end, return to B.Q (else to th
   const start = tickToSec(song, dir.loopTo);
   return start < whole.end ? {start, end: whole.end} : whole;
 }
-function play(fromSec = 0) {
+async function play(fromSec = 0) {
   ensureAudio();
-  if (audio.state === "suspended") audio.resume();
+  await resumeAudio(); // await: scheduling against a frozen clock builds a stale time base
   openMaster();
   buildSchedule();
   playing = true;
@@ -2178,20 +2233,27 @@ speedsl.addEventListener("input", () => { speedlbl.textContent = speedsl.value +
 speedsl.addEventListener("change", () => applySpeed(+speedsl.value)); // on release, not per drag-tick
 speedreset.addEventListener("click", () => applySpeed(100));
 
-// key dial: preview any signature live; Set writes "key: X" at the cursor bar
+// key dial: preview any signature live; Set writes "key: X" at the cursor bar.
+// A signature is mode-ambiguous (Bb major and G minor share two flats), so a
+// major/minor toggle picks which TONIC gets recorded — "key: Gm", never the
+// relative major standing in for it.
 const keysel = document.getElementById("keysel");
 const keysetBtn = document.getElementById("keyset");
+const keymodeBtn = document.getElementById("keymode");
+let keyMinor = false;
+function minorNameOf(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf); }
+function chosenKeyName(sf, minor) {
+  return minor ? minorNameOf(sf) + "m" : (SF_MAJOR[sf] || "C");
+}
 {
   const SIGS = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
-  // relative minor name for the label: major tonic pc + 9 semitones
-  const MINOR_OF = sf => spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf);
   const o0 = document.createElement("option");
   o0.value = "0"; o0.textContent = "0 — C / Am";
   keysel.appendChild(o0);
   for (const sf of SIGS) {
     const o = document.createElement("option");
     o.value = String(sf);
-    o.textContent = Math.abs(sf) + (sf > 0 ? "♯" : "♭") + " — " + SF_MAJOR[sf] + " / " + MINOR_OF(sf) + "m";
+    o.textContent = Math.abs(sf) + (sf > 0 ? "♯" : "♭") + " — " + SF_MAJOR[sf] + " / " + minorNameOf(sf) + "m";
     keysel.appendChild(o);
   }
   // the annotation editor's key picker gets the same signatures (no "unset" row)
@@ -2203,27 +2265,35 @@ const keysetBtn = document.getElementById("keyset");
 }
 function refreshKeysetLabel() {
   if (previewSf === null || !song) return;
-  keysetBtn.textContent = "Set @ bar " + (Math.floor(playCursor / barTicks()) + 1);
+  keymodeBtn.textContent = keyMinor ? "minor" : "major";
+  keysetBtn.textContent = "Set " + chosenKeyName(previewSf, keyMinor) +
+                          " @ bar " + (Math.floor(playCursor / barTicks()) + 1);
 }
 keysel.addEventListener("change", () => {
   previewSf = keysel.value === "" ? null : parseInt(keysel.value, 10);
   keysetBtn.style.display = previewSf === null ? "none" : "";
+  keymodeBtn.style.display = previewSf === null ? "none" : "";
   refreshKeysetLabel();
   buildScoreModel();
   clampView();
   draw();
 });
+keymodeBtn.addEventListener("click", () => {
+  keyMinor = !keyMinor;
+  refreshKeysetLabel();
+});
 keysetBtn.addEventListener("click", () => {
   if (previewSf === null || !song || !songKey) return;
   const bt = barTicks();
   const bar = Math.floor(playCursor / bt) + 1;
-  const name = SF_MAJOR[previewSf] || "C";
+  const name = chosenKeyName(previewSf, keyMinor);
   dropLocalKeyAt(bar);
   rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
                               keydir: previewSf, added: true}));
   previewSf = null;
   keysel.value = "";
   keysetBtn.style.display = "none";
+  keymodeBtn.style.display = "none";
   finalizeNotes();
   saveLocalNotes();
   buildScoreModel();
@@ -2496,7 +2566,11 @@ function openEditor(note) {
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
   document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : song.timesig[0]) : (q2 || song.timesig[0]));
   document.getElementById("ntext").value = note && type !== "key" ? note.text : "";
-  if (type === "key" && note) document.getElementById("nkeysel").value = String(note.keydir);
+  if (type === "key" && note) {
+    document.getElementById("nkeysel").value = String(note.keydir);
+    const nm = (note.text.match(/^key:\s*(\S+)/) || [])[1] || "";
+    document.getElementById("nkeymode").value = /m$/.test(nm) && nm.length > 1 ? "min" : "maj";
+  }
   document.getElementById("ndelete").style.display = note ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
     ? "Synced note — edits and deletes become permanent when you Sync." : "";
@@ -2523,9 +2597,10 @@ document.getElementById("nsave").addEventListener("click", () => {
   let fresh;
   if (type === "key") {
     const sf = parseInt(document.getElementById("nkeysel").value, 10);
+    const minor = document.getElementById("nkeymode").value === "min";
     dropLocalKeyAt(b1);
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
-             text: "key: " + (SF_MAJOR[sf] || "C"), keydir: sf, added: true};
+             text: "key: " + chosenKeyName(sf, minor), keydir: sf, added: true};
   } else if (type === "loop") {
     const lb = Math.max(1, +document.getElementById("nlb").value || 1);
     const lq = +document.getElementById("nlq").value || 1;
@@ -2588,41 +2663,51 @@ document.getElementById("dlfile").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
-document.getElementById("ghsave").addEventListener("click", async e => {
-  const btn = e.currentTarget;
-  const status = document.getElementById("syncstatus");
-  const token = document.getElementById("ghtoken").value.trim();
-  if (!token) { status.textContent = "Paste a token first (or use Copy/Download)."; return; }
-  if (!songKey) { status.textContent = "Local file — no repo path. Use Copy/Download."; return; }
-  localStorage.setItem("ff1roll-ghtoken", token);
-  const path = notesBase() + ".rollnotes";
-  const headers = {Authorization: "Bearer " + token, Accept: "application/vnd.github+json"};
+function ghHeaders(token) {
+  return {Authorization: "Bearer " + token, Accept: "application/vnd.github+json"};
+}
+async function putRollnotes(path, content, headers) { // PUT with one stale-sha retry
   const putOnce = async () => {
     let sha = null;
     const g = await fetch(REPO_API + path + "?ref=main", {headers, cache: "no-store"});
     if (g.ok) sha = (await g.json()).sha;
     const body = {
       message: "Update " + path + " from Night Roll",
-      content: btoa(unescape(encodeURIComponent(serializeRollnotes()))),
+      content: btoa(unescape(encodeURIComponent(content))),
       branch: "main",
     };
     if (sha) body.sha = sha;
     return fetch(REPO_API + path, {method: "PUT", headers, body: JSON.stringify(body)});
   };
+  let r = await putOnce();
+  if (r.status === 409) r = await putOnce();
+  return r;
+}
+function markCurrentSongSynced() {
+  rollnotes.forEach(n => n.added = false); // now canonical in the repo
+  saveLocalNotes();
+  lastSubtitle = undefined;
+  updateSubtitle();
+  draw();
+}
+function takeToken(status) {
+  const token = document.getElementById("ghtoken").value.trim();
+  if (!token) { status.textContent = "Paste a token first (or use Copy/Download)."; return null; }
+  localStorage.setItem("ff1roll-ghtoken", token);
+  return token;
+}
+document.getElementById("ghsave").addEventListener("click", async e => {
+  const btn = e.currentTarget;
+  const status = document.getElementById("syncstatus");
+  const token = takeToken(status);
+  if (!token) return;
+  if (!songKey) { status.textContent = "Local file — no repo path. Use Copy/Download."; return; }
   btn.disabled = true;
   status.textContent = "Committing…";
   try {
-    let r = await putOnce();
-    if (r.status === 409) { // stale sha (e.g. a commit raced us) — refetch and retry once
-      status.textContent = "Retrying with fresh file version…";
-      r = await putOnce();
-    }
+    const r = await putRollnotes(notesBase() + ".rollnotes", serializeRollnotes(), ghHeaders(token));
     if (!r.ok) throw new Error("HTTP " + r.status + (r.status === 401 || r.status === 403 ? " — check token scope" : ""));
-    rollnotes.forEach(n => n.added = false); // now canonical in the repo
-    saveLocalNotes();
-    lastSubtitle = undefined;
-    updateSubtitle();
-    draw();
+    markCurrentSongSynced();
     status.textContent = "Committed ✓ (GitHub Pages takes ~1 min to serve the new file.)";
     setTimeout(() => { // done — close, and return to the notes list if that's where we came from
       syncsheet.classList.remove("on");
@@ -2631,9 +2716,39 @@ document.getElementById("ghsave").addEventListener("click", async e => {
   } catch (err) { status.textContent = "Commit failed: " + err.message; }
   finally { btn.disabled = false; }
 });
+// sync every song with unsynced local notes, not just the loaded one — a key
+// sweep touches many songs in one sitting and shouldn't strand work per-song
+document.getElementById("ghsaveall").addEventListener("click", async e => {
+  const btn = e.currentTarget;
+  const status = document.getElementById("syncstatus");
+  const token = takeToken(status);
+  if (!token) return;
+  const dirty = dirtySongs();
+  if (!dirty.length) { status.textContent = "Nothing unsynced on this device."; return; }
+  btn.disabled = true;
+  const results = [];
+  for (const key of dirty) {
+    const short = key.split("/").pop().replace(/\.midi?$/i, "");
+    status.textContent = "Committing " + short + "… " + results.join("  ");
+    try {
+      const {path, content} = await buildRollnotesFor(key);
+      const r = await putRollnotes(path, content, ghHeaders(token));
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (key === songKey) markCurrentSongSynced();
+      else localStorage.removeItem("ff1roll-notes-" + key);
+      results.push(short + " ✓");
+    } catch (err) {
+      results.push(short + " ✗ " + err.message);
+    }
+  }
+  updateSyncBtn();
+  status.textContent = results.join("  ");
+  btn.disabled = false;
+});
 
 applyViewMode();
 resize();
+updateSyncBtn();
 loadSong(sel.value).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
 </script>
 </body>

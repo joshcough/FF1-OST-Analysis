@@ -60,15 +60,20 @@ highlights the active note's span (ambient range tints removed — on a
 fully-annotated song they covered everything).
 
 **Keys:** display defaults to C until a `key:` annotation exists — key
-discovery is Josh's job, by design (the dial previews signatures live;
-"Set @ bar N" writes the directive at the cursor's bar). Ranged keys revert
-automatically. The dropdown label reports state: "key: not set (C)" vs
-"key: G, Bb(2–4) ✓". MIDI files carry true key signatures (via
+discovery is Josh's job, by design (the dial previews signatures live; a
+major/minor toggle picks the recorded TONIC — "key: Gm", never Bb standing
+in for it — and "Set Gm @ bar N" writes the directive at the cursor's bar).
+Ranged keys revert automatically. The dropdown label reports the recorded
+names: "key: not set (C)" vs "key: Gm ✓". Minor names map to the relative
+major's signature for engraving (keyNameToSf). MIDI files carry true key signatures (via
 tools/fix_keysigs.py) but the app deliberately ignores them for display.
 
 **Sync:** serializes the full current rollnotes state and commits it to
 this repo via the GitHub Contents API (fine-grained token, stored in
-browser localStorage, never in the repo). Copy/Download fallbacks. Local
+browser localStorage, never in the repo). "Commit all changed" syncs every
+song with unsynced local notes (one PUT per file; per-song ✓/✗ status;
+meter for foreign songs comes from a localStorage stash written on load).
+The Sync button shows the dirty-song count. Copy/Download fallbacks. Local
 unsynced additions persist in localStorage keyed by song path.
 
 **Robustness:** MIDI parser finds tracks by MTrk magic scan (the original

@@ -69,6 +69,7 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
     "[1.1 - 4.4]", "section: A", "",
     "[3.1]", "a note", "",
     "[5.1]", "key: G", "",
+    "[6.1]", "key: Gm", "",
     "[6.2.5]", "off-beat", "",
   ].join("\n");
   run(`rollnotes = parseRollnotes(${JSON.stringify(text)}).map(resolveNote);`);
@@ -77,7 +78,9 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
   const twice = run(`serializeRollnotes()`);
   assert.equal(twice, once);
   assert.match(once, /\[1\.1 - 4\.4\]\nsection: A/);
-  assert.match(once, /\[5\.1\]\nkey: G/);
+  assert.match(once, /\[5\.1\]\nkey: G\n/);
+  assert.match(once, /\[6\.1\]\nkey: Gm\n/); // minor tonic survives the round-trip
+  assert.equal(run(`rollnotes.find(n => n.text === "key: Gm").keydir`), -2); // Gm = 2 flats
 });
 
 test("tickToSec/secToTick: piecewise tempo map, mutual inverses", () => {
