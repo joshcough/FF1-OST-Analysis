@@ -5,14 +5,36 @@ change keys; tracking every change is out of scope for this pass. Rationale:
 determining the key is the first step of every song's analysis anyway, so
 this is work pulled forward, and doing it ~20 times in a row builds the
 routine and shows the range of ways a key gets established. (Gurgu proved
-the scope right: it's the first song that genuinely changes pitch center,
-so "the key" has no single answer — the sweep owes only its opening.)
+the scope right: its opening resisted a quick read and pulled the analysis
+through the whole piece. NB the sweep says nothing about internal
+modulation in any other song — those interiors are unexamined, and several
+likely modulate too.)
 
 **Protocol:** (1) predict from the bass at the structural downbeat, written
 down first; (2) determine the key from the music — and record **the path,
 not just the verdict** ("Key: X" is worth little in a month; "Key: X
 because A, then B" survives); (3) verify with the dial. Determining the key
 from the music first keeps the hypothesis test non-circular.
+
+**Legitimate move, on the record (Josh, 08-02):** reading the *final
+measures* to settle the *opening* key is sound, not cheating — a loop is a
+closed circle, and the last bars are engineered to hand off to bar 1. A
+descending bass there is a **retransition** aimed at the loop target: the
+same structural fact as the hypothesis below, read from the other side.
+
+## Thread: loop seam typology (added 08-02)
+
+Per song, cheap to record, test on every remaining song and retroactively
+on the swept nine: **does this song prepare its loop seam, or cut?**
+- *Prepared* — final bars carry a retransition (descending bass, dominant
+  approach, anything aimed at the bar-1 tonic).
+- *Splice* — final bars sit wherever they landed, no approach; hard cut.
+
+One confirmed example of each so far: several swept songs show clear
+retransition bass motion; **Gurgu appears to be a splice** — its block
+transposition leaves nothing pointed back home, which is why the usual
+ending-clue method found no signal there. Open: does splice-vs-prepared
+correlate with whether a song modulates internally?
 
 ## Hypothesis under test (revised 2026-08-02)
 

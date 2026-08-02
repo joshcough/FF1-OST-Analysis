@@ -1,7 +1,12 @@
 # Gurgu Volcano
 
-**Analyzed 2026-08-02 (chip capture, by ear + roll). Key work: DONE — the
-hardest sweep song yet, and the first with a real key change.**
+**Analyzed 2026-08-02 (chip capture, by ear + roll). Key work: DONE.**
+
+Framing correction (Josh, same day): this is NOT "the first song that
+modulates" — the sweep scoped opening keys only, so the other songs'
+interiors are simply unexamined and several likely modulate too. Gurgu is
+the first song whose **opening key resisted a quick read**, which is what
+pulled the analysis into the whole piece.
 
 ## Structure (Josh's derivation)
 
@@ -37,6 +42,44 @@ Notable: **neither vamp ever states its tonic chord.** Both keys are
 inferred entirely from two non-tonic chords — which is why this song was
 hard.
 
+**And the deeper reason it was hard: this song has no retransition.** In
+many swept songs the final measures carry a descending bass or dominant
+approach engineered to hand off to bar 1 — a loop is a closed circle, so
+reading the ending to infer the opening key is using the one moment built
+to prepare the beginning (Josh's method, and it stands — see key-sweep.md).
+Here there was no signal to read: the ending sits in the new key with
+nothing aimed back at the old one. **A hard splice, not a prepared
+retransition** — working hypothesis: block transposition leaves no seam
+material by construction. The absence was informative, but only legible in
+hindsight; at the time it read as difficulty rather than data.
+
+## Why the unannounced modulation works
+
+Josh asked why the D Dorian ↔ F Dorian change succeeds with no pivot chord
+and no dominant preparation in either direction.
+
+Interval content (Claude supplied at Josh's request — fatigue, not a
+knowledge gap):
+
+```
+D Dorian:  D  E   F  G  A   B   C
+F Dorian:  F  G   Ab Bb C   D   Eb
+```
+
+- Shared: 4 of 7 (D, F, G, C); changed: 3 (E→Eb, A→Ab, B→Bb) — every
+  changed tone moves down exactly one semitone.
+- Each tonic lives inside the other's scale: F is ♭3 of D Dorian; D is the
+  6th of F Dorian. Neither key is foreign to the other.
+
+The structural reason (the main one) is something **Josh had already
+discovered and not yet connected to the question**: the modulation is a
+transposed block — same shape, same numerals, new pitch level. The
+listener isn't tracking pitch content; they're tracking a **pattern**, and
+a pattern returning at a new level parses as repetition, not disruption.
+And the return home is easier still: twelve bars established D Dorian, so
+coming back isn't a modulation the ear must parse — it's landing where the
+listener already was.
+
 Method note: Josh derived F Dorian's spelling (F G Ab Bb C D Eb) from the
 tonic and interval pattern alone, from memory, catching two of his own
 slips en route — including correcting Claude's mis-spelling of Eb major's
@@ -67,6 +110,13 @@ sweep song asked one.
 
 ## Open questions
 
+- **What is the specific pivot pitch at each seam?** The pitch that
+  carries the ear across at bar 17 (D→F Dorian), and separately at the
+  return seam (F→D). The two directions may not use the same pivot.
+  (Deferred by Josh — "good questions, my brain is too tired.")
+- **Is the minor-third transposition related to the ♭III already in the
+  vamp?** Coincidence, or is the transposition interval drawn from the
+  harmony of the material being transposed? (Also deferred.)
 - The final pitch center and the loop target sit a **half step** apart —
   unusual; worth a moment on a future pass.
 - Sweep scoring: bass at the loop target is A under a D tonic — hit, miss,

@@ -7,7 +7,9 @@ session start alongside the quiz.)
 ## Questions awaiting Josh
 
 0. **Key sweep in progress — see [key-sweep.md](albums/final-fantasy-i/analysis/key-sweep.md).** 10 songs
-   opened (gurgu the first with a real key change — D→F Dorian), 9 to go.
+   opened (gurgu: opening key resisted the quick read — D→F Dorian; other
+   songs' interiors remain unexamined), 9 to go. New thread: loop seam
+   typology (prepared retransition vs hard splice) — see the sweep doc.
    Hypothesis revised 2026-08-02 to the loop-target form; the naive script
    scoring disagrees with the by-eye sweep (fifths in the bass) and THAT
    ruling is Josh's — see the sweep doc's "Script v1 results".
