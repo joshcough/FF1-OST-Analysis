@@ -1,4 +1,4 @@
-# Main Theme / Overworld (FF1) — Claude's Reference Draft
+# Overworld (FF1) — Claude's Reference Draft
 
 > **Note:** Claude wrote this solo before we established the real process. The actual analysis (`overworld.md`, top level) gets built through Josh's own listening and our conversation. Consult this afterward to check for anything we missed.
 

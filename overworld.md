@@ -1,4 +1,4 @@
-# Main Theme / Overworld (FF1) — Harmonic & Melodic Analysis
+# Overworld (FF1) — Harmonic & Melodic Analysis
 
 **Status: in progress.** Bass track complete (2026-07-21 session). Melody + counter tracks not yet analyzed.
 

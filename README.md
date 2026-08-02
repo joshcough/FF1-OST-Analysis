@@ -25,7 +25,7 @@ Each song gets:
 | Town | — | — | Planned |
 | Matoya's Cave | — | — | Planned |
 | Chaos Shrine (Temple of Fiends) | — | — | Planned |
-| Main Theme (Overworld) | [midi/ff1overworld.mid](midi/ff1overworld.mid) | in progress ([reference draft](reference/overworld-claude-draft.md)) | 🔜 In progress |
+| Overworld | [midi/ff1overworld.mid](midi/ff1overworld.mid) | in progress ([reference draft](reference/overworld-claude-draft.md)) | 🔜 In progress |
 | Battle Theme | — | — | Planned |
 
 ## Key findings so far (Cornelia Castle)

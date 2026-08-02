@@ -12,7 +12,7 @@ Bars 5–6 double the harmonic rhythm (two chords per bar).
 | **Roman** | I | V | vi | V/vi | IV · iv | I · V7/ii | ii | I6/4 → V |
 | **Job** | home | dominant | relative minor | aims at Bm | borrowed darkening | home · aims at Em | target lands | turnaround → loop |
 
-## Overworld / Main Theme (G major, 16-bar loop, ~130 BPM)
+## Overworld (G major, 16-bar loop, ~130 BPM)
 
 Bars 1–8 hold each chord for two bars; bars 9–16 change every bar (double-time harmony).
 
