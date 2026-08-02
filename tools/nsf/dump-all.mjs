@@ -3,22 +3,22 @@
 // transcriptions). Track numbers from the Zophar m3u; meter per song from
 // the corresponding MIDI; tempo auto-fitted to the chip's own timing.
 // Run: node tools/nsf/dump-all.mjs reference/ff1.nsf
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { parseNSF, runNSF } from "./nsf.mjs";
 import { reconstruct, toNotesTxt, fitBpm, detectLoop } from "./notes.mjs";
 import { makeMidi } from "./midi-write.mjs";
 import { createApp } from "../../tests/harness.mjs";
 
-// Songs whose midi/ transcription is already loop-trimmed to a verified bar
-// count: the chip's exact loop length ÷ that count gives the TRUE tempo,
-// fixing the fitted-bpm drift. The rest (untrimmed transcriptions) fall
-// back to the grid fit.
-const TRUSTED_BARS = new Set([
-  "ff1airship", "ff1battle", "ff1cave", "ff1chaostemple", "ff1corneliacastle",
-  "ff1gameover", "ff1gurguvolcano", "ff1matouyascave", "ff1menu",
-  "ff1overworld", "ff1prologue", "ff1ship", "ff1shop", "ff1town",
-  "ff1underwaterpalace",
-]);
+// Verified loop lengths IN BARS (Josh's analyses + earlier MIDI trims): the
+// chip's frame-exact period ÷ this count gives the TRUE tempo. Songs absent
+// here fall back to the grid fit.
+const PERIOD_BARS = {
+  ff1prelude: 16, ff1prologue: 24, ff1overworld: 16, ff1ship: 24,
+  ff1airship: 16, ff1town: 8, ff1corneliacastle: 8, ff1gurguvolcano: 21,
+  ff1matouyascave: 20, ff1cave: 30, ff1chaostemple: 16,
+  ff1underwaterpalace: 16, ff1shop: 21, ff1battle: 26, ff1menu: 8,
+  ff1gameover: 8, ff1victory: 6,
+};
 
 const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 loops]
   [1,  "ff1prelude", 170],
@@ -67,8 +67,11 @@ for (const [track, name, seconds] of TRACKS) {
   events = events.map(e => ({...e, startFrame: e.startFrame - t0, endFrame: e.endFrame - t0}));
   const {tsNum, tsDen, seedBpm, midiBars} = meterOf(name);
 
-  // trim to intro + one loop pass, exactly as the transcriptions were
-  const loop = detectLoop(events, frames - t0);
+  // trim to intro + one loop pass, exactly as the transcriptions were.
+  // victory varies articulation per pass; Josh verified its 6-bar period
+  // by ear, so hint the detector at ~12.8s
+  const HINTS = {ff1victory: 768};
+  const loop = detectLoop(events, frames - t0, HINTS[name] || null);
   let keptFrames = frames - t0;
   if (loop) {
     keptFrames = loop.keep;
@@ -79,15 +82,15 @@ for (const [track, name, seconds] of TRACKS) {
   // tempo: exact from the loop length when the transcription's bar count is
   // verified; otherwise fall back to the grid fit
   let bpm, tempoSrc;
-  if (loop && midiBars && TRUSTED_BARS.has(name)) {
-    const barSec = keptFrames * frameSec / midiBars;
+  if (loop && PERIOD_BARS[name]) {
+    const barSec = loop.period * frameSec / PERIOD_BARS[name];
     bpm = +(60 * (tsNum * 4 / tsDen) / barSec).toFixed(2);
     tempoSrc = "loop-calibrated";
-    // sanity: a calibrated tempo wildly off the MIDI's means the trim itself
-    // is wrong (e.g. a doubled pass) — fall back and flag rather than lie
-    if (bpm < seedBpm * 0.8 || bpm > seedBpm * 1.25) {
+    // sanity: a calibrated tempo wildly off the MIDI's means the detected
+    // period disagrees with the verified bar count — flag rather than lie
+    if (bpm < seedBpm * 0.65 || bpm > seedBpm * 1.5) {
       bpm = fitBpm(events, frameSec, seedBpm);
-      tempoSrc = "grid-fitted (calibration REJECTED — check trim)";
+      tempoSrc = "grid-fitted (calibration REJECTED — check period)";
     }
   } else {
     bpm = fitBpm(events, frameSec, seedBpm);
@@ -101,6 +104,24 @@ for (const [track, name, seconds] of TRACKS) {
   });
   writeFileSync("chip/" + name + ".notes.txt", txt);
   writeFileSync("chip/" + name + ".mid", makeMidi(events, {bpm, tsNum, tsDen, frameSec}));
+
+  // when the loop returns somewhere other than the top, that's hardware fact:
+  // record it as a loop: directive in the chip song's rollnotes (never
+  // overwrite a file Josh may have edited)
+  if (loop && !existsSync("chip/" + name + ".rollnotes")) {
+    const beatSec = 60 / bpm;
+    const backBeats = (loop.keep - loop.period) * frameSec / beatSec;
+    if (backBeats > 0.4) {
+      const bpb = tsNum * 4 / tsDen;
+      const q = x => Math.round(x * 4) / 4;
+      const bar = Math.floor(q(backBeats) / bpb) + 1;
+      const beat = q(backBeats) - (bar - 1) * bpb + 1;
+      const target = "loop: " + bar + "." + beat;
+      writeFileSync("chip/" + name + ".rollnotes",
+        "# " + name + ".rollnotes — chip capture\n\n[1.1]\n" + target + "\n");
+      console.log("   wrote loop directive: " + target);
+    }
+  }
   console.log(name.padEnd(22) + "track " + String(track).padEnd(3) +
               (loop ? "keep " + (loop.keep * frameSec).toFixed(1) + "s (P=" +
                       (loop.period * frameSec).toFixed(1) + "s)" : "no-loop").padEnd(24) +

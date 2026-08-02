@@ -87,50 +87,63 @@ export function reconstruct(apuLog, frames, frameSec) {
 // identical partner at t−P). Keep [0, R): intro + one full pass — the same
 // cut rule used to trim the transcriptions. Returns {keep: R, period: P} in
 // frames, or null (non-looping jingles like the epilogue).
-export function detectLoop(events, frames) {
+export function detectLoop(events, frames, hint = null) {
   const evs = [...events].sort((a, b) => a.startFrame - b.startFrame);
   if (evs.length < 8) return null;
   const byKey = new Map(); // channel:midi:startFrame -> event
   for (const e of evs) byKey.set(e.channel + ":" + e.midi + ":" + e.startFrame, e);
-
-  // probe several events so intro-only material (which never recurs) can't
-  // blind the search: song start, each channel's start, and two loop-body spots
-  const probes = [evs[0]];
-  for (const c of ["pulse1", "pulse2", "triangle", "noise"]) {
-    const p = evs.find(e => e.channel === c);
-    if (p) probes.push(p);
-  }
-  for (const frac of [0.3, 0.45]) {
-    const p = evs.find(e => e.startFrame >= frames * frac);
-    if (p) probes.push(p);
-  }
-  const candidates = [...new Set(probes.flatMap(pr =>
-    evs.filter(e => e !== pr && e.channel === pr.channel && e.midi === pr.midi &&
-                    e.startFrame > pr.startFrame + 60)
-       .map(e => e.startFrame - pr.startFrame)))].sort((a, b) => a - b);
-
+  const partnerOk = (e, P) => {
+    const partner = byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame - P));
+    return partner && (Math.abs((partner.endFrame - partner.startFrame) -
+           (e.endFrame - e.startFrame)) <= 2 || e.endFrame >= frames - 2);
+  };
+  // cheap pre-filter: sample a handful of late events before the full scan
+  const samples = evs.filter((_, i) => i % Math.ceil(evs.length / 12) === 0);
   const TOL = 3; // loop-boundary artifacts (restart attack vs shifted song start)
-  for (const P of candidates) {
+  // a hint (approx period in frames, from a verified by-ear analysis) narrows
+  // the search and relaxes the mismatch bound — some songs vary articulation
+  // per pass more than the blind threshold tolerates
+  const [pLo, pHi, maxBadRatio] = hint
+    ? [hint - 8, hint + 8, 0.25]
+    : [120, frames * 0.6, 0.15];
+  let best = null;
+  for (let P = pLo; P <= pHi; P++) {
+    let quickBad = 0;
+    for (const s of samples) if (s.startFrame >= P && !partnerOk(s, P)) quickBad++;
+    if (quickBad > samples.length / 2) continue;
     const bad = [];
-    let matched = 0;
+    let testable = 0;
     for (const e of evs) {
       if (e.startFrame < P) continue;
-      const partner = byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame - P));
-      const durOk = partner && (Math.abs((partner.endFrame - partner.startFrame) -
-                    (e.endFrame - e.startFrame)) <= 2 || e.endFrame >= frames - 2);
-      if (durOk) matched++;
-      else bad.push(e.startFrame);
+      testable++;
+      if (!partnerOk(e, P)) bad.push(e.startFrame);
     }
-    if (matched < 8) continue;
+    if (testable < 20 || bad.length > testable * maxBadRatio) continue;
     bad.sort((a, b) => a - b);
     const cut = bad.length <= TOL ? 0 : bad[bad.length - TOL - 1] + 1; // allow TOL stragglers
-    const keep = Math.max(P, cut); // repetition can't begin before one period has elapsed
-    // require some post-R evidence that it really repeats (≥ ~3 seconds)
-    if (keep <= frames - 180 || (keep <= frames - 60 && matched > evs.length / 3)) {
-      return {keep, period: P};
+    // the backward check is blind to a non-repeating intro SHORTER than P
+    // (its events sit at t < P, where nothing is tested — gameover's 2-beat
+    // pickup). Forward pass: early events that never recur one period later
+    // are intro material, played once; keep = intro + one full period.
+    // intro is a PREFIX: stop at the first event that does recur, so per-pass
+    // variation deeper in the body can't masquerade as intro
+    const badF = [];
+    for (const e of evs) {
+      if (e.startFrame >= P || e.startFrame >= frames - P - 2) break;
+      if (byKey.get(e.channel + ":" + e.midi + ":" + (e.startFrame + P))) break;
+      badF.push(e);
+    }
+    const introEnd = badF.length
+      ? Math.max(...badF.map(e => Math.min(e.endFrame, e.startFrame + P)))
+      : 0;
+    const keep = Math.max(P + introEnd, cut); // repetition can't begin before one period has elapsed
+    // demand a full clean period observed after the repeat point
+    if (frames - keep >= P) {
+      if (!hint) return {keep, period: P};
+      if (!best || bad.length < best.bad) best = {keep, period: P, bad: bad.length};
     }
   }
-  return null;
+  return best ? {keep: best.keep, period: best.period} : null;
 }
 
 // Seeded ±15% around the transcription's bpm — an open sweep locks onto

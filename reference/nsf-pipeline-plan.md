@@ -10,10 +10,21 @@ Overworld actually runs 150, not the MIDI's 130; Airship 180, not 165):
 prologue, overworld, ship, airship, town, corneliacastle, gurguvolcano,
 matouyascave, cave, chaostemple, underwaterpalace, shop, menu — plus ship
 (loses ~0.6s of its pickup to boundary tolerance; note starts are right).
-**Flagged, need a later pass:** battle and gameover (capture repeats with
-variation the detector didn't untangle — content likely doubled;
-calibration auto-rejected), prelude/victory/floatingcastle (grid-fitted,
-no verified bar count), epilogue (through-composed, no loop — correct).
+**Update 2026-08-02 (verified with Josh):** detector rewritten as a strict
+brute-force minimal-period search plus a forward intro pass (a
+non-repeating intro shorter than the period is invisible to the backward
+check alone — gameover's 2-beat pickup exposed this). Josh's by-ear loop
+claims verified against register data: battle 26-bar body looping bar 29
+beat 3 -> bar 3 beat 3 (his "end of 29.2 -> 3.2", same point — the
+descending run is the body's turnaround, played every pass); gameover
+2-beat intro + 8-bar loop (his claim; his numbering one beat shy of the
+seam); prelude exactly 16 bars at 100, his harmonic sequence confirmed
+from pitch classes (Bb/Gm x2, Eb, F, GbM7, AbM7); ship agrees with his
+original 24-bar pickup-intro analysis; victory 6-bar period into bar 2 —
+data says beat 3 vs his 4& (open: re-listen). Loop-back directives are
+auto-written to chip/*.rollnotes when the target isn't bar 1 beat 1
+(battle 3.3, gameover 1.3, victory 2.3, ship 1.2). Still grid-fitted:
+floatingcastle (Josh: fine as-is); epilogue through-composed (correct).
 
 **Status 2026-08-02 (later still): captures live in the app.** Everything
 sits in `chip/` — `<song>.notes.txt` for analysis and `<song>.mid`
