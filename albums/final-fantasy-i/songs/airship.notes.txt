@@ -1,4 +1,4 @@
-# ff1airship (chip capture, NSF track 6, loop-calibrated 180.01bpm; cut at 17.1, loops to 1.1) — 4/4, 180.01bpm, 17 bars (from NSF capture)
+# airship (chip capture, NSF track 6, loop-calibrated 180.01bpm; cut at 17.1, loops to 1.1) — 4/4, 180.01bpm, 17 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

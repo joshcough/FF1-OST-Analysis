@@ -1,4 +1,4 @@
-# ff1matouyascave (chip capture, NSF track 10, loop-calibrated 150.01bpm; cut at 21.1, loops to 1.1) — 4/4, 150.01bpm, 21 bars (from NSF capture)
+# matoyas-cave (chip capture, NSF track 10, loop-calibrated 150.01bpm; cut at 21.1, loops to 1.1) — 4/4, 150.01bpm, 21 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

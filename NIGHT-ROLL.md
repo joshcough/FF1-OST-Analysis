@@ -128,7 +128,10 @@ loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the
 
 ## Code map (index.html, section comments mark these)
 
-catalog → CATALOG + two-level song picker (groups sheet → songs; opens into the current song's group) ·
+catalog → CATALOG built from albums/manifest.json at boot (run
+tools/build_manifest.mjs after adding music; album.json per album holds
+title/order/name overrides) + two-level song picker (groups sheet → songs;
+opens into the current song's group) ·
 midi parse → parseMidi + tempo maps · rollnotes → parse/serialize/regions/
 sfAt/subtitle · lasso/chord id · load song → setSong (computes songEndTick;
 loadGen guards stale async loads) · track chips · drawing → draw/drawRuler (roll) ·

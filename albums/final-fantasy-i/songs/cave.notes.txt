@@ -1,4 +1,4 @@
-# ff1cave (chip capture, NSF track 11, loop-calibrated 150.01bpm; cut at 31.1, loops to 1.1) — 2/4, 150.01bpm, 31 bars (from NSF capture)
+# cave (chip capture, NSF track 11, loop-calibrated 150.01bpm; cut at 31.1, loops to 1.1) — 2/4, 150.01bpm, 31 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

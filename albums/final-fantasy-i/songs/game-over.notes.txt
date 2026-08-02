@@ -1,4 +1,4 @@
-# ff1gameover (chip capture, NSF track 18, loop-calibrated 90bpm; cut at 9.3, loops to 1.3) — 4/4, 90bpm, 9 bars (from NSF capture)
+# game-over (chip capture, NSF track 18, loop-calibrated 90bpm; cut at 9.3, loops to 1.3) — 4/4, 90bpm, 9 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

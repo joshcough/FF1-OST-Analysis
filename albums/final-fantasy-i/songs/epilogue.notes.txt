@@ -1,4 +1,4 @@
-# ff1epilogue (chip capture, NSF track 3, driver-tempo-family 112.5bpm; through-composed, no cut; raw timing, grid approximate) — 4/4, 112.5bpm, 127 bars (from NSF capture)
+# epilogue (chip capture, NSF track 3, driver-tempo-family 112.5bpm; through-composed, no cut; raw timing, grid approximate) — 4/4, 112.5bpm, 127 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

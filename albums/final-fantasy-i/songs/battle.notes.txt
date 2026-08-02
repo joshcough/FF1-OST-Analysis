@@ -1,4 +1,4 @@
-# ff1battle (chip capture, NSF track 16, loop-calibrated 150.01bpm; cut at 29.3.5, loops to 3.3.5) — 4/4, 150.01bpm, 29 bars (from NSF capture)
+# battle (chip capture, NSF track 16, loop-calibrated 150.01bpm; cut at 29.3.5, loops to 3.3.5) — 4/4, 150.01bpm, 29 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

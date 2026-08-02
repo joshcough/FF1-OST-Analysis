@@ -1,4 +1,4 @@
-# ff1prologue (chip capture, NSF track 2, loop-calibrated 150.01bpm; cut at 25.1, loops to 1.1) — 4/4, 150.01bpm, 25 bars (from NSF capture)
+# prologue (chip capture, NSF track 2, loop-calibrated 150.01bpm; cut at 25.1, loops to 1.1) — 4/4, 150.01bpm, 25 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

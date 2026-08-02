@@ -1,4 +1,4 @@
-# ff1corneliacastle (chip capture, NSF track 8, loop-calibrated 100bpm; cut at 9.1, loops to 1.1) — 4/4, 100bpm, 8 bars (from NSF capture)
+# cornelia-castle (chip capture, NSF track 8, loop-calibrated 100bpm; cut at 9.1, loops to 1.1) — 4/4, 100bpm, 8 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

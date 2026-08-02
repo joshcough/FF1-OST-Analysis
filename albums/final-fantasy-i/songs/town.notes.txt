@@ -1,4 +1,4 @@
-# ff1town (chip capture, NSF track 7, loop-calibrated 90bpm; cut at 9.1, loops to 1.1) — 4/4, 90bpm, 8 bars (from NSF capture)
+# town (chip capture, NSF track 7, loop-calibrated 90bpm; cut at 9.1, loops to 1.1) — 4/4, 90bpm, 8 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

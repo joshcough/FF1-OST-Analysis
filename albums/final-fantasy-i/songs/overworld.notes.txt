@@ -1,4 +1,4 @@
-# ff1overworld (chip capture, NSF track 4, loop-calibrated 150.01bpm; cut at 17.2, loops to 1.2) — 4/4, 150.01bpm, 17 bars (from NSF capture)
+# overworld (chip capture, NSF track 4, loop-calibrated 150.01bpm; cut at 17.2, loops to 1.2) — 4/4, 150.01bpm, 17 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

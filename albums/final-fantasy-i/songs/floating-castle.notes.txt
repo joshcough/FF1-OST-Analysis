@@ -1,4 +1,4 @@
-# ff1floatingcastle (chip capture, NSF track 13, grid-fitted 100bpm; cut at 14.1.5, loops to 1.1) — 4/4, 100bpm, 14 bars (from NSF capture)
+# floating-castle (chip capture, NSF track 13, grid-fitted 100bpm; cut at 14.1.5, loops to 1.1) — 4/4, 100bpm, 14 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

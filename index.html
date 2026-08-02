@@ -476,33 +476,14 @@
 // and the project conventions (keys are Josh's discoveries — never pre-fill).
 "use strict";
 // ---------------------------------------------------------------- catalog
-const CATALOG = { // alphabetical within each group
-  "Final Fantasy I": [
-    ["Airship", "albums/final-fantasy-i/songs/ff1airship.mid"],
-    ["Battle", "albums/final-fantasy-i/songs/ff1battle.mid"],
-    ["Cave", "albums/final-fantasy-i/songs/ff1cave.mid"],
-    ["Chaos Temple", "albums/final-fantasy-i/songs/ff1chaostemple.mid"],
-    ["Cornelia Castle", "albums/final-fantasy-i/songs/ff1corneliacastle.mid"],
-    ["Epilogue", "albums/final-fantasy-i/songs/ff1epilogue.mid"],
-    ["Floating Castle", "albums/final-fantasy-i/songs/ff1floatingcastle.mid"],
-    ["Game Over", "albums/final-fantasy-i/songs/ff1gameover.mid"],
-    ["Gurgu Volcano", "albums/final-fantasy-i/songs/ff1gurguvolcano.mid"],
-    ["Matoya's Cave", "albums/final-fantasy-i/songs/ff1matouyascave.mid"],
-    ["Menu", "albums/final-fantasy-i/songs/ff1menu.mid"],
-    ["Overworld", "albums/final-fantasy-i/songs/ff1overworld.mid"],
-    ["Prelude", "albums/final-fantasy-i/songs/ff1prelude.mid"],
-    ["Prologue", "albums/final-fantasy-i/songs/ff1prologue.mid"],
-    ["Ship", "albums/final-fantasy-i/songs/ff1ship.mid"],
-    ["Shop", "albums/final-fantasy-i/songs/ff1shop.mid"],
-    ["Town", "albums/final-fantasy-i/songs/ff1town.mid"],
-    ["Underwater Palace", "albums/final-fantasy-i/songs/ff1underwaterpalace.mid"],
-    ["Victory", "albums/final-fantasy-i/songs/ff1victory.mid"],
-  ],
-  "My Compositions": [
-    ["Baseball / Beach Song", "albums/compositions/CM6-G7b9.mid"],
-    ["Key Change Test (07-26)", "albums/compositions/KeyChangeTest-07-26.mid"],
-  ],
-};
+let CATALOG = {}; // built from albums/manifest.json at boot — the dropdown
+// mirrors the albums/ directory; run tools/build_manifest.mjs after adding music
+async function initCatalog() {
+  const res = await fetch("albums/manifest.json");
+  if (!res.ok) throw new Error("manifest fetch failed");
+  CATALOG = {};
+  for (const a of await res.json()) CATALOG[a.title] = a.songs.map(x => [x.title, x.path]);
+}
 const TRACK_COLORS = ["#d95926","#3987e5","#199e70","#c98500","#d55181","#9085e9","#008300","#e66767",
                       "#0aa2c0","#b44ac0","#8a7d20","#a1653f"]; // 12 before any repeat (Epilogue has 11 tracks)
 const NOTE_NAMES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
@@ -891,6 +872,25 @@ let lastSubtitle = null;
   const last = localStorage.getItem("ff1roll-lastsong");
   if (last && /^(midi|compositions)\//.test(last))
     localStorage.setItem("ff1roll-lastsong", remap(last));
+  // second wave (same day): ff1 filename prefix dropped, multiword names hyphenated
+  const SONGS = "albums/final-fantasy-i/songs/";
+  const RENAME = {ff1corneliacastle: "cornelia-castle", ff1gurguvolcano: "gurgu-volcano",
+    ff1matouyascave: "matoyas-cave", ff1chaostemple: "chaos-temple",
+    ff1floatingcastle: "floating-castle", ff1underwaterpalace: "underwater-palace",
+    ff1gameover: "game-over"};
+  const remap2 = v => v.replace(new RegExp("(" + SONGS.replace(/[/]/g, "\\/") + ")ff1([a-z]+)(\\.mid)"),
+    (all, pre, base, ext) => pre + (RENAME["ff1" + base] || base) + ext);
+  for (const k of Object.keys(localStorage)) {
+    if (!/^ff1roll-(notes|edits|ts)-/.test(k) || !k.includes(SONGS + "ff1")) continue;
+    const nk = remap2(k);
+    if (nk !== k) {
+      if (!localStorage.getItem(nk)) localStorage.setItem(nk, localStorage.getItem(k));
+      localStorage.removeItem(k);
+    }
+  }
+  const last2 = localStorage.getItem("ff1roll-lastsong");
+  if (last2 && last2.includes(SONGS + "ff1"))
+    localStorage.setItem("ff1roll-lastsong", remap2(last2));
 })();
 let hlOn = localStorage.getItem("ff1roll-hl") === "1"; // ⊙ highlight toggle
 function toggleHl() {
@@ -2228,11 +2228,7 @@ function scoreTap(pos) {
 // 43-entry dropdown got unusable once chip captures joined the catalog
 const songbtn = document.getElementById("songbtn");
 const songsheet = document.getElementById("songsheet");
-const ALL_PATHS = Object.values(CATALOG).flat().map(([, p]) => p);
-let currentPath = (() => {
-  const last = localStorage.getItem("ff1roll-lastsong");
-  return ALL_PATHS.includes(last) ? last : "albums/final-fantasy-i/songs/ff1overworld.mid";
-})();
+let currentPath = null; // resolved in boot() once the manifest is in
 function songTitleOf(path) {
   for (const songs of Object.values(CATALOG)) {
     const hit = songs.find(([, p]) => p === path);
@@ -2885,8 +2881,15 @@ document.getElementById("ghsaveall").addEventListener("click", async e => {
 applyViewMode();
 resize();
 updateSyncBtn();
-updateSongBtn();
-loadSong(currentPath).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
+(async function boot() {
+  try { await initCatalog(); }
+  catch (e) { setInfo("albums/manifest.json failed to load — open via a web server: " + e.message); return; }
+  const all = Object.values(CATALOG).flat().map(([, p]) => p);
+  const last = localStorage.getItem("ff1roll-lastsong");
+  currentPath = all.includes(last) ? last : "albums/final-fantasy-i/songs/overworld.mid";
+  updateSongBtn();
+  loadSong(currentPath).catch(e => setInfo("load failed — open via a web server (GitHub Pages): " + e.message));
+})();
 </script>
 </body>
 </html>

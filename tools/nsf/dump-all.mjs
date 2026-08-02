@@ -16,45 +16,45 @@ import { createApp } from "../../tests/harness.mjs";
 // chip's frame-exact period ÷ this count gives the TRUE tempo. Songs absent
 // here fall back to the grid fit.
 const PERIOD_BARS = {
-  ff1prelude: 16, ff1prologue: 24, ff1overworld: 16, ff1ship: 24,
-  ff1airship: 16, ff1town: 8, ff1corneliacastle: 8,
-  ff1gurguvolcano: 20, // NOT the transcription's 21 — at 20 the period gives
+  prelude: 16, prologue: 24, overworld: 16, ship: 24,
+  airship: 16, town: 8, "cornelia-castle": 8,
+  "gurgu-volcano": 20, // NOT the transcription's 21 — at 20 the period gives
                        // exactly 150bpm (the driver's tempo family); the
                        // 21st MIDI bar was the arranger's, like gameover's
-  ff1matouyascave: 20, ff1cave: 30, ff1chaostemple: 16,
-  ff1underwaterpalace: 16, ff1shop: 21, ff1battle: 26, ff1menu: 8,
-  ff1gameover: 8,
-  ff1victory: 8, // NOT 6 — snap-residual audit picks 150bpm (8 bars) over
+  "matoyas-cave": 20, cave: 30, "chaos-temple": 16,
+  "underwater-palace": 16, shop: 21, battle: 26, menu: 8,
+  "game-over": 8,
+  victory: 8, // NOT 6 — snap-residual audit picks 150bpm (8 bars) over
                  // 112.5 (6 bars) decisively; same driver family as the rest
 };
 
 // no loop to calibrate from (through-composed), but the blind grid fit lands
 // within a hair of a known driver tempo — snap to it (integer frames per 16th)
-const FIXED_BPM = { ff1epilogue: 112.5 };
+const FIXED_BPM = { epilogue: 112.5 };
 // don't grid-snap these: through-composed with tempo changes/fermatas a
 // single grid can't follow — keep raw hardware timing (bar labels approximate)
-const NO_SNAP = { ff1epilogue: true };
+const NO_SNAP = { epilogue: true };
 
 const TRACKS = [ // [nsf track, repo name, seconds to capture — ≥ intro + 2 loops]
-  [1,  "ff1prelude", 170],
-  [2,  "ff1prologue", 85],
-  [3,  "ff1epilogue", 270], // through-composed, ~256s of music + final held chord — no loop to trim
-  [4,  "ff1overworld", 60],
-  [5,  "ff1ship", 90],
-  [6,  "ff1airship", 45],
-  [7,  "ff1town", 45],
-  [8,  "ff1corneliacastle", 40],
-  [9,  "ff1gurguvolcano", 65],
-  [10, "ff1matouyascave", 65],
-  [11, "ff1cave", 50],           // the chip has ONE track for cave/dungeon
-  [12, "ff1chaostemple", 55],
-  [13, "ff1floatingcastle", 65],
-  [14, "ff1underwaterpalace", 55],
-  [15, "ff1shop", 55],
-  [16, "ff1battle", 90],
-  [17, "ff1menu", 35],
-  [18, "ff1gameover", 45],
-  [19, "ff1victory", 30],
+  [1,  "prelude", 170],
+  [2,  "prologue", 85],
+  [3,  "epilogue", 270], // through-composed, ~256s of music + final held chord — no loop to trim
+  [4,  "overworld", 60],
+  [5,  "ship", 90],
+  [6,  "airship", 45],
+  [7,  "town", 45],
+  [8,  "cornelia-castle", 40],
+  [9,  "gurgu-volcano", 65],
+  [10, "matoyas-cave", 65],
+  [11, "cave", 50],           // the chip has ONE track for cave/dungeon
+  [12, "chaos-temple", 55],
+  [13, "floating-castle", 65],
+  [14, "underwater-palace", 55],
+  [15, "shop", 55],
+  [16, "battle", 90],
+  [17, "menu", 35],
+  [18, "game-over", 45],
+  [19, "victory", 30],
 ];
 
 function meterOf(repoName) { // meter + bpm seed + bar count from the transcription MIDI
@@ -85,7 +85,7 @@ for (const [track, name, seconds] of TRACKS) {
   // trim to intro + one loop pass, exactly as the transcriptions were.
   // victory varies articulation per pass; Josh verified its 6-bar period
   // by ear, so hint the detector at ~12.8s
-  const HINTS = {ff1victory: 768};
+  const HINTS = {victory: 768};
   const loop = detectLoop(events, frames - t0, HINTS[name] || null);
   let keptFrames = frames - t0;
   if (loop) {

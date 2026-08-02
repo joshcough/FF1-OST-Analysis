@@ -1,4 +1,4 @@
-# ff1shop (chip capture, NSF track 15, loop-calibrated 200.01bpm; cut at 22.1, loops to 1.1) — 4/4, 200.01bpm, 22 bars (from NSF capture)
+# shop (chip capture, NSF track 15, loop-calibrated 200.01bpm; cut at 22.1, loops to 1.1) — 4/4, 200.01bpm, 22 bars (from NSF capture)
 # Format: bar N: beat pitch duration-in-quarter-notes
 # Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.
 

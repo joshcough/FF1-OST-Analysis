@@ -1,0 +1,96 @@
+[
+ {
+  "title": "Final Fantasy I",
+  "songs": [
+   {
+    "title": "Airship",
+    "path": "albums/final-fantasy-i/songs/airship.mid"
+   },
+   {
+    "title": "Battle",
+    "path": "albums/final-fantasy-i/songs/battle.mid"
+   },
+   {
+    "title": "Cave",
+    "path": "albums/final-fantasy-i/songs/cave.mid"
+   },
+   {
+    "title": "Chaos Temple",
+    "path": "albums/final-fantasy-i/songs/chaos-temple.mid"
+   },
+   {
+    "title": "Cornelia Castle",
+    "path": "albums/final-fantasy-i/songs/cornelia-castle.mid"
+   },
+   {
+    "title": "Epilogue",
+    "path": "albums/final-fantasy-i/songs/epilogue.mid"
+   },
+   {
+    "title": "Floating Castle",
+    "path": "albums/final-fantasy-i/songs/floating-castle.mid"
+   },
+   {
+    "title": "Game Over",
+    "path": "albums/final-fantasy-i/songs/game-over.mid"
+   },
+   {
+    "title": "Gurgu Volcano",
+    "path": "albums/final-fantasy-i/songs/gurgu-volcano.mid"
+   },
+   {
+    "title": "Matoya's Cave",
+    "path": "albums/final-fantasy-i/songs/matoyas-cave.mid"
+   },
+   {
+    "title": "Menu",
+    "path": "albums/final-fantasy-i/songs/menu.mid"
+   },
+   {
+    "title": "Overworld",
+    "path": "albums/final-fantasy-i/songs/overworld.mid"
+   },
+   {
+    "title": "Prelude",
+    "path": "albums/final-fantasy-i/songs/prelude.mid"
+   },
+   {
+    "title": "Prologue",
+    "path": "albums/final-fantasy-i/songs/prologue.mid"
+   },
+   {
+    "title": "Ship",
+    "path": "albums/final-fantasy-i/songs/ship.mid"
+   },
+   {
+    "title": "Shop",
+    "path": "albums/final-fantasy-i/songs/shop.mid"
+   },
+   {
+    "title": "Town",
+    "path": "albums/final-fantasy-i/songs/town.mid"
+   },
+   {
+    "title": "Underwater Palace",
+    "path": "albums/final-fantasy-i/songs/underwater-palace.mid"
+   },
+   {
+    "title": "Victory",
+    "path": "albums/final-fantasy-i/songs/victory.mid"
+   }
+  ]
+ },
+ {
+  "title": "My Compositions",
+  "songs": [
+   {
+    "title": "Baseball / Beach Song",
+    "path": "albums/compositions/CM6-G7b9.mid"
+   },
+   {
+    "title": "Key Change Test (07-26)",
+    "path": "albums/compositions/KeyChangeTest-07-26.mid"
+   }
+  ]
+ }
+]
