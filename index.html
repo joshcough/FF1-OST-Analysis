@@ -356,6 +356,7 @@
     </div>
     <div class="row">
       <button class="primary" id="nsave">Save</button>
+      <button id="nmic" style="display:none">🎤 Speak</button>
       <button id="ndelete" style="display:none">Delete</button>
       <button id="ncancel">Cancel</button>
     </div>
@@ -411,7 +412,7 @@
 
     <h3>ANNOTATIONS (.rollnotes)</h3>
     <dl>
-      <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat. Fill "to bar/beat" to span a range. The ⊙ highlight toggle in the note strip shades the current note's span in the timeline.</dd>
+      <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat — or tap 🎤 Speak and dictate it. Fill "to bar/beat" to span a range. The ⊙ highlight toggle in the note strip shades the current note's span in the timeline.</dd>
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
       <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
@@ -2412,6 +2413,8 @@ function applyEditorType() {
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
   document.getElementById("nlooprow").style.display = t === "loop" ? "" : "none";
   document.getElementById("ntorow").style.display = t === "loop" ? "none" : "";
+  document.getElementById("nmic").style.display =
+    SPEECH && t !== "key" && t !== "loop" ? "" : "none"; // dictation targets the text box
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
                     : "What's happening at this beat?";
@@ -2421,8 +2424,50 @@ function applyEditorType() {
     document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
+
+// dictation into the note text box (Web Speech API — easier on hands than
+// typing; falls back silently to the keyboard mic where unsupported)
+const SPEECH = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let micRec = null;
+const nmic = document.getElementById("nmic");
+function micStop() {
+  if (micRec) { try { micRec.stop(); } catch (err) { /* already stopped */ } }
+  micRec = null;
+  nmic.classList.remove("active");
+  nmic.textContent = "🎤 Speak";
+}
+nmic.addEventListener("click", () => {
+  if (micRec) { micStop(); return; }
+  const ntext = document.getElementById("ntext");
+  const base = ntext.value ? ntext.value.replace(/\s+$/, "") + " " : "";
+  let finals = "";
+  micRec = new SPEECH();
+  micRec.continuous = true;
+  micRec.interimResults = true;
+  micRec.onresult = e => {
+    let interim = "";
+    finals = "";
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finals += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    ntext.value = base + finals + interim;
+  };
+  micRec.onerror = e => {
+    document.getElementById("nstatus").textContent =
+      e.error === "not-allowed" ? "Microphone permission denied — allow it in Safari settings."
+                                : "Dictation error: " + e.error;
+    micStop();
+  };
+  micRec.onend = () => micStop(); // Safari ends recognition on silence
+  nmic.classList.add("active");
+  nmic.textContent = "■ Stop";
+  micRec.start();
+});
+
 function snapBeat(q) { return Math.round((q - 1) / 0.25) * 0.25 + 1; }
 function openEditor(note) {
+  micStop();
   editingNote = note || null;
   fillBarBeatSelects();
   const bt = barTicks();
@@ -2464,8 +2509,9 @@ document.getElementById("notebtn").addEventListener("click", () => {
   const at = rangeSel ? null : activeNoteAt(playCursor);
   openEditor(at && at.added ? at : null);
 });
-document.getElementById("ncancel").addEventListener("click", () => editor.classList.remove("on"));
+document.getElementById("ncancel").addEventListener("click", () => { micStop(); editor.classList.remove("on"); });
 document.getElementById("nsave").addEventListener("click", () => {
+  micStop();
   const type = editorType();
   const text = document.getElementById("ntext").value.trim();
   if (type !== "key" && type !== "loop" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }

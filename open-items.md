@@ -39,18 +39,18 @@ session start alongside the quiz.)
 
 ## Tooling to-do
 
-- **In-app Claude chat — built but parked, decision pending** (2026-08-01):
-  a complete chat feature (💬 button, per-song conversations, streaming,
-  context injection of cursor/rollnotes/lasso, tutor system prompt that
-  won't spoil undiscovered keys/chords) sits UNCOMMITTED in the local
-  working tree of index.html. Blocker: it needs a pay-per-use Anthropic
-  Console API key — Josh's $200 Max subscription can't fund direct API
-  calls, which frustrated him. Options discussed: downgrade Max $200→$100
-  and fund the API from the difference; use the Claude iPad app pointed at
-  this repo (chosen for now — midi/*.notes.txt dumps exist so the app can
-  read actual notes); or drop the feature. Revisit with Josh. ⚠ Until
-  then: never `git add -A` / `git add index.html` without checking the
-  chat diff isn't swept up.
+- **In-app Claude chat — built but parked on the `claude-chat` branch,
+  decision pending** (2026-08-01): a complete chat feature (💬 button,
+  per-song conversations, streaming, context injection of
+  cursor/rollnotes/lasso, tutor system prompt that won't spoil
+  undiscovered keys/chords) is committed on branch `claude-chat` (pushed).
+  Blocker: it needs a pay-per-use Anthropic Console API key — Josh's $200
+  Max subscription can't fund direct API calls, which frustrated him.
+  Options discussed: downgrade Max $200→$100 and fund the API from the
+  difference; use the Claude iPad app pointed at this repo (chosen for
+  now — midi/*.notes.txt dumps exist so the app can read actual notes);
+  or drop the feature. Revisit with Josh; merge the branch if he funds a
+  key (it will need a rebase over main's later changes).
 
 - **Two-regime score zoom** (parked 2026-08-01, low priority): pinch
   compresses time down to the engraving floor (current behavior), then

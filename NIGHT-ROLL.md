@@ -52,7 +52,8 @@ reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
 inversions; missing-5th tolerance).
 
 **Annotations:** see format below. + Note editor is type-first (Text note /
-Section / Key change / Loop point) with bar/beat dropdowns. ☰ Notes lists everything,
+Section / Key change / Loop point) with bar/beat dropdowns and a 🎤 Speak
+dictation button (Web Speech API; hidden where unsupported). ☰ Notes lists everything,
 rows open the editor, Delete works on synced notes too (permanent on Sync).
 Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
 highlights the active note's span (ambient range tints removed — on a
