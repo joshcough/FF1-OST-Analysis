@@ -6,10 +6,11 @@ session start alongside the quiz.)
 
 ## Questions awaiting Josh
 
-0. **Key sweep in progress — see [key-sweep.md](albums/final-fantasy-i/analysis/key-sweep.md).** 6 songs
-   done (6/6 for the first-bass-note rule), ~14 to go, dungeon excluded as
-   a duplicate of cave. Open sweep-wide questions live there (the "first
-   bass note" definition; the "unclear" outcome category; duplicate audit).
+0. **Key sweep in progress — see [key-sweep.md](albums/final-fantasy-i/analysis/key-sweep.md).** 10 songs
+   opened (gurgu the first with a real key change — D→F Dorian), 9 to go.
+   Hypothesis revised 2026-08-02 to the loop-target form; the naive script
+   scoring disagrees with the by-eye sweep (fifths in the bass) and THAT
+   ruling is Josh's — see the sweep doc's "Script v1 results".
    **Convention change (Josh, 2026-08-01): per-song open questions now live
    in each song's own doc** (battle.md, airship.md, cave.md,
    chaos-temple.md, overworld.md, cornelia-castle.md all have Open
@@ -80,6 +81,19 @@ session start alongside the quiz.)
   commits, and it appears in the dropdown. In-app upload UI deliberately
   skipped for now — optimize for analysis throughput, revisit if the tool
   grows beyond personal use.
+- **Concept index + in-app search (from Josh's 08-02 notes):** notes are
+  organized per song but his questions are increasingly per concept
+  ("where else have I seen a raised 7th"). Plan: (a) tag convention in
+  rollnotes (#harmonic-minor, #chromatic-bass) + a script generating
+  concepts.md from all rollnotes; (b) a search box in the app that greps
+  all rollnotes across the album and jumps to hits. The tag index is the
+  prerequisite for meaningful search. Not built yet.
+- **Channel-swap re-check (from gurgu's device find):** re-check
+  already-swept songs for mid-song channel role swaps Josh may have read
+  through — script idea: per song, which channel holds the lowest pitch
+  per bar; report changes. Not built yet.
+- **Game Over exercise owed:** bass root notes of all 8 bars as one
+  sequence; name the pattern (game-over.md).
 - **Browser "Load .nsf" in Night Roll** (idea 2026-08-02; decided
   2026-08-02 over a separate converter tool — Night Roll is already the
   player you need for auditioning a fresh NSF's numbered tracks). Shape:

@@ -101,3 +101,19 @@ Two 8-bar loops: chords from G-land → C7 → F **major** + melody; then the sa
 ## Where the song sessions have placed me so far (2026-07-21)
 
 Material covered in the Cornelia Castle and Overworld (bass) sessions spans Theory I–IV: Roman numerals and chord spelling (I), inversions and bass-line logic (II), secondary dominants and tonicization (III), mode mixture / borrowed chords (IV) — plus the by-ear analysis skill that classrooms teach separately as aural skills. Known weak spot to drill: interval direction arithmetic (fifths vs. fourths).
+
+**2026-08-02 (overnight sweep on chip captures — from session notes):**
+Dead Music D minor called cold (Dm→Gm→F path, non-circular hit). Ending
+Theme G major; "designed to end, not loop" → the anacrusis insight that
+generalized the sweep hypothesis to the loop-target/structural-downbeat
+form. Floating Castle parked: Bb tonic (full-chip unison, unique), mode
+resists — Lydian proposed and correctly abandoned when the natural 4th
+appeared. Gurgu Volcano fully cracked over an hour: D Dorian (no Bb in
+bars 1–12; major IV = Dorian fingerprint), raised-7th cadence device
+(second sighting after Battle), channel role swap at bar 13 (first
+chip-only finding), modulation by transposing the whole vamp up a m3 to
+F Dorian — spelling derived from first principles, catching Claude's Eb
+major slip en route. Feature born from it: seven-mode key picker.
+Quiz-worthy concepts: Dorian's major IV; raised 7th as dominant-maker,
+not scale change; anacrusis vs structural downbeat; tonic ≠ lowest note
+(the fifth-in-the-bass trap, now with script data behind it).

@@ -42,7 +42,11 @@ spoil the discovery process.
 | Airship | [analysis/airship.md](analysis/airship.md) | in progress |
 | Cave (Dungeon) | [analysis/cave.md](analysis/cave.md) | in progress — compound-line finding |
 | Chaos Temple | [analysis/chaos-temple.md](analysis/chaos-temple.md) | in progress |
-| — key sweep — | [analysis/key-sweep.md](analysis/key-sweep.md) | 6 of 19 songs; first-bass-note rule 6/6 so far |
+| Gurgu Volcano | [analysis/gurgu-volcano.md](analysis/gurgu-volcano.md) | ✅ full key work — D→F Dorian, channel-swap device |
+| Dead Music | [analysis/game-over.md](analysis/game-over.md) | key done (D minor); bass-pattern exercise open |
+| Ending Theme | [analysis/epilogue.md](analysis/epilogue.md) | opening key done (G major); 127 bars unanalyzed |
+| Floating Castle | [analysis/floating-castle.md](analysis/floating-castle.md) | parked — tonic Bb, mode resists |
+| — key sweep — | [analysis/key-sweep.md](analysis/key-sweep.md) | 10 of 19 opened; hypothesis revised to loop-target form |
 | — chord charts — | [analysis/chord-charts.md](analysis/chord-charts.md) | grids for analyzed songs + shared templates |
 
 Remaining songs await the sweep. Open questions live inside each song's doc;

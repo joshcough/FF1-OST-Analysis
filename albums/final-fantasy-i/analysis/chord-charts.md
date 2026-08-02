@@ -40,3 +40,21 @@ Both songs open with the same four-slot sentence:
 | secondary dominant aiming at a minor chord | F# (V/vi) | E/G# (V/ii) |
 
 Then both spend the back half on borrowed flat-side chords plus a tonicization, and both exit through a turnaround built on the home key's dominant, delivering onto the loop restart.
+
+## Gurgu Volcano (D Dorian → F Dorian, 20-bar loop, 150 BPM)
+
+The two vamps; neither ever states its tonic chord (see gurgu-volcano.md
+for the full derivation).
+
+| Bars | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|
+| **Chord** | F | G7 | F | G7 | Ab | Bb7 | Ab | Bb7 |
+| **Roman** | ♭III (of D) | IV7 | ♭III | IV7 | ♭III (of F) | IV7 | ♭III | IV7 |
+| **Job** | vamp | Dorian fingerprint (major IV) | vamp | vamp | same vamp, up a m3 | new key, same numerals | vamp | → loops to D |
+
+## Device: modulation by transposing a whole section
+
+Gurgu bars 17–20 are bars 13–16 moved up a minor third — mode and Roman
+numerals preserved, pitch level shifted, and the shift *is* the key change
+(D Dorian → F Dorian). Third transposed-repeat sighting in the corpus,
+first where the transposition constitutes a modulation.
