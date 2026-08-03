@@ -2723,8 +2723,11 @@ function openEditor(note) {
     }
   }
   const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key"
-                       : note.loopTo !== undefined ? "loop" : "note") : "note";
+                       : note.loopTo !== undefined ? "loop" : "note")
+             : rangeSel ? "section" // a drag before + Note almost always means "label this span"
+             : "note";
   document.getElementById("ntype").value = type;
+  if (!note && rangeSel) setTimeout(() => document.getElementById("ntext").focus(), 50);
   if (type === "loop" && note) {
     const lbt = barTicks();
     document.getElementById("nlb").value = String(Math.floor(note.loopTo / lbt) + 1);
@@ -2756,6 +2759,13 @@ document.getElementById("notebtn").addEventListener("click", () => {
   openEditor(at && at.added ? at : null);
 });
 document.getElementById("ncancel").addEventListener("click", () => { micStop(); editor.classList.remove("on"); });
+document.getElementById("ntext").addEventListener("keydown", e => {
+  // sections are one-line labels: Enter = save. Text notes keep Enter = newline
+  if (e.key === "Enter" && editorType() === "section") {
+    e.preventDefault();
+    document.getElementById("nsave").click();
+  }
+});
 document.getElementById("nsave").addEventListener("click", () => {
   micStop();
   const type = editorType();
