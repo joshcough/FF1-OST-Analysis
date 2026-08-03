@@ -218,3 +218,20 @@ test("saveEdits: an added note that was erased is not persisted (regression)", (
   assert.deepEqual(saved.added.map(n => n.p), [62]); // erased added note dropped
   assert.deepEqual(saved.removed, ["0:2"]);          // erased original tracked
 });
+
+test("meter: neutral 4/4 until a timesig directive declares one; anchors convert", () => {
+  installSong();
+  run(`song.timesig = [6, 8];`); // the MIDI's claim
+  run(`rollnotes = []; finalizeNotes();`);
+  assert.equal(run(`barTicks()`), 4 * 480); // MIDI meter drives nothing: neutral 4/4
+  run(`rollnotes = parseRollnotes("[1.1]\\ntimesig: 6/8\\n").map(resolveNote); finalizeNotes();`);
+  assert.deepEqual(val(`declaredTs`), [6, 8]);
+  assert.equal(run(`barTicks()`), 3 * 480); // declared: 6/8 = 3 quarter-beats per bar
+  const once = run(`serializeRollnotes()`);
+  assert.match(once, /timesig: 6\/8\n/); // round-trips like any directive
+  // conversion: [2.1] under 6/8 (tick 1440) re-expressed in 4/4 = bar 1 beat 4
+  run(`rollnotes.push(resolveNote({b1: 2, q1: 1, b2: null, q2: null, text: "hi", added: true})); finalizeNotes();`);
+  run(`convertAnchors(3, 4);`);
+  const n = val(`rollnotes.find(x => x.text === "hi")`);
+  assert.deepEqual([n.b1, n.q1], [1, 4]);
+});

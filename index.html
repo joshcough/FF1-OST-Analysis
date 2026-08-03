@@ -345,6 +345,7 @@
         <option value="note">Text note</option>
         <option value="section">Section</option>
         <option value="key">Key change</option>
+        <option value="timesig">Time signature</option>
         <option value="loop">Loop point</option>
       </select>
     </div>
@@ -369,6 +370,12 @@
         <option value="mixolydian">mixolydian</option>
         <option value="locrian">locrian</option>
       </select>
+    </div>
+    <div class="row" id="ntsrow" style="display:none">
+      <span class="lbl">meter</span>
+      <select id="ntsnum"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>9</option><option>12</option></select>
+      <span class="lbl">/</span>
+      <select id="ntsden"><option>2</option><option selected>4</option><option>8</option><option>16</option></select>
     </div>
     <div class="row" id="nlooprow" style="display:none">
       <span class="lbl">returns to bar</span><select id="nlb"></select>
@@ -625,7 +632,11 @@ let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
 let multiSelSf = 0;      // key context captured at lasso time
 let keyRegions = [];
-let tsDeclared = false; // "timesig:" annotation present — until then the MIDI's meter stays hidden     // [{start, sf, name}] from rollnotes "key:" directives
+let declaredTs = null; // [num, den] from a "timesig: N/D" directive; null = undeclared
+// meter is analysis: until the user declares it, everything runs on a
+// neutral 4/4 ruler — the MIDI's meter meta drives nothing visible
+function effTs() { return declaredTs || [4, 4]; }
+function beatsPerBarEff() { const t = effTs(); return t[0] * 4 / t[1]; }     // [{start, sf, name}] from rollnotes "key:" directives
 let previewSf = null;    // key dial preview override (null = follow regions)
 
 const canvas = document.getElementById("roll");
@@ -671,7 +682,13 @@ function updateClearBtn() {
 }
 
 // ---------------------------------------------------------------- rollnotes
-function barTicks() { return song.timesig[0] * 4 / song.timesig[1] * song.ppq; }
+function barTicks() { return beatsPerBarEff() * song.ppq; }
+function computeSongEnd() { // re-run whenever the effective meter changes
+  let lastTick = 0;
+  song.tracks.forEach(tr => tr.notes.forEach(n => { lastTick = Math.max(lastTick, n.t + n.d); }));
+  const bt = barTicks();
+  songEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt);
+}
 function notesBase() { return songKey ? songKey.replace(/\.midi?$/i, "") : null; } // path minus extension
 function baseName() { return notesBase() ? notesBase().split("/").pop() : "notes"; }
 function notesStoreKey() { return songKey ? "ff1roll-notes-" + songKey : null; }
@@ -698,6 +715,9 @@ function parseRollnotes(text) {
       const sf = keyNameToSf(km[1].trim());
       if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1].trim(); }
     }
+    const tm = n.text.match(/^timesig:\s*(\d+)\s*\/\s*(\d+)/i);
+    if (tm) { n.tsdir = [+tm[1], +tm[2]]; n.text = "timesig: " + tm[1] + "/" + tm[2]; }
+    else delete n.tsdir;
   });
   return out.filter(n => n.text);
 }
@@ -748,7 +768,7 @@ function sfDeclaredAt(tick) { // sf if the user has declared a key governing thi
 function resolveNote(n) {
   const bt = barTicks();
   n.start = (n.b1 - 1) * bt + (n.q1 - 1) * song.ppq;
-  n.end = n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null;
+  n.end = n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarEff()) * song.ppq : null;
   return n;
 }
 function finalizeNotes() {
@@ -768,12 +788,13 @@ function finalizeNotes() {
     if (lm) n.loopTo = (+lm[1] - 1) * bt + ((lm[2] ? +lm[2] : 1) - 1) * song.ppq;
     else delete n.loopTo;
   }
-  tsDeclared = rollnotes.some(n => /^timesig:/i.test(n.text)); // meter is analysis: shown only when declared
-  if (song) updateSongMeta(); // the label renders before annotations load
+  const tsNote = rollnotes.find(n => n.tsdir);
+  declaredTs = tsNote ? tsNote.tsdir : null;
+  if (song) { updateSongMeta(); computeSongEnd(); } // grid may have changed
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir,
                 name: (n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [, SF_MAJOR[n.keydir]])[1], // "Gm"/"D dorian" show as recorded
-                end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || song.timesig[0]) * song.ppq : null,
+                end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarEff()) * song.ppq : null,
                 b1: n.b1, b2: n.b2}))
     .sort((a, b) => a.start - b.start);
   const unsetOpt = document.getElementById("keyunset");
@@ -855,7 +876,7 @@ function serializeNotesList(list, beatsPerBar, base) {
   }
   return lines.join("\n");
 }
-function serializeRollnotes() { return serializeNotesList(rollnotes, song.timesig[0], baseName()); }
+function serializeRollnotes() { return serializeNotesList(rollnotes, beatsPerBarEff(), baseName()); }
 // serialize another song's sidecar + this device's local additions, without
 // loading it: its meter was stashed in localStorage when it was last open
 async function buildRollnotesFor(key) {
@@ -977,21 +998,17 @@ function setSong(parsed, key) {
   loadGen++; // covers the local-file path: invalidate any in-flight catalog load
   song = parsed;
   songKey = key;
+  declaredTs = null; // meter resets to neutral until this song's notes declare one
   selNote = null;
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
   updateSongMeta();
   if (songKey) // stash meter so Sync-all can serialize this song without reloading it
-    localStorage.setItem("ff1roll-ts-" + songKey, song.timesig[0] + "/" + song.timesig[1]);
+    localStorage.setItem("ff1roll-ts-" + songKey, effTs()[0] + "/" + effTs()[1]);
   playCursor = 0;
   lastSubtitle = undefined;
-  {
-    let lastTick = 0;
-    song.tracks.forEach(tr => tr.notes.forEach(n => { lastTick = Math.max(lastTick, n.t + n.d); }));
-    const bt = barTicks();
-    songEndTick = Math.max(bt, Math.ceil(lastTick / bt - 0.05) * bt);
-  }
+  computeSongEnd();
   fitView();
   renderTrackbar();
   buildScoreModel();
@@ -2111,7 +2128,7 @@ function renderMeasure(mi) {
       e.vn = vn;
       vnotes.push(vn);
     }
-    const voice = new VF.Voice({num_beats: song.timesig[0], beat_value: song.timesig[1]});
+    const voice = new VF.Voice({num_beats: effTs()[0], beat_value: effTs()[1]});
     voice.setMode(VF.Voice.Mode.SOFT);
     voice.addTickables(vnotes);
     VF.Accidental.applyAccidentals([voice], SF_MAJOR[sfM] || "C");
@@ -2200,7 +2217,7 @@ function renderIntro() { // pinned-at-start clef / key / time column
     const stave = new VF.Stave(0, y, SCORE_INTRO_W, {fill_style: "#3A4569"});
     stave.addClef(st.clef);
     if (m.sf !== 0) stave.addKeySignature(m.keyName);
-    if (tsDeclared) stave.addTimeSignature(song.timesig[0] + "/" + song.timesig[1]);
+    if (declaredTs) stave.addTimeSignature(declaredTs[0] + "/" + declaredTs[1]);
     stave.setContext(ctx2).draw();
   });
   scoreIntro = c;
@@ -2409,7 +2426,7 @@ function updateSongMeta() { // bpm label shows what you actually hear
   const eff = Math.round(native * playRate);
   document.getElementById("songmeta").textContent =
     (playRate === 1 ? native + "bpm" : eff + "bpm (native " + native + ")") +
-    (tsDeclared ? " · " + song.timesig[0] + "/" + song.timesig[1] : "");
+    (declaredTs ? " · " + declaredTs[0] + "/" + declaredTs[1] : "");
 }
 const speedsl = document.getElementById("speedsl");
 const speedlbl = document.getElementById("speedlbl");
@@ -2652,7 +2669,7 @@ new ResizeObserver(resize).observe(wrap); // subtitle strip toggling resizes the
 const editor = document.getElementById("noteeditor");
 function fillBarBeatSelects() {
   const bars = Math.max(1, Math.round(songEndTick / barTicks()));
-  const beatsPerBar = song.timesig[0] * 4 / song.timesig[1];
+  const beatsPerBar = beatsPerBarEff();
   const mkBars = (id, noneOption, pastEnd) => {
     const s = document.getElementById(id);
     s.innerHTML = "";
@@ -2686,18 +2703,20 @@ function fillBarBeatSelects() {
 function editorType() { return document.getElementById("ntype").value; }
 function applyEditorType() {
   const t = editorType();
-  document.getElementById("ntext").style.display = t === "key" || t === "loop" ? "none" : "";
+  document.getElementById("ntext").style.display = t === "key" || t === "loop" || t === "timesig" ? "none" : "";
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
+  document.getElementById("ntsrow").style.display = t === "timesig" ? "" : "none";
   document.getElementById("nlooprow").style.display = t === "loop" ? "" : "none";
-  document.getElementById("ntorow").style.display = t === "loop" ? "none" : "";
+  document.getElementById("ntorow").style.display = t === "loop" || t === "timesig" ? "none" : "";
   document.getElementById("nmic").style.display =
-    SPEECH && t !== "key" && t !== "loop" ? "" : "none"; // dictation targets the text box
+    SPEECH && t !== "key" && t !== "loop" && t !== "timesig" ? "" : "none"; // dictation targets the text box
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
                     : "What's happening at this beat?";
   document.getElementById("nstatus").textContent =
     t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
     t === "loop" ? "When playback reaches the 'from' point (or the song end, if 'from' is at/before the target), it jumps back to the target bar/beat." :
+    t === "timesig" ? "Until you declare a meter, the grid is a neutral 4/4 ruler. Declaring re-bars the song; existing annotations are converted to keep their musical positions." :
     document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
@@ -2761,10 +2780,16 @@ function openEditor(note) {
     }
   }
   const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key"
+                       : note.tsdir ? "timesig"
                        : note.loopTo !== undefined ? "loop" : "note")
              : rangeSel ? "section" // a drag before + Note almost always means "label this span"
              : "note";
   document.getElementById("ntype").value = type;
+  if (type === "timesig" && note) {
+    document.getElementById("ntsnum").value = String(note.tsdir[0]);
+    document.getElementById("ntsden").value = String(note.tsdir[1]);
+  }
+  rebarArmed = false; // any editor open resets the two-tap warning
   if (!note && rangeSel) setTimeout(() => document.getElementById("ntext").focus(), 50);
   if (type === "loop" && note) {
     const lbt = barTicks();
@@ -2774,7 +2799,7 @@ function openEditor(note) {
   document.getElementById("nb1").value = String(note ? note.b1 : b1);
   document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
-  document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : song.timesig[0]) : (q2 || song.timesig[0]));
+  document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : beatsPerBarEff()) : (q2 || beatsPerBarEff()));
   document.getElementById("ntext").value = note && type !== "key" ? note.text : "";
   if (type === "key" && note) {
     document.getElementById("nkeysel").value = String(note.keydir);
@@ -2797,6 +2822,25 @@ document.getElementById("notebtn").addEventListener("click", () => {
   openEditor(at && at.added ? at : null);
 });
 document.getElementById("ncancel").addEventListener("click", () => { micStop(); editor.classList.remove("on"); });
+let rebarArmed = false; // two-tap confirmation for meter changes that move annotations
+// re-express every annotation's anchors under a new meter so they stay glued
+// to the MUSIC (bar.beat is a coordinate system; changing the meter re-bars)
+function convertAnchors(oldBpb, newBpb) {
+  const oldBt = oldBpb * song.ppq, newBt = newBpb * song.ppq;
+  const conv = (b, q) => {
+    const tick = (b - 1) * oldBt + (q - 1) * song.ppq;
+    return [Math.floor(tick / newBt) + 1, (tick % newBt) / song.ppq + 1];
+  };
+  for (const n of rollnotes) {
+    [n.b1, n.q1] = conv(n.b1, n.q1);
+    if (n.b2) [n.b2, n.q2] = conv(n.b2, n.q2 || oldBpb);
+    const lm = n.text.match(/^loop:\s*(\d+)(?:\.(\d+(?:\.\d+)?))?/);
+    if (lm) {
+      const [lb, lq] = conv(+lm[1], lm[2] ? +lm[2] : 1);
+      n.text = "loop: " + lb + (lq === 1 ? "" : "." + (+lq.toFixed(2)));
+    }
+  }
+}
 document.getElementById("ntext").addEventListener("keydown", e => {
   // sections are one-line labels: Enter = save. Text notes keep Enter = newline
   if (e.key === "Enter" && editorType() === "section") {
@@ -2808,7 +2852,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   micStop();
   const type = editorType();
   const text = document.getElementById("ntext").value.trim();
-  if (type !== "key" && type !== "loop" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  if (type !== "key" && type !== "loop" && type !== "timesig" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
   const b2raw = +document.getElementById("nb2").value || 0;
@@ -2821,6 +2865,23 @@ document.getElementById("nsave").addEventListener("click", () => {
     dropLocalKeyAt(b1);
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: "key: " + chosenKeyName(sf, mode), keydir: sf, added: true};
+  } else if (type === "timesig") {
+    const num = +document.getElementById("ntsnum").value, den = +document.getElementById("ntsden").value;
+    const newBpb = num * 4 / den, oldBpb = beatsPerBarEff();
+    const others = rollnotes.filter(n => !n.tsdir).length;
+    if (newBpb !== oldBpb && others > 0 && !rebarArmed) {
+      rebarArmed = true; // big warning, second tap confirms
+      document.getElementById("nstatus").textContent =
+        "⚠ Re-bar from " + effTs()[0] + "/" + effTs()[1] + " to " + num + "/" + den + "? " +
+        others + " annotation(s) will be converted to keep their musical positions. " +
+        "Tap Save again to confirm (then Sync to make permanent).";
+      return;
+    }
+    rebarArmed = false;
+    if (newBpb !== oldBpb) convertAnchors(oldBpb, newBpb);
+    rollnotes = rollnotes.filter(n => !(n.tsdir)); // one meter per song
+    fresh = {b1: newBpb !== oldBpb ? 1 : b1, q1: newBpb !== oldBpb ? 1 : q1, b2: null, q2: null,
+             text: "timesig: " + num + "/" + den, tsdir: [num, den], added: true};
   } else if (type === "loop") {
     const lb = Math.max(1, +document.getElementById("nlb").value || 1);
     const lq = +document.getElementById("nlq").value || 1;
@@ -2845,6 +2906,20 @@ document.getElementById("nsave").addEventListener("click", () => {
   draw();
 });
 document.getElementById("ndelete").addEventListener("click", () => {
+  // deleting the meter directive re-bars back to neutral 4/4 — same two-tap
+  // warning + anchor conversion as declaring one, never a silent move
+  if (editingNote && editingNote.tsdir) {
+    const oldBpb = beatsPerBarEff(), others = rollnotes.filter(n => !n.tsdir).length;
+    if (oldBpb !== 4 && others > 0 && !rebarArmed) {
+      rebarArmed = true;
+      document.getElementById("nstatus").textContent =
+        "⚠ Removing the meter re-bars back to neutral 4/4. " + others +
+        " annotation(s) will be converted to keep their musical positions. Tap Delete again to confirm.";
+      return;
+    }
+    rebarArmed = false;
+    if (oldBpb !== 4) convertAnchors(oldBpb, 4);
+  }
   rollnotes = rollnotes.filter(n => n !== editingNote);
   finalizeNotes();
   saveLocalNotes();

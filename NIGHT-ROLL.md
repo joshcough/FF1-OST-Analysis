@@ -59,6 +59,14 @@ Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
 highlights the active note's span (ambient range tints removed — on a
 fully-annotated song they covered everything).
 
+**Meter:** neutral 4/4 grid until a `timesig:` directive declares the
+real meter (set via the editor's Time signature type — numerator/
+denominator pickers, never free text). Same philosophy as keys: the
+rhythmic grouping is the analyst's finding, so the app won't pre-commit
+it. Changing meter over existing annotations demands a second Save tap
+and converts every anchor (incl. loop directives) to preserve musical
+position. cave (2/4) and menu (6/8) carry grandfathered declarations.
+
 **Keys:** display defaults to C until a `key:` annotation exists — key
 discovery is Josh's job, by design (the dial previews signatures live; a
 major/minor toggle picks the recorded TONIC — "key: Gm", never Bb standing
@@ -107,6 +115,15 @@ key: Bb            ← "key:" prefix = key directive. Open-ended: applies
 [2.1 - 4.4]
 key: Db            ← ranged key: applies bars 2–4, then the surrounding
                      key resumes (score draws cancellation naturals).
+
+[1.1]
+timesig: 6/8       ← meter directive. Until one exists the app runs on a
+                     neutral 4/4 ruler — the MIDI's meter meta drives
+                     nothing visible (meter is analysis, like keys).
+                     Declaring one re-bars the song; the editor converts
+                     existing anchors through absolute time (two-tap
+                     warning) so annotations keep their musical positions.
+                     One per song.
 
 [25.1]
 loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the

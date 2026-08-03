@@ -71,8 +71,9 @@ session start alongside the quiz.)
 - **Fixed from the town/menu handoff (2026-08-03):** one-beat ruler
   selections prefill To=From; display spelling is all-sharps until a key
   is declared (every view agrees with the captures; no more phantom Ab);
-  time signature hidden until a `timesig:` annotation declares it (meter
-  is analysis — menu's 6/8 was a spoiler); rollnotes/manifest fetches
+  time signature is now a first-class editor type (neutral 4/4 grid until
+  declared; declaring re-bars with a two-tap warning + automatic anchor
+  conversion — Josh's design, 2026-08-03); rollnotes/manifest fetches
   cache-bust the Pages CDN (stale reads after Sync looked like data
   loss).
 - **Duplicate-song audit — RESOLVED 2026-08-02 by the chip migration:**
