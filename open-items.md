@@ -96,6 +96,17 @@ session start alongside the quiz.)
   found the payment); arc clutter (show near cursor or behind ⊙ only).
   Matches Josh's promise/payment vocabulary from the 07-22 theory
   session — his frame, made into a data structure.
+- **Counted loops (Josh's idea, 2026-08-03 — parked, not needed now):**
+  extend the loop directive with a repeat count — `loop: 1.1 x5` = jump
+  back four times, fifth arrival continues onward (repeat barlines + coda,
+  in rollnotes form). Player already shows-but-never-plays material past
+  the loop anchor, so the outro slot exists. NB re the epilogue that
+  inspired it: the detector found NO exact repetition in its 270s — Josh
+  hears ~5 passes + outro, so the passes must vary per pass
+  (orchestration? articulation?). Stripping it would lose that variation;
+  the better epilogue question someday is *what changes between passes*.
+  Counted loops shine instead for Josh's own compositions (vamp ×4 then
+  bridge) and future albums with true exact internal repeats.
 - **Concept index + in-app search (from Josh's 08-02 notes):** notes are
   organized per song but his questions are increasingly per concept
   ("where else have I seen a raised 7th"). Plan: (a) tag convention in
