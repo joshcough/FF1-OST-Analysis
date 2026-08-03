@@ -83,6 +83,19 @@ session start alongside the quiz.)
   commits, and it appears in the dropdown. In-app upload UI deliberately
   skipped for now — optimize for analysis throughput, revisit if the tool
   grows beyond personal use.
+- **Promise annotation (Josh's idea, 2026-08-03 — parked for design):** a
+  relation annotation: "this beat aims at that beat" — secondary dominant
+  at [4.1] promising delivery at 5.1. First annotation type capturing a
+  relation rather than a location; syntax could mirror the loop directive
+  (`[4.1] promise: 5.1 — E7 aims at Am`). Drawable as ruler arcs (the
+  song's tension→resolution network at a glance); active-span subtitle
+  while a promise is "open"; queryable for the concept index (promise
+  density, deferral length, unpaid promises). Design questions before
+  building: broken/redirected promises (deceptive cadences) as
+  first-class; target-less "open" promises (heard the promise, haven't
+  found the payment); arc clutter (show near cursor or behind ⊙ only).
+  Matches Josh's promise/payment vocabulary from the 07-22 theory
+  session — his frame, made into a data structure.
 - **Concept index + in-app search (from Josh's 08-02 notes):** notes are
   organized per song but his questions are increasingly per concept
   ("where else have I seen a raised 7th"). Plan: (a) tag convention in
