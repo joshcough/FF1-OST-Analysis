@@ -37,7 +37,19 @@ section: B
 section: A min
 
 [5.3 - 5.4]
-section: D maj
+section: D7
 
 [6.1 - 6.2]
 section: G maj
+
+[6.3 - 6.4]
+section: Cmaj7
+
+[7.1 - 7.4]
+section: Bb
+
+[8.1 - 8.2]
+section: Gsus4
+
+[8.3 - 8.4]
+section: G7
