@@ -2717,7 +2717,7 @@ function openEditor(note) {
     b1 = Math.floor(rangeSel.a / bt) + 1;
     q1 = snapBeat((rangeSel.a % bt) / song.ppq + 1);
     const last = rangeSel.b - song.ppq; // inclusive last beat of the selection
-    if (last > rangeSel.a) {
+    if (last >= rangeSel.a) { // >= so a one-beat selection prefills To = From
       b2 = Math.floor(last / bt) + 1;
       q2 = snapBeat((last % bt) / song.ppq + 1);
     }
