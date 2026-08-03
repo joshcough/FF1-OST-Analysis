@@ -1,4 +1,4 @@
-# ff1overworld.rollnotes — beat-anchored annotations
+# overworld.rollnotes — beat-anchored annotations
 
 [1.1]
 key: G
@@ -9,15 +9,6 @@ section: A — G home
 [1.1 - 4.4]
 section: A1
 
-[5.1 - 8.4]
-section: A2 (up a step)
-
-[9.1 - 13.4]
-section: B — Am visit
-
-[14.1 - 16.4]
-section: C — borrowed + turnaround
-
 [1.1 - 2.4]
 G — I, root position. Home. The gallop begins: strong-beat
 note twice, then a dip to D (5th of G).
@@ -27,6 +18,9 @@ D/F# — V, first inversion. Root sacrificed so the bass keeps
 the chromatic pair G→F#. Dip note D frozen from last bar:
 5th of G becomes root of D.
 
+[5.1 - 8.4]
+section: A2 (up a step)
+
 [5.1 - 6.4]
 Am — ii, root position. Pair 2 begins: A→G# is pair 1 (G→F#)
 moved up a whole step. Same move, transposed.
@@ -35,6 +29,9 @@ moved up a whole step. Same move, transposed.
 E/G# — V/ii. The G# giveaway: out of key, so it's functional —
 a secondary dominant aiming at Am. Dip note E shared: 5th of
 Am = root of E.
+
+[9.1 - 13.4]
+section: B — Am visit
 
 [9.1]
 C — IV. E7's promise DEFERRED — it aimed at Am but landed here.
@@ -54,6 +51,9 @@ E — V/ii again. ii–V–i in A minor underway: Bdim → E → Am.
 Am — the promised target finally lands, four bars late,
 with a stronger escort. Tonicization: a real key visit.
 
+[14.1 - 16.4]
+section: C — borrowed + turnaround
+
 [14.1]
 F octaves — bVII, borrowed from G minor. No Gm ever sounds:
 mixture, not modulation. Also doubles as V of the coming Bb.
@@ -66,6 +66,3 @@ borrowing — the devices nest.
 Turnaround: the gallop stops for the first time. Bass walks
 D–C–B–A in even quarters, delivering onto G at the loop restart.
 Texture change marks the cadence.
-
-[17.2]
-loop: 1.2
