@@ -419,7 +419,7 @@
 
     <h3>TRACKS</h3>
     <dl>
-      <dt>Track chips (top)</dt><dd>Tap a selected chip to hide that track — sound and visuals, instantly, even mid-playback. Tap again to bring back.</dd>
+      <dt>Track chips (top)</dt><dd>Tap a chip to select its track. <b>M</b> mutes — hides the track and silences it together, instantly, even mid-playback; tap M again to bring it back. <b>S</b> solos (only soloed tracks play). One tap each, any time.</dd>
       <dt>S</dt><dd>Solo: hide everyone else instead.</dd>
     </dl>
 
@@ -444,6 +444,11 @@
     <dl>
       <dt>key? dial</dt><dd>Songs display in C until YOU set the key. Preview any signature live — the right one makes most accidentals vanish. Tap the major/minor toggle to record the true tonic (Gm, not Bb).</dd>
       <dt>Set Gm @ bar N</dt><dd>Writes your key choice into the song's notes at the cursor's bar. Set a different key mid-song for key changes — the score draws the new signature there.</dd>
+    </dl>
+
+    <h3>NO SOUND ON iPAD?</h3>
+    <dl>
+      <dt>Silent Mode</dt><dd>iOS mutes Web Audio (this app's sound engine) when Silent Mode is on — while YouTube keeps playing, which makes it look like an app bug. Control Center → tap the bell. Also try volume-up while playing: the ringer channel has its own volume.</dd>
     </dl>
 
     <h3>EDITING &amp; SYNC</h3>
@@ -1628,17 +1633,25 @@ function ensureAudio() { // one context for the app's lifetime — iOS Safari
 // misses. And on iOS resume() can RESOLVE while the clock stays dead — so
 // verify state, retry, and rebuild the context as a last resort; a dead
 // clock freezes the whole transport (playhead derives from audio.currentTime)
+async function clockAlive() { // don't trust the state string: prove the clock ticks
+  if (!audio || audio.state !== "running") return false;
+  const t0 = audio.currentTime;
+  await new Promise(r => setTimeout(r, 40));
+  return audio.currentTime > t0;
+}
 async function resumeAudio() {
   if (!audio) return;
   await audio.resume().catch(() => {});
-  if (audio.state !== "running") await audio.resume().catch(() => {});
-  if (audio.state !== "running") {
-    try { await audio.close(); } catch (err) {}
-    audio = null; master = null; pulse25 = null; trackGains = [];
-    ensureAudio(); // rebuilds + re-warms (covers the first-quantum glitch)
+  if (!(await clockAlive())) {
     await audio.resume().catch(() => {});
+    if (!(await clockAlive())) {
+      try { await audio.close(); } catch (err) {}
+      audio = null; master = null; pulse25 = null; trackGains = [];
+      ensureAudio(); // rebuilds + re-warms (covers the first-quantum glitch)
+      await audio.resume().catch(() => {});
+    }
   }
-  if (audio.state !== "running")
+  if (!(await clockAlive()))
     setInfo("audio asleep — tap ▶ again"); // surfaced: consoles don't exist on an iPad
 }
 // coming back from another app: revive audio without waiting for a Play tap
