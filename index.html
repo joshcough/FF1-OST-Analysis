@@ -490,14 +490,22 @@
 let CATALOG = {}; // built from albums/manifest.json at boot — the dropdown
 // mirrors the albums/ directory; run tools/build_manifest.mjs after adding music
 async function initCatalog() {
-  const res = await fetch("albums/manifest.json");
+  const res = await fetch("albums/manifest.json?t=" + Date.now(), {cache: "no-cache"});
   if (!res.ok) throw new Error("manifest fetch failed");
   CATALOG = {};
   for (const a of await res.json()) CATALOG[a.title] = a.songs.map(x => [x.title, x.path]);
 }
 const TRACK_COLORS = ["#d95926","#3987e5","#199e70","#c98500","#d55181","#9085e9","#008300","#e66767",
                       "#0aa2c0","#b44ac0","#8a7d20","#a1653f"]; // 12 before any repeat (Epilogue has 11 tracks)
-const NOTE_NAMES = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
+// display spelling when NO key has been declared: all sharps, matching the
+// captures' neutral spelling — the app never volunteers flats the user
+// didn't derive (a mixed table once had Josh chasing a chord on Fb)
+const SHARP_SPELL = (() => {
+  const N = [["C",""],["C","#"],["D",""],["D","#"],["E",""],["F",""],["F","#"],["G",""],["G","#"],["A",""],["A","#"],["B",""]];
+  const m = {};
+  N.forEach(([letter, acc], i) => m[i] = {letter, acc});
+  return m;
+})();
 
 // ---------------------------------------------------------------- midi parse
 function parseMidi(buf) {
@@ -616,7 +624,8 @@ let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
 let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
 let multiSelSf = 0;      // key context captured at lasso time
-let keyRegions = [];     // [{start, sf, name}] from rollnotes "key:" directives
+let keyRegions = [];
+let tsDeclared = false; // "timesig:" annotation present — until then the MIDI's meter stays hidden     // [{start, sf, name}] from rollnotes "key:" directives
 let previewSf = null;    // key dial preview override (null = follow regions)
 
 const canvas = document.getElementById("roll");
@@ -725,6 +734,17 @@ function sfAt(tick) {
 }
 const spellMemo = {};
 function spellFor(sf) { return spellMemo[sf] || (spellMemo[sf] = keySpelling(sf)); }
+function sfDeclaredAt(tick) { // sf if the user has declared a key governing this tick, else null
+  if (previewSf !== null) return previewSf;
+  let ranged = null, open = null;
+  for (const r of keyRegions) {
+    if (r.start > tick) continue;
+    if (r.end !== null) {
+      if (tick < r.end && (!ranged || r.start > ranged.start)) ranged = r;
+    } else if (!open || r.start > open.start) open = r;
+  }
+  return ranged ? ranged.sf : open ? open.sf : null;
+}
 function resolveNote(n) {
   const bt = barTicks();
   n.start = (n.b1 - 1) * bt + (n.q1 - 1) * song.ppq;
@@ -748,6 +768,8 @@ function finalizeNotes() {
     if (lm) n.loopTo = (+lm[1] - 1) * bt + ((lm[2] ? +lm[2] : 1) - 1) * song.ppq;
     else delete n.loopTo;
   }
+  tsDeclared = rollnotes.some(n => /^timesig:/i.test(n.text)); // meter is analysis: shown only when declared
+  if (song) updateSongMeta(); // the label renders before annotations load
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir,
                 name: (n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [, SF_MAJOR[n.keydir]])[1], // "Gm"/"D dorian" show as recorded
@@ -779,7 +801,9 @@ async function loadNotes() {
   rollnotes = [];
   if (songKey) {
     try {
-      const res = await fetch(notesBase() + ".rollnotes", {cache: "no-cache"});
+      // ?t= busts the Pages CDN (it caches ~10 min; a reload right after
+      // Sync otherwise shows pre-sync annotations and looks like data loss)
+      const res = await fetch(notesBase() + ".rollnotes?t=" + Date.now(), {cache: "no-cache"});
       const text = res.ok ? await res.text() : null;
       if (gen !== loadGen) return;
       if (text !== null) rollnotes = parseRollnotes(text).map(resolveNote);
@@ -1172,7 +1196,7 @@ function draw() {
       ctx.fillText("C" + (Math.floor(p/12) - 1), RULER_W - 6, y + rowH - 3);
     } else if (view.rowH >= 12 && [2,4,5,7,9,11].includes(pc)) {
       ctx.fillStyle = css("--grid");
-      ctx.fillText(NOTE_NAMES[pc], RULER_W - 6, y + rowH - 3);
+      ctx.fillText(spellPc(pc), RULER_W - 6, y + rowH - 3);
     }
   }
   ctx.textAlign = "left";
@@ -1180,7 +1204,8 @@ function draw() {
 
 // ---------------------------------------------------------------- lasso / chord id
 function spellPc(pc, sf) {
-  const s = spellFor(sf === undefined ? sfAt(playCursor) : sf)[pc];
+  if (sf === undefined) sf = sfDeclaredAt(playCursor);
+  const s = sf === null ? SHARP_SPELL[pc] : spellFor(sf)[pc];
   return s.letter + (s.acc || "");
 }
 function pitchName(p, sf) { return spellPc(p % 12, sf) + (Math.floor(p / 12) - 1); }
@@ -1267,7 +1292,7 @@ function finalizeLasso() {
   multiSelKey = new Set(multiSel.map(s => s.ti + ":" + s.ni));
   if (!multiSel.length) { setInfo("lasso: nothing selected"); draw(); return; }
   const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
-  const selSf = sfAt(Math.max(0, t0));
+  const selSf = sfDeclaredAt(Math.max(0, t0));
   multiSelSf = selSf;
   setInfo(pitches.map(p => pitchName(p, selSf)).join(" · ") + "  (" + multiSel.length + " notes)");
   document.getElementById("chordbtn").style.display = "";
@@ -2055,7 +2080,7 @@ function renderMeasure(mi) {
   ctx2.setFillStyle("#C7D0E8");
   ctx2.setStrokeStyle("#C7D0E8");
   const sfM = sfAt(mi * m.bt);
-  const spell = spellFor(sfM);
+  const spell = sfDeclaredAt(mi * m.bt) === null ? SHARP_SPELL : spellFor(sfM);
   const sfPrev = mi > 0 ? sfAt((mi - 1) * m.bt) : sfM;
   const keyChanged = mi > 0 && sfM !== sfPrev;
   const built = []; // per-stave build products, formatted together below
@@ -2175,7 +2200,7 @@ function renderIntro() { // pinned-at-start clef / key / time column
     const stave = new VF.Stave(0, y, SCORE_INTRO_W, {fill_style: "#3A4569"});
     stave.addClef(st.clef);
     if (m.sf !== 0) stave.addKeySignature(m.keyName);
-    stave.addTimeSignature(song.timesig[0] + "/" + song.timesig[1]);
+    if (tsDeclared) stave.addTimeSignature(song.timesig[0] + "/" + song.timesig[1]);
     stave.setContext(ctx2).draw();
   });
   scoreIntro = c;
@@ -2384,7 +2409,7 @@ function updateSongMeta() { // bpm label shows what you actually hear
   const eff = Math.round(native * playRate);
   document.getElementById("songmeta").textContent =
     (playRate === 1 ? native + "bpm" : eff + "bpm (native " + native + ")") +
-    " · " + song.timesig[0] + "/" + song.timesig[1];
+    (tsDeclared ? " · " + song.timesig[0] + "/" + song.timesig[1] : "");
 }
 const speedsl = document.getElementById("speedsl");
 const speedlbl = document.getElementById("speedlbl");
