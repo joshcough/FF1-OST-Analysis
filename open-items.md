@@ -61,12 +61,20 @@ session start alongside the quiz.)
   3 of 21 MIDIs (prelude, shop, victory) stay within the NES's
   3-pitched-voice ceiling; the rest are arrangements, so voice-leading
   analysis on them measures the arranger.
-- **Fixed 2026-08-02 from Josh's session notes:** key writer now records
-  mode (major/minor toggle; `key: Gm` not `key: Bb`) and the three
-  affected rollnotes were corrected; "Commit all changed" syncs every
-  dirty song; audio should now survive app-switching on iOS (resume
-  unconditional + awaited, visibilitychange revival, closed-context
-  rebuild) — **Josh should confirm on the iPad**.
+- **iOS audio after app-switch — REOPENED then re-fixed, awaiting test:**
+  the 08-02 fix (unconditional awaited resume + visibilitychange revival)
+  was confirmed BROKEN on the iPad (playhead stuck, only reload
+  recovers). A stronger fix shipped 2026-08-03: resumeAudio now PROVES
+  the clock advances (samples currentTime twice), rebuilds the context
+  when frozen, and surfaces "audio asleep — tap ▶ again" in the UI.
+  **Josh: test app-switch-and-return on the new build.**
+- **Fixed from the town/menu handoff (2026-08-03):** one-beat ruler
+  selections prefill To=From; display spelling is all-sharps until a key
+  is declared (every view agrees with the captures; no more phantom Ab);
+  time signature hidden until a `timesig:` annotation declares it (meter
+  is analysis — menu's 6/8 was a spoiler); rollnotes/manifest fetches
+  cache-bust the Pages CDN (stale reads after Sync looked like data
+  loss).
 - **Duplicate-song audit — RESOLVED 2026-08-02 by the chip migration:**
   the NSF is the authoritative track list (19 songs). dungeon (=cave) and
   elfland (absent from the NSF — likely not FF1 at all) were deleted with

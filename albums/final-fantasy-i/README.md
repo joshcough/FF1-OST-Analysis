@@ -46,6 +46,8 @@ spoil the discovery process.
 | Dead Music | [analysis/game-over.md](analysis/game-over.md) | key done (D minor); bass-pattern exercise open |
 | Ending Theme | [analysis/epilogue.md](analysis/epilogue.md) | opening key done (G major); 127 bars unanalyzed |
 | Floating Castle | [analysis/floating-castle.md](analysis/floating-castle.md) | parked — tonic Bb, mode resists |
+| Town | [analysis/town.md](analysis/town.md) | ✅ key + full chord map; 4–3 suspension device |
+| Menu Screen | [analysis/menu.md](analysis/menu.md) | in progress — chords through bar 3, no key yet |
 | — key sweep — | [analysis/key-sweep.md](analysis/key-sweep.md) | 10 of 19 opened; hypothesis revised to loop-target form |
 | — chord charts — | [analysis/chord-charts.md](analysis/chord-charts.md) | grids for analyzed songs + shared templates |
 

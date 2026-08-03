@@ -30,8 +30,9 @@ on the swept nine: **does this song prepare its loop seam, or cut?**
   approach, anything aimed at the bar-1 tonic).
 - *Splice* — final bars sit wherever they landed, no approach; hard cut.
 
-One confirmed example of each so far: several swept songs show clear
-retransition bass motion; **Gurgu appears to be a splice** — its block
+Confirmed so far — prepared: Town (bar 8 Gsus4→G7 retransition, the
+second clear example) and several earlier sweep songs by bass motion;
+splice: **Gurgu** — its block
 transposition leaves nothing pointed back home, which is why the usual
 ending-clue method found no signal there. Open: does splice-vs-prepared
 correlate with whether a song modulates internally?
@@ -61,7 +62,7 @@ every pass, so the seam is where the composer can least afford tonal
 ambiguity. Prediction: strongest in short loops, weakest in ceremonial
 non-looping pieces.
 
-Status after 9 scored songs: **8 hits, 1 flagged** (see Gurgu row). Caveats
+Status after 10 scored songs (Town joins the hits): **8 hits, 1 flagged** (see Gurgu row). Caveats
 still attached:
 - A song whose key was decided *using* the rule can't also count as a
   confirmation — mark those unscored.
@@ -83,13 +84,13 @@ still attached:
 | Ending Theme (epilogue) | G major | G (structural downbeat; no loop) | hit, general form — judgment-based, flagged | epilogue.md |
 | Gurgu Volcano | D Dorian | **A** (bass sits on the 5th under a held D) | **flagged — Josh to rule** | gurgu-volcano.md |
 | Floating Castle | tonic Bb; mode unresolved | Bb (full-chip unison) | parked — "unclear" is a permitted verdict | floating-castle.md |
+| Town | C major | C | hit — non-circular; key called from the chords first | town.md |
 | Matoya's Cave | | | | |
-| Menu Screen | | | | |
+| Menu Screen | | | (opened; in progress — no key yet) | menu.md |
 | Prelude | | | | |
 | Opening Theme (prologue) | | | | |
 | Ship | | | | |
 | Shop | | | | |
-| Town | | | | |
 | Undersea Shrine | | | | |
 | Victory | | | | |
 

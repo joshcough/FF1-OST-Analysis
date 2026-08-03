@@ -117,3 +117,19 @@ major slip en route. Feature born from it: seven-mode key picker.
 Quiz-worthy concepts: Dorian's major IV; raised 7th as dominant-maker,
 not scale change; anacrusis vs structural downbeat; tonic ≠ lowest note
 (the fifth-in-the-bass trap, now with script data behind it).
+
+**2026-08-02 (late evening — town + menu, from the handoff):** Town done
+end-to-end solo: C major (diatonic set → C-vs-Am tiebreak via opening C +
+G7 pointing home), full 15-chord map, sections, and a textbook **4–3
+suspension** identified at bar 8 (C prepared in bar 7, held over the
+third's slot, resolving to B). Passing-tone discipline now a named
+three-test routine (duration, metrical position, approached/left by
+step) applied consistently (bar 6's B, bar 7's C). Inverted chords
+distinguished purely by bass under identical arpeggio figures (G/B,
+G7/F). Seam typology: Town = prepared (Gsus4→G7 retransition). Menu
+opened: compound-meter arpeggio figure parsed into two-chords-per-bar
+harmonic rhythm; mid-flight thread = E7's tritone into bar 4.
+Quiz-worthy: the three passing-tone tests; what makes a 4–3 suspension
+(preparation, dissonance on the beat, downward resolution); why a full
+quarter on the beat makes D7 vs D; inversion identification from bass
+alone.
