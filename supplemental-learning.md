@@ -133,3 +133,15 @@ Quiz-worthy: the three passing-tone tests; what makes a 4–3 suspension
 (preparation, dissonance on the beat, downward resolution); why a full
 quarter on the beat makes D7 vs D; inversion identification from bass
 alone.
+
+**2026-08-03 (theory exchange — 6/8 vs 3/4, prompted by the new meter
+feature):** Josh's initial frame: "the composer counts to six rather
+than three." Sharpened: both meters hold the same six eighths; the
+difference is grouping — 3/4 = 2+2+2 (three beats, square insides),
+6/8 = 3+3 (TWO beats, triplet insides) — so 6/8 counts lower, not
+higher. Ear test: pulse spacing — strong points every three eighths =
+6/8, every two = 3/4; bass placement and harmonic-rhythm alignment are
+the fingerprints. Hemiola = regrouping the same six eighths mid-piece
+(Bernstein's "America"). Application to Menu deliberately withheld —
+his determination. Quiz-worthy: the 2+2+2 vs 3+3 distinction; why 6/8
+is felt in two; the ear test; hemiola.
