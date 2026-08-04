@@ -143,5 +143,13 @@ higher. Ear test: pulse spacing — strong points every three eighths =
 6/8, every two = 3/4; bass placement and harmonic-rhythm alignment are
 the fingerprints. Hemiola = regrouping the same six eighths mid-piece
 (Bernstein's "America"). Application to Menu deliberately withheld —
-his determination. Quiz-worthy: the 2+2+2 vs 3+3 distinction; why 6/8
-is felt in two; the ear test; hemiola.
+his determination. Josh then pushed to the deep version: what separates
+6/8@100 from 3/4@200 when the sound streams are identical? Answer:
+nothing acoustic — meter is a CLAIM about grouping, not a property of
+the wave. 6/8 writes the strong-weak pairing of triple groups into the
+bar; fast 3/4 (waltz "in one", Beethoven scherzos) leaves pairing to
+unnotated hypermeter (cf. ritmo di tre battute). His original
+"changes on the sixes" instinct = the right evidence: harmonic rhythm
+aligning with paired groups argues 6/8. Quiz-worthy: 2+2+2 vs 3+3; why
+6/8 is felt in two; the ear test; hemiola; meter-as-claim vs acoustics;
+hypermeter.
