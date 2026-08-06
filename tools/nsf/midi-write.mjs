@@ -54,7 +54,10 @@ export function makeMidi(events, {bpm, tsNum = 4, tsDen = 4, frameSec, snap = tr
     const d = Math.max(40, toTick(e.endFrame) - t); // min = a quantized 12th
     const p = e.channel === "noise" ? noiseDrum(e.midi) : e.midi;
     if (p < 0 || p > 127) continue;
-    byCh[e.channel].push({t, d, p, v: 96});
+    // chip volume -> velocity (accent data from the ROM); triangle and
+    // envelope-mode notes have no level, so they get a neutral 96
+    const v = e.vol == null ? 96 : Math.max(8, Math.round(e.vol / 15 * 127));
+    byCh[e.channel].push({t, d, p, v});
   }
   const metas = [
     {t: 0, d: [0xFF, 0x58, 4, tsNum, Math.round(Math.log2(tsDen)), 24, 8]},

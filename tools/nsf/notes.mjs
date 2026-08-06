@@ -41,7 +41,11 @@ export function reconstruct(apuLog, frames, frameSec) {
     const cur = open[name];
     if (cur && (!isOn || cur.midi !== midi)) { cur.endFrame = frame; delete open[name]; }
     if (isOn && !open[name]) {
-      open[name] = {channel: name, startFrame: frame, endFrame: null, midi, periodValue: c.period};
+      // vol: the 4-bit level at note start — accent data straight from the
+      // ROM. Only meaningful in constant-volume mode (else the field is the
+      // envelope period) and never on the triangle (no volume control).
+      const vol = name !== "triangle" && c.constVol ? c.vol : null;
+      open[name] = {channel: name, startFrame: frame, endFrame: null, midi, periodValue: c.period, vol};
       events.push(open[name]);
     }
   };
@@ -61,7 +65,7 @@ export function reconstruct(apuLog, frames, frameSec) {
       if (r < 0 || r > 3) continue;
       if (r === 0) {
         if (name === "triangle") c.linear = value & 0x7F;
-        else c.vol = value & 0x0F; // constant-volume field; envelope users still write nonzero here
+        else { c.vol = value & 0x0F; c.constVol = !!(value & 0x10); } // bit 4: constant-volume flag
       } else if (r === 2) {
         c.period = (c.period & 0x700) | value;
       } else if (r === 3) {
@@ -229,7 +233,7 @@ export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4,
   for (const e of events) (byChannel[e.channel] = byChannel[e.channel] || []).push(e);
   const L = [];
   L.push(`# ${title} — ${tsNum}/${tsDen}, ${bpm}bpm, ${Math.ceil(frames * frameSec / (beatSec * beatsPerBar))} bars (from NSF capture)`);
-  L.push("# Format: bar N: beat pitch duration-in-quarter-notes");
+  L.push("# Format: bar N: beat pitch duration-in-quarter-notes [vN = chip volume 0-15; pulse/noise only — the triangle has no volume control]");
   L.push("# Channel identity is hardware fact. Pitches use sharp spelling; no key is stated.");
   for (const [name, evs] of Object.entries(byChannel)) {
     L.push("");
@@ -243,7 +247,8 @@ export function toNotesTxt(events, {frames, frameSec, bpm, tsNum = 4, tsDen = 4,
       const beat = qb - (bar - 1) * beatsPerBar + 1; // so no "beat 5" in 4/4
       const label = name === "noise" ? "N" + e.midi : pitchName(e.midi);
       (rows[bar] = rows[bar] || []).push(
-        (+beat.toFixed(2)) + " " + label + " " + (+durBeats.toFixed(2)));
+        (+beat.toFixed(2)) + " " + label + " " + (+durBeats.toFixed(2)) +
+        (e.vol != null ? " v" + e.vol : ""));
     }
     for (const bar of Object.keys(rows).map(Number).sort((a, b) => a - b)) {
       L.push("bar " + bar + ": " + rows[bar].join(", "));
