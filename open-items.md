@@ -123,6 +123,20 @@ session start alongside the quiz.)
   concepts.md from all rollnotes; (b) a search box in the app that greps
   all rollnotes across the album and jumps to hits. The tag index is the
   prerequisite for meaningful search. Not built yet.
+- **NSF meter/tempo fossil problem + build request (Josh, 2026-08-05):**
+  the pipeline reads each song's meter and seed tempo from the .mid it
+  itself wrote — a closed loop tracing back to the discarded arrangement
+  MIDIs, with no provenance and no error detection. Shop proved a fossil
+  wrong (4/4 → Josh determined 3/4). BUILD (in progress 2026-08-05):
+  (1) preserve chip volume → MIDI velocity + notes.txt column (pulse
+  channels only; triangle has no volume control); (2) best-fit meter
+  detector from the capture alone — figure-period barline test first
+  (shop's method), then onset grouping and pulse accents; confidence +
+  "ambiguous" allowed; note-value naming pinned by a 60–180ish tempo
+  window and labeled as convention; (3) key detection DROPPED (Josh's
+  job); (4) audit all songs, surface mismatches with evidence, never
+  auto-overwrite — full report quarantined in reference/ so
+  undetermined meters aren't spoiled in passing.
 - **Channel-swap re-check (from gurgu's device find):** re-check
   already-swept songs for mid-song channel role swaps Josh may have read
   through — script idea: per song, which channel holds the lowest pitch

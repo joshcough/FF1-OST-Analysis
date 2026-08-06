@@ -153,3 +153,18 @@ unnotated hypermeter (cf. ritmo di tre battute). His original
 aligning with paired groups argues 6/8. Quiz-worthy: 2+2+2 vs 3+3; why
 6/8 is felt in two; the ear test; hemiola; meter-as-claim vs acoustics;
 hypermeter.
+
+**2026-08-05 (prologue chords + shop meter):** Prologue: eleven chords
+verified, four corrected through the work — and a method upgrade fell
+out: reading only a chord's ONSET beat is a heuristic that broke at 5.3
+(the D arrives on beat 4 → D/A, not F#m); read the full span, weight
+what's long and metrically strong. Two chords deliberately left open
+(6.1 Gm-vs-C7, 6.3 span split). Shop: the project's first from-scratch
+meter determination and first confirmed fossil error — inherited 4/4
+disproved by the barline test (dominant triangle figure of three
+quarters phases across 4/4 barlines; realigns only every 3 bars),
+re-barred clean, then 3/4-vs-6/8 settled by onset grouping (positions
+1,3,5 = duple insides; spans straddle the 3+3 boundary) plus the felt
+one-beat-per-bar. Fast 3/4 in one — the exact category from the 08-03
+hypermeter discussion, now found in the wild. Quiz-worthy: the barline
+test; onset-position evidence for 3/4 vs 6/8; full-span chord reading.
