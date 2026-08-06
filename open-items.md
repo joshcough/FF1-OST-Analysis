@@ -4,6 +4,50 @@ Standing list of things agreed but not done, and questions asked but not
 answered. Prune as items close; add as they appear. (Claude: check this at
 session start alongside the quiz.)
 
+## RESTART CONTEXT — state as of 2026-08-05, late night
+
+Read this first in a fresh session. Also read the memory files —
+especially the interface discovery: **mid-turn text is swallowed by
+Josh's client; only each turn's FINAL message reaches him.** Announce
+nothing before tool calls; put the whole story in the final message, and
+END THE TURN to get his sign-off before touching his analysis files or
+rollnotes.
+
+**App (Night Roll, all deployed):** meter is user-declared (neutral 4/4
+grid until a timesig: directive; two-tap re-bar warning converts
+anchors); spelling is all-sharps until a key is declared; seven-mode key
+picker (key: D dorian); fast section flow (drag → +Note → type → Enter);
+sync review pane with per-note discard; notehead lasso; aligned score
+columns; chip-volume velocities now drive real dynamics. AWAITING JOSH'S
+iPAD TEST: the clock-verified audio fix (app-switch-and-return — third
+attempt at this bug; resumeAudio now proves audio.currentTime advances
+and rebuilds the context if frozen).
+
+**Pipeline:** chip volume preserved end-to-end (velocity + vN column in
+notes.txt; pulses/noise only). Shop re-barred to 28 bars of 3/4 per
+Josh's determination (first fossil error confirmed; METER_OVERRIDE in
+dump-all). Meter audit v1 (tools/nsf/meter_audit.mjs) mechanizes his
+barline test; findings quarantined in reference/meter-audit.md — only
+epilogue fails (expected: rubato). The fossil design problem (meterOf
+reads the pipeline's own output) is documented in open-items below;
+detector v2 (grouping/accent second pass, cutting the circular
+dependency, full audit sign-off flow) is future work.
+
+**Analysis state:** sweep 11 songs opened (see key-sweep.md). In flight,
+awaiting Josh's handoffs: prologue (chords, two open: 6.1 Gm-vs-C7, 6.3
+span; key suspected F, undetermined), menu (chords bars 1-3, E7 tritone
+thread, meter + key undetermined), matoyas-cave rollnotes synced
+2026-08-05 but NO handoff yet — do not process. Floating Castle parked
+as Josh's no-help song. Big open rulings HIS to make: the
+fifths-in-the-bass script results (key-sweep.md "Script v1"), the
+Gurgu seam pivots, victory/gameover bass exercises.
+
+**Conventions that keep biting:** every push must be hash-verified
+(iPad syncs race constantly); pure-git commit commands only (the
+auto-allow hook); name every file before batch edits; park-before-
+pointers when Josh is tired; never pre-declare meters/keys/anything on
+his behalf.
+
 ## Questions awaiting Josh
 
 0. **Key sweep in progress — see [key-sweep.md](albums/final-fantasy-i/analysis/key-sweep.md).** 10 songs
