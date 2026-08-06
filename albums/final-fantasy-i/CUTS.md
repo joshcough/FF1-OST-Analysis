@@ -27,7 +27,7 @@ Verified 2026-08-02 (Josh by ear + frame-exact register data agreeing).
 | chaostemple | 17.1 | 1.1 | 16 bars | 150 |
 | floatingcastle | 14.1-ish | 1.1 | unverified (grid-fitted) | ~100 — SUSPECT: grid drifts across the song; true bar count needed |
 | underwaterpalace | 17.1 | 1.1 | 16 bars | 150 |
-| shop | 22.1 | 1.1 | 21 bars | 200 |
+| shop | 29.1 | 1.1 | 28 bars (3/4 — Josh's determination 2026-08-05; inherited 4/4 was a fossil error) | 200 |
 | battle | 29.3.5 | 3.3.5 | 26 bars | 150 |
 | menu | 9.1 | 1.1 | 8 bars | 90 |
 | gameover | 9.3 | 1.3 | 8 bars | 90 |

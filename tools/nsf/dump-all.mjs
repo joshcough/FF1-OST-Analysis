@@ -22,7 +22,11 @@ const PERIOD_BARS = {
                        // exactly 150bpm (the driver's tempo family); the
                        // 21st MIDI bar was the arranger's, like gameover's
   "matoyas-cave": 20, cave: 30, "chaos-temple": 16,
-  "underwater-palace": 16, shop: 21, battle: 26, menu: 8,
+  "underwater-palace": 16,
+  shop: 28, // 3/4 per Josh's meter determination (2026-08-05) — the
+            // inherited 4/4 was the first confirmed fossil error; same
+            // loop seconds, re-barred: 28 bars of 3/4 at 200
+  battle: 26, menu: 8,
   "game-over": 8,
   victory: 8, // NOT 6 — snap-residual audit picks 150bpm (8 bars) over
                  // 112.5 (6 bars) decisively; same driver family as the rest
@@ -31,6 +35,9 @@ const PERIOD_BARS = {
 // no loop to calibrate from (through-composed), but the blind grid fit lands
 // within a hair of a known driver tempo — snap to it (integer frames per 16th)
 const FIXED_BPM = { epilogue: 112.5 };
+// meters determined by Josh that override the .mid's inherited (fossil)
+// meta — see the analysis docs for the derivations
+const METER_OVERRIDE = { shop: [3, 4] };
 // don't grid-snap these: through-composed with tempo changes/fermatas a
 // single grid can't follow — keep raw hardware timing (bar labels approximate)
 const NO_SNAP = { epilogue: true };
@@ -80,7 +87,8 @@ for (const [track, name, seconds] of TRACKS) {
   // (caveat: a pickup-intro song like ship starts its pickup at bar 1 beat 1)
   const t0 = Math.min(...events.map(e => e.startFrame));
   events = events.map(e => ({...e, startFrame: e.startFrame - t0, endFrame: e.endFrame - t0}));
-  const {tsNum, tsDen, seedBpm, midiBars} = meterOf(name);
+  let {tsNum, tsDen, seedBpm, midiBars} = meterOf(name);
+  if (METER_OVERRIDE[name]) [tsNum, tsDen] = METER_OVERRIDE[name];
 
   // trim to intro + one loop pass, exactly as the transcriptions were.
   // victory varies articulation per pass; Josh verified its 6-bar period
