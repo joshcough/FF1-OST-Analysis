@@ -9,6 +9,9 @@ section: C/E
 [2.1 - 2.2]
 section: Bb/F
 
+[2.1 - 2.2]
+section: Bb/D
+
 [2.3 - 2.4]
 section: Am/C
 
@@ -20,6 +23,9 @@ section: G maj
 
 [3.3]
 This G maj has no 5th
+
+[3.3 - 3.4]
+section: G7/B (no 5th)
 
 [4.1 - 4.2]
 section: Fsus4/C
