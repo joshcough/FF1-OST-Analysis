@@ -93,8 +93,27 @@ his behalf.
   "melody sounds like E minor" instinct.
 - **Baseball/Beach song** — Josh annotates his own hearing first (rollnotes
   from bed), then joint session.
+- **Retrospective progression pass across analyzed songs (Josh,
+  2026-08-06):** the key sweep scoped opening keys only, so nobody ever
+  read the progressions across songs — cadence habits, V7 vs modal
+  motion, recurring progressions, where rare triads (menu's iii) appear.
+  Data exists in analysis/*.md + chord-charts.md; this is a reading pass,
+  not new capture. Not now — Josh flagged it to circle back to.
 
 ## Tooling to-do
+
+- **Full Synthesia-style piano view (Josh, 2026-08-07):** third view mode,
+  time vertical, notes falling onto the keyboard. Milestone 1 (the 🎹
+  instrument panel: piano + fretboard, lasso lighting, tap-to-play)
+  shipped 2026-08-07; the falling-note view reuses that keyboard as its
+  bottom half. Josh wants this — panel-first was sequencing, not scope.
+- **Zoom-out clamp to song extents, roll view (Josh, 2026-08-06):**
+  pinch-out stops once the whole song fits; axes decouple near the limit
+  (time already fits → further pinch expands pitch only); clamp to the
+  chop-trimmed range, flush to the outermost notes, no padding (his
+  experiment — don't invent a margin). Spec final in the 08-06 handoff;
+  revises the "unlimited roll zoom-out" note under the parked two-regime
+  score item.
 
 - **NSF pipeline** (scoped 2026-08-01, **built 2026-08-02**): extract
   analysis-grade note data from the actual chip — see

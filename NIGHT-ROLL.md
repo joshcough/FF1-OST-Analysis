@@ -51,6 +51,21 @@ drag-select across notes; pitch list shown; chord name behind a "Chord?"
 reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
 inversions; missing-5th tolerance).
 
+**Instrument panel** (2026-08-07, 🎹 in the footer): a piano-keyboard /
+guitar-fretboard strip above the footer, so Josh can think with the
+instrument instead of purely symbolically. Lasso'd pitches light gold on
+both instruments; sounding notes light live during playback; every key
+and fret is tappable (plays through master, so track mutes never silence
+it — square voice on piano, triangle on guitar). Labels are the pitch
+name spelled per the governing key plus the scale degree when a `key:`
+directive governs the cursor (degrees never shown for undeclared keys —
+key discovery stays the analyst's job). Piano range = the song's own
+extent, octave-aligned. Guitar: standard tuning EADGBE, high-e on top
+(tab convention), 15 frets, inlay dots, a lit pitch appears at every
+playable position. Open state and tab persist in localStorage. This is
+milestone 1 of the full Synthesia-style falling-note view (parked in
+open-items.md) — that view reuses this keyboard as its bottom half.
+
 **Annotations:** see format below. + Note editor is type-first (Text note /
 Section / Chord / Key change / Time signature / Loop point) with bar/beat
 dropdowns and a 🎤 Speak dictation button (Web Speech API; hidden where

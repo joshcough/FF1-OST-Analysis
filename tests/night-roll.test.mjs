@@ -329,3 +329,29 @@ test("meter: neutral 4/4 until a timesig directive declares one; anchors convert
   const n = val(`rollnotes.find(x => x.text === "hi")`);
   assert.deepEqual([n.b1, n.q1], [1, 4]);
 });
+
+test("instrument panel: degrees vs the recorded tonic, guitar/piano hit maps", () => {
+  installSong();
+  // degree labels follow the tonic letter of the recorded name (mode-agnostic)
+  assert.equal(run(`degreeOf(3, "Bb")`), "4");    // Eb in Bb major
+  assert.equal(run(`degreeOf(10, "Gm")`), "♭3");  // Bb in G minor
+  assert.equal(run(`degreeOf(11, "Bb")`), "♭2");  // the B natural Josh flagged in menu
+  assert.equal(run(`degreeOf(0, null)`), null);   // no declared key → no degrees
+  // keyNameAt: ranged key wins inside its span, surrounding key resumes
+  run(`keyRegions = [{start: 0, end: null, sf: -2, name: "Bb"},
+                     {start: 960, end: 1920, sf: 1, name: "Em"}];`);
+  assert.equal(run(`keyNameAt(0)`), "Bb");
+  assert.equal(run(`keyNameAt(1000)`), "Em");
+  assert.equal(run(`keyNameAt(2000)`), "Bb");
+  run(`keyRegions = [];`);
+  // guitar: y rows are strings high-e→low-E, x left of the nut = open string
+  assert.deepEqual(val(`guitarHit(10, 14, 800, 168)`), {p: 64, si: 0, f: 0});   // open high e
+  assert.deepEqual(val(`guitarHit(10, 168, 800, 168)`), {p: 40, si: 5, f: 0});  // open low E
+  const g5 = val(`guitarHit(44 + ((800 - 50) / 15) * 2.5, 14, 800, 168)`);      // 3rd fret, high e
+  assert.deepEqual(g5, {p: 67, si: 0, f: 3});
+  // piano: no song range set here → default C4..B4 octave-aligned keyboard
+  run(`song = null;`);
+  assert.deepEqual(val(`instRange()`), [60, 71]);
+  assert.equal(run(`pianoHit(1, 160, 700, 168)`), 60);          // bottom-left = middle C
+  assert.equal(run(`pianoHit(700 / 7 - 2, 10, 700, 168)`), 61); // black-key zone over the C/D seam = C#
+});

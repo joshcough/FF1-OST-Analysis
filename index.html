@@ -167,6 +167,23 @@
     margin-left: 8px;
   }
   .seg { display: flex; border: 1px solid var(--grid); border-radius: 6px; overflow: hidden; }
+
+  #instpanel { display: none; flex-shrink: 0; background: var(--panel); border-top: 1px solid var(--grid); }
+  #instpanel.on { display: block; }
+  #instbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px 4px; }
+  #instbar .seg button { border: 0; min-height: 32px; padding: 5px 14px; }
+  #instinfo {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--gold);
+    min-width: 0;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
+  #instwrap { position: relative; height: 168px; }
   .seg button { border: none; border-radius: 0; min-height: 36px; padding: 6px 11px; }
   .hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
 
@@ -350,6 +367,16 @@
 <div id="trackbar"></div>
 <div id="rollwrap"><canvas id="roll"></canvas></div>
 <div id="subtitle"></div>
+<div id="instpanel">
+  <div id="instbar">
+    <div class="seg">
+      <button id="insttab-piano" class="active">Piano</button>
+      <button id="insttab-guitar">Guitar</button>
+    </div>
+    <div id="instinfo">tap a key</div>
+  </div>
+  <div id="instwrap"><canvas id="instcanvas"></canvas></div>
+</div>
 <footer>
   <button id="editbtn">Edit</button>
   <div class="seg" id="modeseg" style="display:none">
@@ -364,6 +391,7 @@
     <button data-dur="2">1/2</button>
   </div>
   <button id="lassobtn">⊞ Lasso</button>
+  <button id="instbtn">🎹</button>
   <button id="chordbtn" style="display:none">Chord?</button>
   <select id="keysel" aria-label="Key">
     <option value="" id="keyunset">key: not set (C)</option>
@@ -508,6 +536,7 @@
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
+      <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 15 frets.</dd>
     </dl>
 
     <h3>ANNOTATIONS (.rollnotes)</h3>
@@ -702,6 +731,7 @@ let playCursor = 0;      // tick
 let editingNote = null;  // rollnote being edited, or null for new
 let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
 let lassoMode = false;   // one-finger drag selects notes instead of panning
+let instOpen = false;    // instrument panel (set from localStorage once its section wires up)
 let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
 let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
@@ -1240,6 +1270,7 @@ function drawRangeTints(W, H) {
 }
 function pxPerTick() { return view.pxq / song.ppq; }
 function draw() {
+  if (instOpen) drawInst(); // panel repaints on every app repaint (incl. playback frames)
   if (!song) return;
   const W = wrap.clientWidth, H = wrap.clientHeight;
   ctx.fillStyle = css("--bg");
@@ -2888,6 +2919,275 @@ document.getElementById("clearbtn").addEventListener("click", () => {
 });
 window.addEventListener("resize", resize);
 new ResizeObserver(resize).observe(wrap); // subtitle strip toggling resizes the roll
+
+// ------------------------------------------- instrument panel (piano / fretboard)
+// Lasso'd pitches light gold, sounding notes light live during playback, and
+// every key/fret is tappable (plays through master, so track mutes don't
+// silence it). Labels: pitch name spelled per the governing key, plus the
+// scale degree when a key: directive governs the cursor — degrees are never
+// shown for undeclared keys (key discovery stays Josh's job).
+let instTab = "piano";
+let instFlash = null;    // {p, si, f, until} tap flash (si/f only for guitar)
+const instWrap = document.getElementById("instwrap");
+const instCanvas = document.getElementById("instcanvas");
+const ictx = instCanvas.getContext("2d");
+const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
+const GTR_TUNING = [64, 59, 55, 50, 45, 40]; // high e on top — tab convention
+const GTR_NAMES = ["e", "B", "G", "D", "A", "E"];
+const GTR_FRETS = 15;
+const DEGREE_LABEL = ["1", "♭2", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7"];
+function keyNameAt(tick) { // recorded key name governing this tick, or null
+  let ranged = null, open = null;
+  for (const r of keyRegions) {
+    if (r.start > tick) continue;
+    if (r.end !== null) { if (tick < r.end && (!ranged || r.start > ranged.start)) ranged = r; }
+    else if (!open || r.start > open.start) open = r;
+  }
+  return ranged ? ranged.name : open ? open.name : null;
+}
+function degreeOf(pc, keyName) { // degree label vs the key's tonic (major-scale convention: ♭3 in minor)
+  if (!keyName) return null;
+  const m = keyName.match(/^([A-G])([#b]?)/i);
+  if (!m) return null;
+  const tonic = (LETTER_PC[m[1].toUpperCase()] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12;
+  return DEGREE_LABEL[(pc - tonic + 12) % 12];
+}
+function instRange() { // the song's pitch extent, octave-aligned C..B
+  let lo = 60, hi = 71;
+  if (song) {
+    let mn = Infinity, mx = -Infinity;
+    song.tracks.forEach((tr, ti) => {
+      if (trackIsDrums(ti)) return;
+      for (const n of tr.notes) if (!n.gone) { if (n.p < mn) mn = n.p; if (n.p > mx) mx = n.p; }
+    });
+    if (mn <= mx) { lo = mn; hi = mx; }
+  }
+  return [Math.max(12, Math.floor(lo / 12) * 12), Math.min(107, Math.floor(hi / 12) * 12 + 11)];
+}
+function instLitPitches() { // sel = lasso'd, live = sounding right now
+  const sel = new Set(song ? multiSel.map(s => song.tracks[s.ti].notes[s.ni].p) : []);
+  const live = new Set();
+  if (playing && audio) {
+    const s = playSec();
+    for (const e of schedEvents) {
+      if (e.sec > s) break; // sorted by sec
+      if (s < e.sec + e.dur && trackAudible(e.ti) && !(e.n.ch === 9 || trackIsDrums(e.ti))) live.add(e.n.p);
+    }
+  }
+  return {sel, live};
+}
+function drawInst() {
+  if (!instOpen) return;
+  const W = instWrap.clientWidth, H = instWrap.clientHeight;
+  if (!W || !H) return;
+  ictx.fillStyle = css("--panel");
+  ictx.fillRect(0, 0, W, H);
+  if (instFlash && instFlash.until < performance.now()) instFlash = null;
+  const lit = instLitPitches();
+  if (instTab === "piano") drawPiano(W, H, lit);
+  else drawGuitar(W, H, lit);
+}
+function pianoGeom(W) {
+  const [lo, hi] = instRange();
+  const whites = [];
+  for (let p = lo; p <= hi; p++) if (WHITE_PCS.includes(p % 12)) whites.push(p);
+  const wW = W / whites.length;
+  const wx = {};
+  whites.forEach((p, i) => wx[p] = i * wW);
+  return {lo, hi, whites, wW, wx};
+}
+function instLitColor(p, lit) {
+  if (instFlash && instFlash.p === p) return css("--accent");
+  if (lit.sel.has(p)) return css("--gold");
+  if (lit.live.has(p)) return css("--accent");
+  return null;
+}
+function drawPiano(W, H, lit) {
+  const g = pianoGeom(W);
+  const kn = keyNameAt(curTick()), sf = sfDeclaredAt(curTick());
+  ictx.textAlign = "center";
+  for (const p of g.whites) {
+    const x = g.wx[p], c = instLitColor(p, lit);
+    ictx.fillStyle = c || "#e8e4da";
+    ictx.fillRect(x + 0.5, 0, g.wW - 1, H - 1);
+    ictx.strokeStyle = "#333";
+    ictx.strokeRect(x + 0.5, 0.5, g.wW - 1, H - 2);
+    if (c) {
+      ictx.fillStyle = "#111";
+      ictx.font = "bold 10px " + css("--mono");
+      ictx.fillText(pitchName(p, sf), x + g.wW / 2, H - 18);
+      const deg = degreeOf(p % 12, kn);
+      if (deg) { ictx.font = "9px " + css("--mono"); ictx.fillText(deg, x + g.wW / 2, H - 6); }
+    } else if (p % 12 === 0) { // C labels for orientation
+      ictx.fillStyle = "#999";
+      ictx.font = "9px " + css("--mono");
+      ictx.fillText("C" + (p / 12 - 1), x + g.wW / 2, H - 6);
+    }
+  }
+  const bw = g.wW * 0.6, bh = H * 0.6;
+  for (let p = g.lo; p <= g.hi; p++) {
+    if (WHITE_PCS.includes(p % 12)) continue;
+    const x = g.wx[p - 1] + g.wW - bw / 2, c = instLitColor(p, lit);
+    ictx.fillStyle = c || "#1a1a1a";
+    ictx.fillRect(x, 0, bw, bh);
+    ictx.strokeStyle = "#000";
+    ictx.strokeRect(x + 0.5, 0.5, bw - 1, bh - 1);
+    if (c) {
+      ictx.fillStyle = "#111";
+      ictx.font = "bold 9px " + css("--mono");
+      ictx.fillText(pitchName(p, sf), x + bw / 2, bh - 14);
+      const deg = degreeOf(p % 12, kn);
+      if (deg) { ictx.font = "8px " + css("--mono"); ictx.fillText(deg, x + bw / 2, bh - 4); }
+    }
+  }
+}
+function pianoHit(x, y, W, H) {
+  const g = pianoGeom(W);
+  const bw = g.wW * 0.6, bh = H * 0.6;
+  if (y <= bh) { // black keys claim their zone first
+    for (let p = g.lo; p <= g.hi; p++) {
+      if (WHITE_PCS.includes(p % 12)) continue;
+      const bx = g.wx[p - 1] + g.wW - bw / 2;
+      if (x >= bx && x <= bx + bw) return p;
+    }
+  }
+  return g.whites[Math.max(0, Math.min(g.whites.length - 1, Math.floor(x / g.wW)))];
+}
+function guitarGeom(W, H) {
+  const nutX = 44, top = 14, bot = 24;
+  return {nutX, top, bot, fw: (W - nutX - 6) / GTR_FRETS, sh: (H - top - bot) / (GTR_TUNING.length - 1)};
+}
+function drawGuitar(W, H, lit) {
+  const g = guitarGeom(W, H);
+  const kn = keyNameAt(curTick()), sf = sfDeclaredAt(curTick());
+  for (let f = 0; f <= GTR_FRETS; f++) {
+    ictx.fillStyle = f === 0 ? css("--text") : css("--grid");
+    ictx.fillRect(g.nutX + f * g.fw, g.top, f === 0 ? 3 : 1, H - g.top - g.bot);
+  }
+  ictx.font = "9px " + css("--mono");
+  ictx.textAlign = "center";
+  for (const f of [3, 5, 7, 9, 12, 15]) { // inlay dots + fret numbers
+    const cx = g.nutX + (f - 0.5) * g.fw, cy = g.top + (H - g.top - g.bot) / 2;
+    ictx.fillStyle = css("--dim");
+    ictx.globalAlpha = 0.35;
+    ictx.beginPath();
+    if (f === 12) { ictx.arc(cx, cy - g.sh, 4, 0, 7); ictx.arc(cx, cy + g.sh, 4, 0, 7); }
+    else ictx.arc(cx, cy, 4, 0, 7);
+    ictx.fill();
+    ictx.globalAlpha = 1;
+    ictx.fillText(String(f), cx, H - 6);
+  }
+  GTR_TUNING.forEach((open, si) => {
+    const y = g.top + si * g.sh;
+    ictx.fillStyle = css("--dim");
+    ictx.fillRect(g.nutX, y, W - g.nutX - 6, si >= 4 ? 1.6 : 1); // wound strings thicker
+    ictx.font = "10px " + css("--mono");
+    ictx.textAlign = "right";
+    ictx.fillText(GTR_NAMES[si], g.nutX - 8, y + 3);
+    ictx.textAlign = "center";
+  });
+  const dots = [];
+  const add = (p, color) => GTR_TUNING.forEach((open, si) => {
+    const f = p - open;
+    if (f >= 0 && f <= GTR_FRETS) dots.push({si, f, p, color});
+  });
+  lit.live.forEach(p => add(p, css("--accent")));
+  lit.sel.forEach(p => add(p, css("--gold"))); // lasso wins where both apply
+  if (instFlash && instFlash.si !== undefined) dots.push({...instFlash, color: css("--accent")});
+  for (const d of dots) {
+    const cx = g.nutX + (d.f === 0 ? 2 : (d.f - 0.5) * g.fw), cy = g.top + d.si * g.sh;
+    ictx.fillStyle = d.color;
+    ictx.beginPath();
+    ictx.arc(cx, cy, 11, 0, 7);
+    ictx.fill();
+    ictx.fillStyle = "#111";
+    ictx.font = "bold 9px " + css("--mono");
+    ictx.fillText(spellPc(d.p % 12, sf), cx, cy - 1);
+    const deg = degreeOf(d.p % 12, kn);
+    if (deg) { ictx.font = "8px " + css("--mono"); ictx.fillText(deg, cx, cy + 8); }
+  }
+}
+function guitarHit(x, y, W, H) {
+  const g = guitarGeom(W, H);
+  const si = Math.max(0, Math.min(5, Math.round((y - g.top) / g.sh)));
+  const f = x < g.nutX ? 0 : Math.min(GTR_FRETS, Math.floor((x - g.nutX) / g.fw) + 1);
+  return {p: GTR_TUNING[si] + f, si, f};
+}
+async function instPlay(p) {
+  ensureAudio();
+  await resumeAudio();
+  openMaster();
+  const o = makeOsc(instTab === "guitar" ? "triangle" : "square25");
+  o.frequency.value = 440 * Math.pow(2, (p - 69) / 12);
+  const g = audio.createGain();
+  const when = audio.currentTime + 0.01, dur = 0.5;
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(0.35, when + 0.008);
+  g.gain.setValueAtTime(0.35, when + dur - 0.06);
+  g.gain.linearRampToValueAtTime(0, when + dur);
+  o.connect(g);
+  g.connect(master); // master, not a track gain: mutes never silence the panel
+  o.start(when);
+  o.stop(when + dur + 0.05);
+}
+let instPtrOn = false, instLastP = null;
+function instTap(e, dragging) {
+  const r = instCanvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const W = instWrap.clientWidth, H = instWrap.clientHeight;
+  let p, si, f;
+  if (instTab === "piano") p = pianoHit(x, y, W, H);
+  else ({p, si, f} = guitarHit(x, y, W, H));
+  if (p === undefined || (dragging && p === instLastP)) return;
+  instLastP = p;
+  instFlash = {p, si, f, until: performance.now() + 350};
+  instPlay(p);
+  const deg = degreeOf(p % 12, keyNameAt(curTick()));
+  const at = si !== undefined ? "  ·  " + GTR_NAMES[si] + " string" + (f ? ", fret " + f : ", open") : "";
+  document.getElementById("instinfo").textContent =
+    pitchName(p, sfDeclaredAt(curTick())) + (deg ? "  ·  degree " + deg : "") + at;
+  drawInst();
+  setTimeout(drawInst, 400); // clear the flash when idle (playback frames handle it otherwise)
+}
+instCanvas.addEventListener("pointerdown", e => {
+  instPtrOn = true;
+  instCanvas.setPointerCapture(e.pointerId);
+  instTap(e);
+});
+instCanvas.addEventListener("pointermove", e => { if (instPtrOn) instTap(e, true); });
+instCanvas.addEventListener("pointerup", () => { instPtrOn = false; instLastP = null; });
+instCanvas.addEventListener("pointercancel", () => { instPtrOn = false; instLastP = null; });
+function instResize() {
+  const dpr = window.devicePixelRatio || 1;
+  instCanvas.width = instWrap.clientWidth * dpr;
+  instCanvas.height = instWrap.clientHeight * dpr;
+  ictx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawInst();
+}
+new ResizeObserver(instResize).observe(instWrap);
+const instbtn = document.getElementById("instbtn");
+function applyInst() {
+  document.getElementById("instpanel").classList.toggle("on", instOpen);
+  instbtn.classList.toggle("active", instOpen);
+  document.getElementById("insttab-piano").classList.toggle("active", instTab === "piano");
+  document.getElementById("insttab-guitar").classList.toggle("active", instTab === "guitar");
+  if (instOpen) instResize(); // canvas had zero size while display:none
+}
+instbtn.addEventListener("click", () => {
+  instOpen = !instOpen;
+  localStorage.setItem("ff1roll-inst-open", instOpen ? "1" : "0");
+  applyInst();
+});
+for (const tab of ["piano", "guitar"]) {
+  document.getElementById("insttab-" + tab).addEventListener("click", () => {
+    instTab = tab;
+    localStorage.setItem("ff1roll-inst-tab", instTab);
+    applyInst();
+  });
+}
+instTab = localStorage.getItem("ff1roll-inst-tab") || "piano";
+instOpen = localStorage.getItem("ff1roll-inst-open") === "1";
+applyInst();
 
 // ---------------------------------------------------------------- note editor
 const editor = document.getElementById("noteeditor");
