@@ -189,9 +189,15 @@
   .hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
 
   #subtitle {
+    /* constant-height slot: shown for the whole song when it has text notes,
+       blank between them — toggling per-note reflowed the layout and made
+       the instrument panel bounce (Josh, 2026-08-07). Long notes scroll. */
     display: none;
     position: relative;
-    padding: 10px 96px 10px 16px;
+    height: 60px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 8px 96px 8px 16px;
     background: var(--panel2);
     border-top: 1px solid var(--grid);
     font-family: var(--mono);
@@ -1134,11 +1140,16 @@ function toggleHl() {
 function updateSubtitle() {
   refreshKeysetLabel(); // cursor moved: keep "Set @ bar N" honest
   const el = document.getElementById("subtitle");
+  // the slot exists for the whole song (constant height, no layout bounce);
+  // only its CONTENT follows the playhead
+  const hasNotes = !!song && rollnotes.some(n =>
+    !(n.section || n.chord || n.chopdir || n.keydir !== undefined || n.loopTo !== undefined));
+  el.classList.toggle("on", hasNotes);
   const n = song ? activeNoteAt(curTick()) : null;
   if (n === lastSubtitle) return;
   lastSubtitle = n;
-  if (!n) { el.classList.remove("on"); return; }
   el.innerHTML = "";
+  if (!n) return;
   const where = document.createElement("span");
   where.className = "where";
   const sec = sectionPathAt(n.start);
@@ -1149,7 +1160,7 @@ function updateSubtitle() {
   hl.textContent = "⊙ highlight";
   hl.addEventListener("click", toggleHl);
   el.append(where, document.createTextNode(n.text), hl);
-  el.classList.add("on");
+  el.scrollTop = 0;
 }
 
 // ---------------------------------------------------------------- load song

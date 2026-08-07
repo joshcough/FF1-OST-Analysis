@@ -102,7 +102,11 @@ that applyChop() carves the visible tracks from, so roll, score,
 playback, and loop-at-end all follow for free.
 Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
 highlights the active note's span (ambient range tints removed — on a
-fully-annotated song they covered everything).
+fully-annotated song they covered everything). The strip is a
+constant-height slot (2026-08-07): present for the whole song whenever
+the song has text notes, blank between them, long notes scroll inside —
+per-note toggling reflowed the layout and made the instrument panel
+bounce.
 
 **Meter:** neutral 4/4 grid until a `timesig:` directive declares the
 real meter (set via the editor's Time signature type — numerator/
