@@ -99,6 +99,31 @@ his behalf.
   motion, recurring progressions, where rare triads (menu's iii) appear.
   Data exists in analysis/*.md + chord-charts.md; this is a reading pass,
   not new capture. Not now — Josh flagged it to circle back to.
+- **Whole-tone exercise — floating castle (deferred 2026-08-07):** Josh
+  identified the song as whole-tone material (melody D5–A#5 = five
+  consecutive whole steps; static tritone field in the bass; every
+  standard test fails because the scale is symmetric — no privileged
+  root, three tritones, no leading tone). Stopped deliberately while
+  tired. The exercise, fresh: classify every pitch by collection (there
+  are exactly two, complements); decide whether the D#/C# material is
+  second-collection structure or decoration; whole-tone notation done
+  properly (Debussy reference); and whether "opening key" even applies —
+  may need its own sweep category. The sweep's recorded Bb tonic has NO
+  derivation anywhere — treat as unsupported until re-derived.
+- **From the 08-07 sweep session, still open per song:** undersea-shrine
+  past chord 2 + why the offbeat D# pedal; ship's Pulse-2 E question
+  (position says chord tone/Fmaj7, duration says neighbor — logged
+  unresolved) + the withheld-third open fifths; prologue bars 5+ (Gm...
+  C7 back to F?); victory's thin two-Db evidence rides on metrical
+  placement.
+- **Data issues flagged 2026-08-07 (awaiting Josh's go to fix):**
+  key-sweep.md Tally shows ? for songs whose rollnotes have keys
+  (matoyas-cave B minor, menu Bb) and 8 songs total are recorded but not
+  swept; gurgu-volcano carries two key lines (D dorian, F dorian) and
+  the sweep only records the first — should it capture section-level
+  changes at all?; floating-castle has a sweep entry but no .rollnotes;
+  prologue line 38 has a chord in a section field ("section: F#m or
+  Gbm") — and worth checking whether the app makes that mistake easy.
 
 ## Tooling to-do
 
@@ -120,6 +145,37 @@ his behalf.
   air, mirroring the left/top bars. fitView lands exactly on the floor, so the
   load view = the zoom-out limit. Revises the "unlimited roll zoom-out"
   note under the parked two-regime score item.
+
+### Tooling requests — 08-07 sweep handoff (proposed; Josh signs off)
+
+- **Key picker: tonic-only first dropdown + stored-vs-applied keys.**
+  Design decided in the handoff: first dropdown lists 12 pitch classes
+  only (no "D / B minor" pairings — that pairing wrote a silent wrong
+  `key: D` on matoyas-cave); mode comes entirely from the second
+  control. Tonic-without-mode must be ENTERABLE (finding tonic and mode
+  separately is normal method — floating castle is live) but must not
+  REGISTER: no key signature, no respelling, nothing downstream until
+  mode lands. UI must show which state an entry is in — a partial can't
+  read as a verdict.
+- **Lasso: beyond one rectangle.** Rectangle-only can't isolate
+  non-separable targets (undersea-shrine: offbeat D# pedal interleaved
+  with the chord tones). Josh's first thought: additive rectangles via
+  modifier-drag, explicitly open to better designs — Claude Code asked
+  to weigh in. CC's recommendation (2026-08-07): design touch-first, no
+  modifiers (iPad has none) — while a selection exists, a new drag
+  UNIONS into it, tapping an individual note TOGGLES it in/out, tapping
+  empty space clears. Tap-to-toggle alone solves the pedal case (box the
+  region, tap the D#s out). Also note solo+lasso already constrains to a
+  channel today.
+- **Pitch-class highlight.** Select a pitch class → every occurrence
+  lights across all channels. The most repeated sweep operation (A vs A#
+  on undersea-shrine, E vs Eb on ship, Ab vs A on victory). By pitch
+  CLASS (Bb must catch the capture's A#); the highlight is the output,
+  not a count; zero hits must read as a confident zero (ruling a mode
+  out depends on it); label by scale degree when a key is set.
+- **Sweep-vs-rollnotes drift check.** A check that flags any song whose
+  rollnotes `key:` disagrees with or is missing from the key-sweep
+  Tally — the drift is real (see data issues in the analysis queue).
 
 ### Backlog — from the 2026-08-07 web-session sketch (recorded, not approved)
 
