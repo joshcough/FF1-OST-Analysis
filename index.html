@@ -400,6 +400,7 @@
   </div>
   <button id="lassobtn">⊞ Lasso</button>
   <button id="instbtn">🎹</button>
+  <button id="subbtn">💬</button>
   <button id="chordbtn" style="display:none">Chord?</button>
   <select id="keysel" aria-label="Key">
     <option value="" id="keyunset">key: not set (C)</option>
@@ -544,6 +545,7 @@
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
+      <dt>💬</dt><dd>Show/hide the text-note strip (the fixed slot that shows your notes as the playhead crosses them). Off frees the vertical space; setting sticks.</dd>
       <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 15 frets.</dd>
       <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
     </dl>
@@ -742,6 +744,7 @@ let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
 let lassoMode = false;   // one-finger drag selects notes instead of panning
 let instOpen = false;    // instrument panel (set from localStorage once its section wires up)
 let fallOn = false;      // Synthesia fall view: main canvas drops notes into the panel's keys
+let subOn = localStorage.getItem("ff1roll-sub") !== "0"; // 💬 subtitle strip visible (default on)
 let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
 let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
@@ -1144,7 +1147,7 @@ function updateSubtitle() {
   // only its CONTENT follows the playhead
   const hasNotes = !!song && rollnotes.some(n =>
     !(n.section || n.chord || n.chopdir || n.keydir !== undefined || n.loopTo !== undefined));
-  el.classList.toggle("on", hasNotes);
+  el.classList.toggle("on", hasNotes && subOn);
   const n = song ? activeNoteAt(curTick()) : null;
   if (n === lastSubtitle) return;
   lastSubtitle = n;
@@ -3310,6 +3313,14 @@ instbtn.addEventListener("click", () => {
   localStorage.setItem("ff1roll-inst-open", instOpen ? "1" : "0");
   applyInst();
   draw(); // closing the panel while Fall is active must restore the roll
+});
+const subbtn = document.getElementById("subbtn");
+subbtn.classList.toggle("active", subOn);
+subbtn.addEventListener("click", () => {
+  subOn = !subOn;
+  localStorage.setItem("ff1roll-sub", subOn ? "1" : "0");
+  subbtn.classList.toggle("active", subOn);
+  updateSubtitle();
 });
 instFallBtn.addEventListener("click", () => {
   fallOn = !fallOn;
