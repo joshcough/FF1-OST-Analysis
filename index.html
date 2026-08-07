@@ -692,7 +692,11 @@ let declaredTs = null; // [num, den] from a "timesig: N/D" directive; null = und
 // meter is analysis: until the user declares it, everything runs on a
 // neutral 4/4 ruler — the MIDI's meter meta drives nothing visible
 function effTs() { return declaredTs || [4, 4]; }
-function beatsPerBarEff() { const t = effTs(); return t[0] * 4 / t[1]; }     // [{start, sf, name}] from rollnotes "key:" directives
+function beatsPerBarEff() { const t = effTs(); return t[0] * 4 / t[1]; } // bar length in QUARTERS (tick math)
+// the displayed/counted beat is the denominator note: eighths in 6/8, so
+// anchors read [1.4] = fourth eighth — the way compound meters are counted
+function beatTicks() { return song.ppq * 4 / effTs()[1]; }
+function beatsPerBarDisp() { return effTs()[0]; }     // [{start, sf, name}] from rollnotes "key:" directives
 let previewSf = null;    // key dial preview override (null = follow regions)
 
 const canvas = document.getElementById("roll");
@@ -831,11 +835,17 @@ function sfDeclaredAt(tick) { // sf if the user has declared a key governing thi
 }
 function resolveNote(n) {
   const bt = barTicks();
-  n.start = (n.b1 - 1) * bt + (n.q1 - 1) * song.ppq;
-  n.end = n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarEff()) * song.ppq : null;
+  n.start = (n.b1 - 1) * bt + (n.q1 - 1) * beatTicks();
+  n.end = n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarDisp()) * beatTicks() : null;
   return n;
 }
 function finalizeNotes() {
+  // adopt any declared meter FIRST, then re-resolve every anchor under it —
+  // at load, resolveNote ran under neutral 4/4 before the file's timesig was
+  // seen, so 6/8 songs' anchors landed on wrong ticks (the old menu bug)
+  const tsNote = rollnotes.find(n => n.tsdir);
+  declaredTs = tsNote ? tsNote.tsdir : null;
+  rollnotes.forEach(resolveNote);
   rollnotes.sort((a, b) => a.start - b.start);
   const bt = barTicks();
   const plain = rollnotes.filter(n => !n.section && !n.chord);
@@ -849,16 +859,14 @@ function finalizeNotes() {
   // Discovered per song (some FF1 loops return past an intro, e.g. to bar 2).
   for (const n of rollnotes) {
     const lm = n.text.match(/^loop:\s*(\d+)(?:\.(\d+(?:\.\d+)?))?\s*$/);
-    if (lm) n.loopTo = (+lm[1] - 1) * bt + ((lm[2] ? +lm[2] : 1) - 1) * song.ppq;
+    if (lm) n.loopTo = (+lm[1] - 1) * bt + ((lm[2] ? +lm[2] : 1) - 1) * beatTicks();
     else delete n.loopTo;
   }
-  const tsNote = rollnotes.find(n => n.tsdir);
-  declaredTs = tsNote ? tsNote.tsdir : null;
   if (song) { updateSongMeta(); computeSongEnd(); } // grid may have changed
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir,
                 name: (n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [, SF_MAJOR[n.keydir]])[1], // "Gm"/"D dorian" show as recorded
-                end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarEff()) * song.ppq : null,
+                end: n.b2 ? (n.b2 - 1) * bt + (n.q2 || beatsPerBarDisp()) * beatTicks() : null,
                 b1: n.b1, b2: n.b2}))
     .sort((a, b) => a.start - b.start);
   const unsetOpt = document.getElementById("keyunset");
@@ -944,7 +952,7 @@ function serializeNotesList(list, beatsPerBar, base) {
   }
   return lines.join("\n");
 }
-function serializeRollnotes() { return serializeNotesList(rollnotes, beatsPerBarEff(), baseName()); }
+function serializeRollnotes() { return serializeNotesList(rollnotes, beatsPerBarDisp(), baseName()); }
 // serialize another song's sidecar + this device's local additions, without
 // loading it: its meter was stashed in localStorage when it was last open
 async function buildRollnotesFor(key) {
@@ -1199,16 +1207,19 @@ function draw() {
 
   drawRangeTints(W, H);
 
-  // beat + bar lines
+  // beat + bar lines — beat = the meter's denominator note (eighths in 6/8);
+  // compound meters (6/8, 9/8, 12/8) get a medium line on each group of 3
   const t0 = view.x / ppt, t1 = (view.x + W) / ppt;
-  const beatT = song.ppq;
+  const beatT = beatTicks();
+  const groupT = effTs()[1] >= 8 && effTs()[0] % 3 === 0 ? beatT * 3 : null;
   ctx.textAlign = "left";
   for (let t = Math.floor(t0 / beatT) * beatT; t < t1; t += beatT) {
     const x = RULER_W + t * ppt - view.x;
     if (x < RULER_W) continue;
     const isBar = Math.round(t) % bt === 0;
+    const isGroup = !isBar && groupT && Math.round(t) % groupT === 0;
     ctx.fillStyle = isBar ? css("--grid") : css("--grid-soft");
-    ctx.fillRect(x, RULER_H, isBar ? 1.5 : 1, H);
+    ctx.fillRect(x, RULER_H, isBar ? 1.5 : isGroup ? 1.25 : 0.75, H);
   }
 
   // notes
@@ -1488,7 +1499,7 @@ function noteLabel(ti, ni) {
   const n = song.tracks[ti].notes[ni];
   const bt = barTicks();
   const bar = Math.floor(n.t / bt) + 1;
-  const beat = (n.t % bt) / song.ppq + 1;
+  const beat = (n.t % bt) / beatTicks() + 1;
   const name = pitchName(n.p, sfAt(n.t));
   const tname = song.tracks[ti].name || "tr" + (ti+1);
   return name + " · bar " + bar + " beat " + beatLabel(beat) + " · " +
@@ -1584,8 +1595,8 @@ canvas.addEventListener("pointermove", e => {
     }
     else if (drag.cursor) scrubTo(evtPos(e));
     else if (drag.ruler) { // drag along the ruler = select a beat range
-      const a = tickAtX(drag.spos.x, song.ppq);
-      const b = tickAtX(evtPos(e).x, song.ppq);
+      const a = tickAtX(drag.spos.x, beatTicks());
+      const b = tickAtX(evtPos(e).x, beatTicks());
       rangeSel = a === b ? null : {a: Math.min(a, b), b: Math.max(a, b)};
       draw();
     }
@@ -1679,7 +1690,7 @@ function tap(pos) {
       return;
     }
     const target = hitMark ? hitMark.start
-                 : Math.max(0, Math.round(tick / song.ppq) * song.ppq); // snap to beat
+                 : Math.max(0, Math.round(tick / beatTicks()) * beatTicks()); // snap to beat
     if (playing) { stop(); play(tickToSec(song, target)); }
     else { playCursor = target; updateSubtitle(); draw(); }
     return;
@@ -2642,7 +2653,7 @@ function renderNoteList() {
       row.setAttribute("role", "button");
       const where = document.createElement("span");
       where.className = "where";
-      where.textContent = n.b2 ? n.b1 + "." + n.q1 + "–" + n.b2 + "." + (n.q2 || beatsPerBarEff())
+      where.textContent = n.b2 ? n.b1 + "." + n.q1 + "–" + n.b2 + "." + (n.q2 || beatsPerBarDisp())
                                : "bar " + n.b1 + (n.q1 !== 1 ? "." + n.q1 : "");
       const body = document.createElement("span");
       body.className = "body";
@@ -2784,7 +2795,7 @@ new ResizeObserver(resize).observe(wrap); // subtitle strip toggling resizes the
 const editor = document.getElementById("noteeditor");
 function fillBarBeatSelects() {
   const bars = Math.max(1, Math.round(songEndTick / barTicks()));
-  const beatsPerBar = beatsPerBarEff();
+  const beatsPerBar = beatsPerBarDisp();
   const mkBars = (id, noneOption, pastEnd) => {
     const s = document.getElementById(id);
     s.innerHTML = "";
@@ -2975,15 +2986,15 @@ function openEditor(note, presetType) {
   fillBarBeatSelects();
   const bt = barTicks();
   let b1 = Math.floor(playCursor / bt) + 1;
-  let q1 = snapBeat((playCursor % bt) / song.ppq + 1);
+  let q1 = snapBeat((playCursor % bt) / beatTicks() + 1);
   let b2 = "", q2 = "";
   if (!note && rangeSel) { // prefill the from/to fields from the ruler selection
     b1 = Math.floor(rangeSel.a / bt) + 1;
-    q1 = snapBeat((rangeSel.a % bt) / song.ppq + 1);
-    const last = rangeSel.b - song.ppq; // inclusive last beat of the selection
+    q1 = snapBeat((rangeSel.a % bt) / beatTicks() + 1);
+    const last = rangeSel.b - beatTicks(); // inclusive last beat of the selection
     if (last >= rangeSel.a) { // >= so a one-beat selection prefills To = From
       b2 = Math.floor(last / bt) + 1;
-      q2 = snapBeat((last % bt) / song.ppq + 1);
+      q2 = snapBeat((last % bt) / beatTicks() + 1);
     }
   }
   const type = note ? (note.chord ? "chord" : note.section ? "section" : note.keydir !== undefined ? "key"
@@ -3005,12 +3016,12 @@ function openEditor(note, presetType) {
   if (type === "loop" && note) {
     const lbt = barTicks();
     document.getElementById("nlb").value = String(Math.floor(note.loopTo / lbt) + 1);
-    document.getElementById("nlq").value = String(snapBeat((note.loopTo % lbt) / song.ppq + 1));
+    document.getElementById("nlq").value = String(snapBeat((note.loopTo % lbt) / beatTicks() + 1));
   }
   document.getElementById("nb1").value = String(note ? note.b1 : b1);
   document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
-  document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : beatsPerBarEff()) : (q2 || beatsPerBarEff()));
+  document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : beatsPerBarDisp()) : (q2 || beatsPerBarDisp()));
   document.getElementById("ntext").value =
     type === "chord" ? (note && note.cnote || "") : note && type !== "key" ? note.text : "";
   if (type === "chord") setChordWidget(note ? note.text : "");
@@ -3038,11 +3049,12 @@ document.getElementById("ncancel").addEventListener("click", () => { micStop(); 
 let rebarArmed = false; // two-tap confirmation for meter changes that move annotations
 // re-express every annotation's anchors under a new meter so they stay glued
 // to the MUSIC (bar.beat is a coordinate system; changing the meter re-bars)
-function convertAnchors(oldBpb, newBpb) {
-  const oldBt = oldBpb * song.ppq, newBt = newBpb * song.ppq;
+function convertAnchors(oldTs, newTs) {
+  const oldUnit = song.ppq * 4 / oldTs[1], newUnit = song.ppq * 4 / newTs[1];
+  const oldBt = oldTs[0] * oldUnit, newBt = newTs[0] * newUnit;
   const conv = (b, q) => {
-    const tick = (b - 1) * oldBt + (q - 1) * song.ppq;
-    return [Math.floor(tick / newBt) + 1, (tick % newBt) / song.ppq + 1];
+    const tick = (b - 1) * oldBt + (q - 1) * oldUnit;
+    return [Math.floor(tick / newBt) + 1, (tick % newBt) / newUnit + 1];
   };
   for (const n of rollnotes) {
     [n.b1, n.q1] = conv(n.b1, n.q1);
@@ -3080,9 +3092,11 @@ document.getElementById("nsave").addEventListener("click", () => {
              text: "key: " + chosenKeyName(sf, mode), keydir: sf, added: true};
   } else if (type === "timesig") {
     const num = +document.getElementById("ntsnum").value, den = +document.getElementById("ntsden").value;
-    const newBpb = num * 4 / den, oldBpb = beatsPerBarEff();
+    const oldTs = effTs();
+    // bar length OR beat unit changing moves anchors (6/8 counts eighths)
+    const tsChanged = num !== oldTs[0] || den !== oldTs[1];
     const others = rollnotes.filter(n => !n.tsdir).length;
-    if (newBpb !== oldBpb && others > 0 && !rebarArmed) {
+    if (tsChanged && others > 0 && !rebarArmed) {
       rebarArmed = true; // big warning, second tap confirms
       document.getElementById("nstatus").textContent =
         "⚠ Re-bar from " + effTs()[0] + "/" + effTs()[1] + " to " + num + "/" + den + "? " +
@@ -3091,9 +3105,9 @@ document.getElementById("nsave").addEventListener("click", () => {
       return;
     }
     rebarArmed = false;
-    if (newBpb !== oldBpb) convertAnchors(oldBpb, newBpb);
+    if (tsChanged) convertAnchors(oldTs, [num, den]);
     rollnotes = rollnotes.filter(n => !(n.tsdir)); // one meter per song
-    fresh = {b1: newBpb !== oldBpb ? 1 : b1, q1: newBpb !== oldBpb ? 1 : q1, b2: null, q2: null,
+    fresh = {b1: tsChanged ? 1 : b1, q1: tsChanged ? 1 : q1, b2: null, q2: null,
              text: "timesig: " + num + "/" + den, tsdir: [num, den], added: true};
   } else if (type === "loop") {
     const lb = Math.max(1, +document.getElementById("nlb").value || 1);
@@ -3129,8 +3143,9 @@ document.getElementById("ndelete").addEventListener("click", () => {
   // deleting the meter directive re-bars back to neutral 4/4 — same two-tap
   // warning + anchor conversion as declaring one, never a silent move
   if (editingNote && editingNote.tsdir) {
-    const oldBpb = beatsPerBarEff(), others = rollnotes.filter(n => !n.tsdir).length;
-    if (oldBpb !== 4 && others > 0 && !rebarArmed) {
+    const oldTs = effTs(), others = rollnotes.filter(n => !n.tsdir).length;
+    const tsChanged = oldTs[0] !== 4 || oldTs[1] !== 4;
+    if (tsChanged && others > 0 && !rebarArmed) {
       rebarArmed = true;
       document.getElementById("nstatus").textContent =
         "⚠ Removing the meter re-bars back to neutral 4/4. " + others +
@@ -3138,7 +3153,7 @@ document.getElementById("ndelete").addEventListener("click", () => {
       return;
     }
     rebarArmed = false;
-    if (oldBpb !== 4) convertAnchors(oldBpb, 4);
+    if (tsChanged) convertAnchors(oldTs, [4, 4]);
   }
   rollnotes = rollnotes.filter(n => n !== editingNote);
   finalizeNotes();

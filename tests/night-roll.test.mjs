@@ -83,6 +83,36 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
   assert.equal(run(`rollnotes.find(n => n.text === "key: Gm").keydir`), -2); // Gm = 2 flats
 });
 
+test("6/8: beats are eighths — anchors, defaults, re-bar conversion", () => {
+  installSong();
+  const text = [
+    "[1.1]", "timesig: 6/8", "",
+    "[1.1 - 1.3]", "chord: Bb", "",
+    "[1.4 - 1.6]", "chord: F7", "",
+    "[2.1]", "a note", "",
+  ].join("\n");
+  run(`declaredTs = null; rollnotes = parseRollnotes(${JSON.stringify(text)}).map(resolveNote); finalizeNotes();`);
+  assert.deepEqual(val(`effTs()`), [6, 8]);
+  assert.equal(run(`beatTicks()`), 240);           // eighth at ppq 480
+  assert.equal(run(`barTicks()`), 1440);           // 6 eighths = 3 quarters
+  const bb = val(`rollnotes.find(n => n.text === "Bb")`);
+  assert.equal(bb.start, 0);
+  assert.equal(bb.end, 720);                       // first half of the bar (3 eighths)
+  const f7 = val(`rollnotes.find(n => n.text === "F7")`);
+  assert.equal(f7.start, 720);                     // second half starts mid-bar
+  assert.equal(f7.end, 1440);
+  assert.equal(val(`rollnotes.find(n => n.text === "a note")`).start, 1440); // bar 2 = one 6/8 bar in
+  // serialize keeps eighth-counted anchors
+  assert.match(run(`serializeRollnotes()`), /\[1\.4 - 1\.6\]\nchord: F7\n/);
+  // re-bar 6/8 → 4/4 preserves absolute positions: eighth 4 of bar 1 = quarter 2.5
+  run(`convertAnchors([6, 8], [4, 4]); declaredTs = null;
+       rollnotes = rollnotes.filter(n => !n.tsdir); finalizeNotes();`);
+  const f74 = val(`rollnotes.find(n => n.text === "F7")`);
+  assert.equal(f74.b1, 1);
+  assert.equal(f74.q1, 2.5);
+  assert.equal(f74.start, 720); // same tick as before
+});
+
 test("chord directives: parse, attached note, round-trip", () => {
   installSong();
   const text = [
@@ -256,9 +286,9 @@ test("meter: neutral 4/4 until a timesig directive declares one; anchors convert
   assert.equal(run(`barTicks()`), 3 * 480); // declared: 6/8 = 3 quarter-beats per bar
   const once = run(`serializeRollnotes()`);
   assert.match(once, /timesig: 6\/8\n/); // round-trips like any directive
-  // conversion: [2.1] under 6/8 (tick 1440) re-expressed in 4/4 = bar 1 beat 4
+  // conversion: [2.1] under 6/8 (tick 1440 = 3 quarters) re-expressed in 4/4 = bar 1 beat 4
   run(`rollnotes.push(resolveNote({b1: 2, q1: 1, b2: null, q2: null, text: "hi", added: true})); finalizeNotes();`);
-  run(`convertAnchors(3, 4);`);
+  run(`convertAnchors([6, 8], [4, 4]);`);
   const n = val(`rollnotes.find(x => x.text === "hi")`);
   assert.deepEqual([n.b1, n.q1], [1, 4]);
 });

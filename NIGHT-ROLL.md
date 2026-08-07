@@ -72,6 +72,13 @@ rhythmic grouping is the analyst's finding, so the app won't pre-commit
 it. Changing meter over existing annotations demands a second Save tap
 and converts every anchor (incl. loop directives) to preserve musical
 position. cave (2/4) and menu (6/8) carry grandfathered declarations.
+**The counted beat is the denominator note** (2026-08-06): X/4 counts
+quarters, X/8 counts eighths, X/2 counts halves — so 6/8 bars run
+beats 1–6, the way compound meter is actually counted. The roll grid
+draws one line per beat, with a medium line every 3 beats in compound
+meters (6/8, 9/8, 12/8) marking the big pulses. Anchors, beat
+dropdowns, loop targets, and the info strip all use this unit; meter
+changes convert anchors across unit changes through absolute time.
 
 **Keys:** display defaults to C until a `key:` annotation exists — key
 discovery is Josh's job, by design (the dial previews signatures live; a
@@ -143,7 +150,9 @@ timesig: 6/8       ← meter directive. Until one exists the app runs on a
                      Declaring one re-bars the song; the editor converts
                      existing anchors through absolute time (two-tap
                      warning) so annotations keep their musical positions.
-                     One per song.
+                     One per song. Beats in anchors count the DENOMINATOR
+                     note: under 6/8, [1.4] = the fourth eighth, and the
+                     first half-bar chord is [1.1 - 1.3].
 
 [25.1]
 loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the
