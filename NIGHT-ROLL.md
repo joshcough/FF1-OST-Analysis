@@ -59,7 +59,8 @@ inversions; missing-5th tolerance).
 **Instrument panel** (2026-08-07, 🎹 in the footer): a piano-keyboard /
 guitar-fretboard strip above the footer, so Josh can think with the
 instrument instead of purely symbolically. Lasso'd pitches light gold on
-both instruments; sounding notes light live during playback; every key
+both instruments; sounding notes light live during playback in their
+track's color (same palette as the roll/fall notes); every key
 and fret is tappable (plays through master, so track mutes never silence
 it — square voice on piano, triangle on guitar). Labels are the pitch
 name spelled per the governing key plus the scale degree when a `key:`

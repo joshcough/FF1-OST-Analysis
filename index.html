@@ -3025,14 +3025,15 @@ function instRange() { // the song's pitch extent, octave-aligned C..B
   }
   return [Math.max(12, Math.floor(lo / 12) * 12), Math.min(107, Math.floor(hi / 12) * 12 + 11)];
 }
-function instLitPitches() { // sel = lasso'd, live = sounding right now
+function instLitPitches() { // sel = lasso'd, live = sounding right now (pitch → track index)
   const sel = new Set(song ? multiSel.map(s => song.tracks[s.ti].notes[s.ni].p) : []);
-  const live = new Set();
+  const live = new Map();
   if (playing && audio) {
     const s = playSec();
     for (const e of schedEvents) {
       if (e.sec > s) break; // sorted by sec
-      if (s < e.sec + e.dur && trackAudible(e.ti) && !(e.n.ch === 9 || trackIsDrums(e.ti))) live.add(e.n.p);
+      if (s < e.sec + e.dur && trackAudible(e.ti) && !(e.n.ch === 9 || trackIsDrums(e.ti)) && !live.has(e.n.p))
+        live.set(e.n.p, e.ti);
     }
   }
   return {sel, live};
@@ -3060,7 +3061,7 @@ function pianoGeom(W) {
 function instLitColor(p, lit) {
   if (instFlash && instFlash.p === p) return css("--accent");
   if (lit.sel.has(p)) return css("--gold");
-  if (lit.live.has(p)) return css("--accent");
+  if (lit.live.has(p)) return TRACK_COLORS[lit.live.get(p) % TRACK_COLORS.length]; // the sounding track's color
   return null;
 }
 function drawPiano(W, H, lit) {
@@ -3152,7 +3153,7 @@ function drawGuitar(W, H, lit) {
     const f = p - open;
     if (f >= 0 && f <= GTR_FRETS) dots.push({si, f, p, color});
   });
-  lit.live.forEach(p => add(p, css("--accent")));
+  lit.live.forEach((ti, p) => add(p, TRACK_COLORS[ti % TRACK_COLORS.length]));
   lit.sel.forEach(p => add(p, css("--gold"))); // lasso wins where both apply
   if (instFlash && instFlash.si !== undefined) dots.push({...instFlash, color: css("--accent")});
   for (const d of dots) {
