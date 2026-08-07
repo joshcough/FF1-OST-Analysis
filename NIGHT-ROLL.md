@@ -52,14 +52,32 @@ rebuilds on toggle.
 
 **Inspection:** tap note → pitch (spelled per active key), bar, beat in
 1e&a counting, duration, velocity, track. Lasso mode (footer toggle):
-drag-select across notes; pitch list shown; chord name behind a "Chord?"
-reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
-inversions; missing-5th tolerance). Chord challenge (2026-08-07): tap a
-chord band in the ruler and the same footer button reads "Challenge?" —
-chordEvidence() compares the label's tones to every pitch sounding in
-the span and reports present/missing/extra plus the namer's read of the
-stack. Request-only, labeled bands only; extras are evidence, not
-verdicts (pedal points and passing tones land there by design).
+drag-select across notes in any view (roll, score, fall); pitch list
+shown; chord name behind a "Chord?" reveal (templates: triads, 6, 7s,
+9s, sus, dim7, power-dyad "5"; slash inversions; missing-5th tolerance).
+Lasso selection is EDITABLE (2026-08-07, for targets a rectangle can't
+separate — undersea/underwater's interleaved pedal): each new box UNIONS
+into the selection, tapping a note toggles it in/out (all three views
+hit-test their own geometry: hitNote / scoreLassoTap / fallHitNote),
+tapping empty space clears. Touch-first by design — no modifier keys on
+iPad. Chord challenge (2026-08-07): tap a chord band in the ruler and
+the same footer button reads "Challenge?" — opens a dialog built from
+chordEvidence(): each label tone with its role (root/3rd/5th/7th...)
+and whether it sounds (gold) or is missing (red), extras under an
+"evidence, not verdict" heading (blue — pedals and passing tones land
+there by design), per-channel note lists, and the namer's read of the
+full stack, with a Copy button. Request-only, labeled bands only.
+
+**Pitch-class finder** (2026-08-07, "find:" dropdown in the footer —
+the sweep's most repeated operation, mode-hunting single degrees): pick
+a pitch class and every occurrence highlights across all audible
+channels while everything else dims to 15% — so zero hits reads as a
+confident zero, which mode rulings depend on. Works in roll (accent
+stroke), score (accent notehead boxes), and fall. Matches by pitch
+CLASS (find Bb catches the capture's A#); options respell per the
+governing key and carry the scale degree when one is set; the info
+strip reports count + channels. Selector options rebuild on focus so
+spellings track the current key.
 
 **Instrument panel** (2026-08-07, 🎹 in the footer): a piano-keyboard /
 guitar-fretboard strip above the footer, so Josh can think with the

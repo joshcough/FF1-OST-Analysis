@@ -445,3 +445,23 @@ test("chord challenge roles: menu's F7 case — guide tones present, root/5th mi
   assert.equal(ev.namer, "no standard chord match"); // honest: a bare tritone + pedal names nothing
   run(`keyRegions = [];`);
 });
+
+test("lasso toggle: tap adds, tap again removes, empty selection hides Chord?", () => {
+  installSong();
+  run(`
+    trackState = [{muted: false, solo: false}];
+    song.tracks = [{name: "t", notes: [
+      {t: 0, d: 480, p: 60, v: 80}, {t: 480, d: 480, p: 64, v: 80}]}];
+    multiSel = []; multiSelKey = new Set();
+    previewNote = async () => {}; // no AudioContext in the vm
+    toggleSel({ti: 0, ni: 0});
+    toggleSel({ti: 0, ni: 1});
+  `);
+  assert.equal(run(`multiSel.length`), 2);
+  assert.equal(run(`multiSelKey.has("0:1")`), true);
+  run(`toggleSel({ti: 0, ni: 0});`); // tap the first one back out
+  assert.equal(run(`multiSel.length`), 1);
+  assert.equal(run(`multiSelKey.has("0:0")`), false);
+  run(`toggleSel({ti: 0, ni: 1});`);
+  assert.equal(run(`multiSel.length`), 0);
+});

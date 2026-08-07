@@ -409,6 +409,9 @@
   <button id="lassobtn">⊞ Lasso</button>
   <button id="instbtn">🎹</button>
   <button id="subbtn">💬</button>
+  <select id="findsel" aria-label="Highlight a pitch class" style="max-width:110px">
+    <option value="">find: off</option>
+  </select>
   <button id="chordbtn" style="display:none">Chord?</button>
   <select id="keysel" aria-label="Key">
     <option value="" id="keyunset">key: not set (C)</option>
@@ -529,6 +532,7 @@
     <dl>
       <dt>𝄞 Score / ▦ Roll</dt><dd>Switch between piano roll and engraved sheet music. Same timeline, same everything else. Your choice is remembered.</dd>
       <dt>Drag / pinch</dt><dd>One finger pans; two fingers zoom — spread horizontally to stretch time, vertically to grow/shrink the pitch rows (roll only). Songs open fitted to the screen. In score view, scroll fully left to see the clefs and key signature.</dd>
+      <dt>Roll zoom-out limit</dt><dd>Pinch-out stops once the whole song is in view — per axis: when every bar fits, further pinch-out only reveals pitch; when every note is visible, it stops, framed with a ruler-width of air. Opening a song lands exactly on this limit.</dd>
       <dt>Score zoom limit</dt><dd>The score stops zooming out where its busiest bar would overflow — engraved notes can't shrink. Mute dense tracks to zoom out further, or use the Roll for the bird's-eye view.</dd>
     </dl>
 
@@ -551,11 +555,12 @@
     <dl>
       <dt>Tap a note</dt><dd>Inspector shows pitch, bar &amp; beat (counted 1e&amp;a), length, velocity, track — and plays it.</dd>
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
-      <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
+      <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in all views). Boxes ADD to the selection — draw as many as you need. Tap any note to toggle it in or out (surgical removal of a pedal or neighbor); tap empty space to clear. Shows all the pitch names, low to high.</dd>
+      <dt>find: (pitch finder)</dt><dd>Pick a pitch class in the footer dropdown and every occurrence lights up across all visible channels — everything else dims, so nothing lit means a confident zero. Works by pitch class (find B♭ catches A#), shows the count and channels in the strip, and labels the degree when a key is set. Made for mode-hunting: chasing the one accidental that separates two candidate modes.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — opens the evidence dialog: each label tone with its role and whether it sounds (and where), extra pitches present, the per-channel note lists, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
       <dt>💬</dt><dd>Show/hide the text-note strip (the fixed slot that shows your notes as the playhead crosses them). Off frees the vertical space; setting sticks.</dd>
-      <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 24 frets; a pitch that doesn't fit the neck shows octave-folded with a dashed ring and a tiny ▴/▾ pointing at its true octave.</dd>
+      <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback in their track's color. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared (the readout fades after a few seconds). Guitar is standard tuning, 24 frets; a pitch that doesn't fit the neck shows octave-folded with a dashed ring and a tiny ▴/▾ pointing at its true octave.</dd>
       <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
     </dl>
 
@@ -585,7 +590,7 @@
     <h3>EDITING &amp; SYNC</h3>
     <dl>
       <dt>Edit</dt><dd>Reveals Pencil (insert MIDI notes) and Erase. Tucked away so bedtime thumbs don't hit them.</dd>
-      <dt>Sync</dt><dd>Commit your annotations, sections, and keys to GitHub (needs your token, one-time), or Copy/Download the file. "Commit all changed" pushes every song you touched this session, not just the open one — the Sync button shows how many are waiting. "Unsynced" = still only on this device.</dd>
+      <dt>Sync</dt><dd>Commit your annotations, sections, and keys to GitHub (needs your token, one-time), or Copy/Download the file. "Commit all changed" pushes every song you touched this session, not just the open one — the Sync button shows how many are waiting. "Unsynced" = still only on this device. Repo ↗ opens the GitHub repository in a new tab.</dd>
       <dt>Load .mid</dt><dd>Open any MIDI file from your device.</dd>
     </dl>
 
@@ -1372,10 +1377,18 @@ function draw() {
       const y = RULER_H + (PMAX - n.p) * rowH - view.y;
       if (y < RULER_H - rowH || y > H) continue;
       ctx.globalAlpha = 0.55 + 0.45 * (n.v / 127);
+      if (findPc !== null && n.p % 12 !== findPc) ctx.globalAlpha *= 0.15; // finder: non-matches recede
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(x, y + 1.5, w, rowH - 3, 2.5);
       ctx.fill();
+      if (findPc !== null && n.p % 12 === findPc) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = css("--accent");
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
       if (n.added) {
         ctx.globalAlpha = 1;
         ctx.strokeStyle = "#fff";
@@ -1491,7 +1504,13 @@ function finalizeLasso() {
   const ppt = pxPerTick();
   let t0 = (x0 - RULER_W + view.x) / ppt;
   const t1 = (x1 - RULER_W + view.x) / ppt;
-  multiSel = [];
+  // union: a new box ADDS to the selection (taps toggle individuals; an
+  // empty-space tap clears) — rectangle-only couldn't isolate interleaved
+  // targets like undersea-shrine's offbeat pedal (Josh, 2026-08-07)
+  const addSel = (ti, ni) => {
+    const k = ti + ":" + ni;
+    if (!multiSelKey.has(k)) { multiSel.push({ti, ni}); multiSelKey.add(k); }
+  };
   if (fallActive()) {
     // fall geometry: x = key column, y = time (bottom edge = now, later above)
     const W = wrap.clientWidth, H = wrap.clientHeight;
@@ -1507,7 +1526,7 @@ function finalizeLasso() {
         const white = WHITE_PCS.includes(n.p % 12);
         const nx0 = white ? g.wx[n.p] : g.wx[n.p - 1] + g.wW - bw / 2;
         if (nx0 + (white ? g.wW : bw) < x0 || nx0 > x1) return;
-        if (tickToSec(song, n.t) < sHi && tickToSec(song, n.t + n.d) > sLo) multiSel.push({ti, ni});
+        if (tickToSec(song, n.t) < sHi && tickToSec(song, n.t + n.d) > sLo) addSel(ti, ni);
       });
     });
     t0 = secToTick(song, Math.max(0, sLo)); // key context for spelling comes from the box's start
@@ -1521,7 +1540,6 @@ function finalizeLasso() {
     const mOrigin = k => RULER_W + k * mbt - view.x - SCORE_PAD;
     const mLo = Math.max(0, Math.floor((x0 - RULER_W + view.x) / mbt) - 1);
     const mHi = Math.min(scoreModel.nMeasures - 1, Math.ceil((x1 - RULER_W + view.x) / mbt) + 1);
-    const seen = new Set();
     for (let k = mLo; k <= mHi; k++) {
       const entry = scoreCache.get(k) || renderMeasure(k);
       if (!entry) continue;
@@ -1530,10 +1548,8 @@ function finalizeLasso() {
         const gy0 = topY + g.y0, gy1 = topY + g.y1;
         if (gx1 < x0 || gx0 > x1 || gy1 < y0 || gy0 > y1) continue;
         for (const ref of g.refs) {
-          const rk = ref.ti + ":" + ref.ni;
-          if (seen.has(rk) || song.tracks[ref.ti].notes[ref.ni].gone) continue;
-          seen.add(rk);
-          multiSel.push({ti: ref.ti, ni: ref.ni});
+          if (song.tracks[ref.ti].notes[ref.ni].gone) continue;
+          addSel(ref.ti, ref.ni);
         }
       }
     }
@@ -1543,22 +1559,63 @@ function finalizeLasso() {
     song.tracks.forEach((tr, ti) => {
       if (!trackAudible(ti)) return;
       tr.notes.forEach((n, ni) => {
-        if (!n.gone && n.p >= pLo && n.p <= pHi && n.t < t1 && n.t + n.d > t0) multiSel.push({ti, ni});
+        if (!n.gone && n.p >= pLo && n.p <= pHi && n.t < t1 && n.t + n.d > t0) addSel(ti, ni);
       });
     });
   }
-  multiSelKey = new Set(multiSel.map(s => s.ti + ":" + s.ni));
-  if (!multiSel.length) { setInfo("lasso: nothing selected"); draw(); return; }
+  refreshSelInfo();
+}
+function toggleSel(hit) { // lasso-mode tap on a note: in/out of the selection
+  const k = hit.ti + ":" + hit.ni;
+  if (multiSelKey.has(k)) {
+    multiSelKey.delete(k);
+    multiSel = multiSel.filter(s => s.ti + ":" + s.ni !== k);
+  } else {
+    multiSel.push(hit);
+    multiSelKey.add(k);
+    previewNote(hit.ti, song.tracks[hit.ti].notes[hit.ni].p);
+  }
+  refreshSelInfo();
+}
+function refreshSelInfo() { // one source of truth for the selection readout
+  if (!multiSel.length) {
+    document.getElementById("chordbtn").style.display = "none";
+    setInfo("lasso: nothing selected");
+    draw();
+    return;
+  }
+  const tMin = Math.min(...multiSel.map(s => song.tracks[s.ti].notes[s.ni].t));
+  multiSelSf = sfDeclaredAt(Math.max(0, tMin));
   const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
-  const selSf = sfDeclaredAt(Math.max(0, t0));
-  multiSelSf = selSf;
-  const names = pitches.map(p => pitchName(p, selSf));
+  const names = pitches.map(p => pitchName(p, multiSelSf));
   setInfo(names.join(" · ") + "  (" + multiSel.length + " notes)", names.join(", "));
   challengeSec = null;
   const cb = document.getElementById("chordbtn");
   cb.textContent = "Chord?";
   cb.style.display = "";
   draw();
+}
+function fallHitNote(pos) { // reverse of drawFall's geometry
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const nowSec = playing ? playSec() : tickToSec(song, playCursor);
+  const pps = H / FALL_WINDOW;
+  const g = pianoGeom(W);
+  const bw = g.wW * 0.6;
+  let best = null;
+  song.tracks.forEach((tr, ti) => {
+    if (!trackAudible(ti) || trackIsDrums(ti)) return;
+    tr.notes.forEach((n, ni) => {
+      if (n.gone) return;
+      const yB = H - (tickToSec(song, n.t) - nowSec) * pps;
+      const yT = H - (tickToSec(song, n.t + n.d) - nowSec) * pps;
+      if (pos.y < yT - 2 || pos.y > yB + 2) return;
+      const white = WHITE_PCS.includes(n.p % 12);
+      const x = white ? g.wx[n.p] + 1 : g.wx[n.p - 1] + g.wW - bw / 2;
+      if (pos.x < x - 1 || pos.x > x + (white ? g.wW : bw) - 1) return;
+      if (!best || !white) best = {ti, ni}; // black columns overlay white ones: narrower wins
+    });
+  });
+  return best;
 }
 function drawLasso() {
   if (!lassoRect) return;
@@ -1653,6 +1710,33 @@ function hitNote(pos) {
     }
   }
   return null;
+}
+function scoreLassoTap(pos) { // lasso-mode tap on the score: toggle the notehead under it
+  if (!scoreModel) return;
+  const x0 = pos.x - 7, x1 = pos.x + 7, y0 = pos.y - 7, y1 = pos.y + 7;
+  const ppt = pxPerTick();
+  const topY = RULER_H + 4 - (view.y || 0);
+  const mbt = scoreModel.bt * ppt;
+  const mOrigin = k => RULER_W + k * mbt - view.x - SCORE_PAD;
+  const mLo = Math.max(0, Math.floor((x0 - RULER_W + view.x) / mbt) - 1);
+  const mHi = Math.min(scoreModel.nMeasures - 1, Math.ceil((x1 - RULER_W + view.x) / mbt) + 1);
+  for (let k = mLo; k <= mHi; k++) {
+    const entry = scoreCache.get(k) || renderMeasure(k);
+    if (!entry) continue;
+    for (const g of entry.geo) {
+      const gx0 = mOrigin(k) + g.x0, gx1 = mOrigin(k) + g.x1;
+      const gy0 = topY + g.y0, gy1 = topY + g.y1;
+      if (gx1 < x0 || gx0 > x1 || gy1 < y0 || gy0 > y1) continue;
+      for (const ref of g.refs) {
+        if (song.tracks[ref.ti].notes[ref.ni].gone) continue;
+        toggleSel({ti: ref.ti, ni: ref.ni});
+        return;
+      }
+    }
+  }
+  clearMultiSel();
+  setInfo("lasso: cleared");
+  draw();
 }
 function beatLabel(beat) {
   const base = Math.floor(beat + 0.03);
@@ -1880,6 +1964,19 @@ function clampView() {
 }
 
 function tap(pos) {
+  // lasso mode: taps EDIT the selection — tap a note to toggle it in/out,
+  // tap empty space to clear. The box unions; taps are the precision tool.
+  // Ruler taps keep their normal meaning (fall view has no ruler).
+  if (lassoMode && song && (fallActive() || pos.y >= RULER_H)) {
+    const hit = fallActive() ? fallHitNote(pos)
+              : viewMode === "score" ? null : hitNote(pos);
+    if (viewMode === "score" && !fallActive()) { scoreLassoTap(pos); return; }
+    if (hit) { toggleSel(hit); return; }
+    clearMultiSel();
+    setInfo("lasso: cleared");
+    draw();
+    return;
+  }
   clearMultiSel();
   if (pos.y < RULER_H) { // section tap, marker tap, or seek
     rangeSel = null; // a plain ruler tap clears any range selection
@@ -2593,9 +2690,8 @@ function drawScore(W, H) {
                     x, RULER_H + 4 - (view.y || 0), intro.width / dpr, intro.height / dpr);
     }
   }
-  // lasso-selected noteheads
-  if (multiSelKey.size) {
-    ctx.strokeStyle = css("--gold");
+  // lasso-selected noteheads (gold) + pitch-class finder hits (accent)
+  if (multiSelKey.size || findPc !== null) {
     ctx.lineWidth = 2;
     for (let mi = first; mi <= last; mi++) {
       const entry = scoreCache.get(mi);
@@ -2603,7 +2699,11 @@ function drawScore(W, H) {
       const mx = RULER_W + mi * m.bt * ppt - view.x - SCORE_PAD;
       const my = RULER_H + 4 - (view.y || 0);
       for (const g of entry.geo) {
-        if (g.refs.some(rf => multiSelKey.has(rf.ti + ":" + rf.ni))) {
+        const sel = g.refs.some(rf => multiSelKey.has(rf.ti + ":" + rf.ni));
+        const hit = findPc !== null &&
+                    g.refs.some(rf => song.tracks[rf.ti].notes[rf.ni].p % 12 === findPc);
+        if (sel || hit) {
+          ctx.strokeStyle = sel ? css("--gold") : css("--accent");
           ctx.strokeRect(mx + g.x0, my + g.y0, g.x1 - g.x0, g.y1 - g.y0);
         }
       }
@@ -2938,6 +3038,43 @@ document.getElementById("helpbtn").addEventListener("click", () =>
   document.getElementById("helpsheet").classList.add("on"));
 document.getElementById("helpclose").addEventListener("click", () =>
   document.getElementById("helpsheet").classList.remove("on"));
+
+// ---------------------------------------------------------------- pitch-class finder
+// The sweep's most repeated operation (Josh, 2026-08-07): pick a pitch class,
+// every occurrence lights across all audible channels — non-matches dim, so
+// zero hits reads as a confident zero (mode rulings depend on trusting it).
+// By pitch CLASS: "find Bb" catches what the capture wrote as A#.
+let findPc = null;
+const findsel = document.getElementById("findsel");
+function refreshFindSel() { // respell the 12 options per the governing key
+  const sf = sfDeclaredAt(curTick());
+  while (findsel.options.length > 1) findsel.remove(1);
+  for (let pc = 0; pc < 12; pc++) {
+    const o = document.createElement("option");
+    o.value = String(pc);
+    const deg = typeof degreeOf === "function" ? degreeOf(pc, keyNameAt(curTick())) : null;
+    o.textContent = spellPc(pc, sf) + (deg ? " · " + deg : "");
+    findsel.appendChild(o);
+  }
+  findsel.value = findPc === null ? "" : String(findPc);
+}
+findsel.addEventListener("focus", refreshFindSel);
+findsel.addEventListener("change", () => {
+  findPc = findsel.value === "" ? null : +findsel.value;
+  if (findPc === null) { setInfo("find: off"); draw(); return; }
+  let count = 0;
+  const chans = new Set();
+  if (song) song.tracks.forEach((tr, ti) => {
+    if (!trackAudible(ti) || trackIsDrums(ti)) return;
+    for (const n of tr.notes) if (!n.gone && n.p % 12 === findPc) { count++; chans.add(tr.name || "track " + (ti + 1)); }
+  });
+  const sf = sfDeclaredAt(curTick());
+  const deg = degreeOf(findPc, keyNameAt(curTick()));
+  const name = spellPc(findPc, sf) + (deg ? " (degree " + deg + ")" : "");
+  setInfo(count ? "find " + name + ": " + count + " notes — " + [...chans].join(", ")
+                : "find " + name + ": 0 — not present in this song");
+  draw();
+});
 
 const lassobtn = document.getElementById("lassobtn");
 lassobtn.addEventListener("click", () => {
@@ -3442,13 +3579,14 @@ function drawFall(W, H) {
       const w = (white ? g.wW : bw) - 2;
       const sounding = yB >= H && yT < H;          // remainder sinks into the keys
       ctx.globalAlpha = 0.55 + 0.45 * (n.v / 127);
+      if (findPc !== null && n.p % 12 !== findPc) ctx.globalAlpha *= 0.15; // finder dims non-matches
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(x, yT, w, Math.max(3, Math.min(yB, H) - yT - 1), 3);
       ctx.fill();
-      if (sounding || multiSelKey.has(ti + ":" + ni)) {
+      if (sounding || multiSelKey.has(ti + ":" + ni) || (findPc !== null && n.p % 12 === findPc)) {
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = sounding ? "#fff" : css("--gold");
+        ctx.strokeStyle = sounding ? "#fff" : multiSelKey.has(ti + ":" + ni) ? css("--gold") : css("--accent");
         ctx.stroke();
       }
     });

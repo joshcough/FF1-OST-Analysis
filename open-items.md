@@ -157,22 +157,17 @@ his behalf.
   REGISTER: no key signature, no respelling, nothing downstream until
   mode lands. UI must show which state an entry is in — a partial can't
   read as a verdict.
-- **Lasso: beyond one rectangle.** Rectangle-only can't isolate
-  non-separable targets (undersea-shrine: offbeat D# pedal interleaved
-  with the chord tones). Josh's first thought: additive rectangles via
-  modifier-drag, explicitly open to better designs — Claude Code asked
-  to weigh in. CC's recommendation (2026-08-07): design touch-first, no
-  modifiers (iPad has none) — while a selection exists, a new drag
-  UNIONS into it, tapping an individual note TOGGLES it in/out, tapping
-  empty space clears. Tap-to-toggle alone solves the pedal case (box the
-  region, tap the D#s out). Also note solo+lasso already constrains to a
-  channel today.
-- **Pitch-class highlight.** Select a pitch class → every occurrence
-  lights across all channels. The most repeated sweep operation (A vs A#
-  on undersea-shrine, E vs Eb on ship, Ab vs A on victory). By pitch
-  CLASS (Bb must catch the capture's A#); the highlight is the output,
-  not a count; zero hits must read as a confident zero (ruling a mode
-  out depends on it); label by scale degree when a key is set.
+- **Lasso: beyond one rectangle — SHIPPED 2026-08-07** (CC's touch-first
+  design, per Josh's "build whatever you think appropriate"): boxes
+  union into the selection, tapping a note toggles it in/out (works in
+  roll, score, and fall), tapping empty space clears. No modifier keys —
+  iPad has none. Solves the interleaved-pedal case: box the region, tap
+  the pedal notes out.
+- **Pitch-class highlight — SHIPPED 2026-08-07** ("find:" dropdown in
+  the footer): pick a pitch class, every occurrence lights in all views
+  while everything else dims — zero hits reads as a confident zero.
+  Matches by pitch class (Bb catches A#), respells per governing key,
+  shows scale degree + count + channels in the strip.
 - **Sweep-vs-rollnotes drift check.** A check that flags any song whose
   rollnotes `key:` disagrees with or is missing from the key-sweep
   Tally — the drift is real (see data issues in the analysis queue).
