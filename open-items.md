@@ -107,6 +107,11 @@ his behalf.
   instrument panel: piano + fretboard, lasso lighting, tap-to-play)
   shipped 2026-08-07; the falling-note view reuses that keyboard as its
   bottom half. Josh wants this — panel-first was sequencing, not scope.
+- **Instrument-panel piano zoom (Josh, 2026-08-07):** wide-range songs
+  stretch the auto-fit keyboard thin on the iPad — keys may get too
+  narrow to tap. Wanted: a way to zoom the piano in, maybe just a button
+  that enables zoom. Parked at Josh's call — leave until fat-finger
+  trouble actually shows up in use.
 - **Zoom-out clamp to song extents, roll view (Josh, 2026-08-06):**
   pinch-out stops once the whole song fits; axes decouple near the limit
   (time already fits → further pinch expands pitch only); clamp to the
