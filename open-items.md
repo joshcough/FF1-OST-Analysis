@@ -114,9 +114,10 @@ his behalf.
   trouble actually shows up in use.
 - **Zoom-out clamp to song extents, roll view — SHIPPED 2026-08-07:**
   pinch-out (and ctrl+wheel) stops once the whole song fits; per-axis
-  floors, so time stops while pitch keeps revealing; flush to the
-  chop-trimmed extents, no padding (Josh's experiment — revisit if tight
-  feels wrong in use). fitView now lands exactly on the floor, so the
+  floors, so time stops while pitch keeps revealing; bounded to the
+  chop-trimmed extents. The no-padding experiment concluded 2026-08-07:
+  flush felt cramped — right/bottom now keep a ruler-width/-height of
+  air, mirroring the left/top bars. fitView lands exactly on the floor, so the
   load view = the zoom-out limit. Revises the "unlimited roll zoom-out"
   note under the parked two-regime score item.
 
