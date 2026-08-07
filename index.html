@@ -183,6 +183,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: right;
+    transition: opacity 1.5s ease;
   }
   #instwrap { position: relative; height: 168px; }
   .seg button { border: none; border-radius: 0; min-height: 36px; padding: 6px 11px; }
@@ -3215,7 +3216,14 @@ async function instPlay(p) {
   o.start(when);
   o.stop(when + dur + 0.05);
 }
-let instPtrOn = false, instLastP = null;
+let instPtrOn = false, instLastP = null, instInfoTimer = 0;
+function setInstInfo(s) { // linger 10s, then fade — a stale key name reads like a live one
+  const el = document.getElementById("instinfo");
+  el.textContent = s;
+  el.style.opacity = "1";
+  clearTimeout(instInfoTimer);
+  instInfoTimer = setTimeout(() => { el.style.opacity = "0"; }, 10000);
+}
 function instTap(e, dragging) {
   const r = instCanvas.getBoundingClientRect();
   const x = e.clientX - r.left, y = e.clientY - r.top;
@@ -3229,8 +3237,7 @@ function instTap(e, dragging) {
   instPlay(p);
   const deg = degreeOf(p % 12, keyNameAt(curTick()));
   const at = si !== undefined ? "  ·  " + GTR_NAMES[si] + " string" + (f ? ", fret " + f : ", open") : "";
-  document.getElementById("instinfo").textContent =
-    pitchName(p, sfDeclaredAt(curTick())) + (deg ? "  ·  degree " + deg : "") + at;
+  setInstInfo(pitchName(p, sfDeclaredAt(curTick())) + (deg ? "  ·  degree " + deg : "") + at);
   drawInst();
   setTimeout(drawInst, 400); // clear the flash when idle (playback frames handle it otherwise)
 }
