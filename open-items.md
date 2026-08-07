@@ -181,6 +181,16 @@ his behalf.
   job); (4) audit all songs, surface mismatches with evidence, never
   auto-overwrite — full report quarantined in reference/ so
   undetermined meters aren't spoiled in passing.
+- **Meter judge — detector v2 researched, parked (2026-08-05/06):** full
+  plan in [reference/meter-detection-plan.md](albums/final-fantasy-i/reference/meter-detection-plan.md).
+  Two independent judges test Josh's by-ear meter guess (guess required —
+  tool refuses to run without one): audio judge (render chip wav from our
+  emulator → Beat This! downbeat tracker → beats-per-bar) + symbolic
+  judge (McLeod met-detection/met-align PCFG/HMM on header-stripped
+  .mid). v1 audit proven too weak (would have passed shop's wrong 4/4).
+  Acceptance: shop→3/4, menu→6/8, epilogue→refuses. Open: audio-only
+  first vs both; does the APU stage emit samples. Motivation: Mega Man
+  and other cold NSFs with no transcription reference.
 - **Channel-swap re-check (from gurgu's device find):** re-check
   already-swept songs for mid-song channel role swaps Josh may have read
   through — script idea: per song, which channel holds the lowest pitch
