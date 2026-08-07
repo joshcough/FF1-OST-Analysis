@@ -1,0 +1,62 @@
+# prologue.rollnotes — beat-anchored annotations
+
+[1.1 - 1.2]
+chord: F5
+
+[1.3 - 1.4]
+chord: C/E
+
+[2.1 - 2.2]
+chord: Bb/F
+
+[2.1 - 2.2]
+chord: Bb/D
+
+[2.3 - 2.4]
+chord: Am/C
+
+[3.1 - 3.2]
+chord: Bb
+
+[3.3 - 3.4]
+chord: G
+
+[3.3]
+This G maj has no 5th
+
+[3.3 - 3.4]
+chord: G7/B
+no 5th
+
+[4.1 - 4.2]
+chord: Fsus4/C
+
+[4.3 - 4.4]
+chord: C
+
+[5.1 - 5.2]
+chord: Gm/Bb
+
+[5.3 - 5.4]
+section: F#m or Gbm
+
+[6.1 - 6.2]
+chord: Gm
+
+[6.3 - 6.4]
+chord: Gb
+
+[7.1 - 7.2]
+chord: Gm
+
+[7.3 - 7.4]
+chord: G7/F
+
+[8.1 - 8.2]
+chord: Am/E
+
+[8.3 - 8.4]
+chord: C7
+
+[9.1 - 9.2]
+chord: F5
