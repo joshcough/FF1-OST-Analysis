@@ -1,4 +1,10 @@
-# ff1victory.rollnotes — beat-anchored annotations
+# victory.rollnotes — beat-anchored annotations
+
+[1.1]
+key: Eb
+
+[3.3 - 4.2]
+chord: Eb
 
 [11.3]
 loop: 3.3
