@@ -546,6 +546,7 @@
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
+      <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — the evidence report: which label tones actually sound in the span, which are missing, what extra pitches are present, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
       <dt>💬</dt><dd>Show/hide the text-note strip (the fixed slot that shows your notes as the playhead crosses them). Off frees the vertical space; setting sticks.</dd>
       <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 24 frets; a pitch that doesn't fit the neck shows octave-folded with a dashed ring and a tiny ▴/▾ pointing at its true octave.</dd>
       <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
@@ -1451,8 +1452,13 @@ function nameChord(pitches, sf) {
   const inv = best.root !== bassPc ? "/" + spellPc(bassPc, sf) : "";
   return spellPc(best.root, sf) + best.suffix + inv + (best.no5 ? " (no 5th)" : "");
 }
+let challengeSec = null; // chord band armed for a challenge (tap on the ruler)
 function clearMultiSel() {
-  if (!multiSel.length && !lassoRect) return;
+  challengeSec = null;
+  if (!multiSel.length && !lassoRect) {
+    document.getElementById("chordbtn").style.display = "none";
+    return;
+  }
   multiSel = []; multiSelKey = new Set(); lassoRect = null;
   document.getElementById("chordbtn").style.display = "none";
 }
@@ -1528,7 +1534,10 @@ function finalizeLasso() {
   multiSelSf = selSf;
   const names = pitches.map(p => pitchName(p, selSf));
   setInfo(names.join(" · ") + "  (" + multiSel.length + " notes)", names.join(", "));
-  document.getElementById("chordbtn").style.display = "";
+  challengeSec = null;
+  const cb = document.getElementById("chordbtn");
+  cb.textContent = "Chord?";
+  cb.style.display = "";
   draw();
 }
 function drawLasso() {
@@ -1864,6 +1873,12 @@ function tap(pos) {
         playCursor = sec.start;
         setInfo((sec.chord ? "chord " : "section ") + sec.text + " · bar " + sec.b1 + "–" + (sec.b2 || sec.b1) +
                 (sec.cnote ? " · ✱ " + sec.cnote.split("\n")[0] : ""));
+        if (sec.chord) { // arm the challenge — evidence only on request, never volunteered
+          challengeSec = sec;
+          const cb = document.getElementById("chordbtn");
+          cb.textContent = "Challenge?";
+          cb.style.display = "";
+        }
         updateSubtitle(); draw();
         return;
       }
@@ -2912,7 +2927,51 @@ lassobtn.addEventListener("click", () => {
   setInfo(lassoMode ? "lasso: drag across notes to identify them" : "tap a note");
   draw();
 });
+// Challenge a chord band (Josh, 2026-08-07): tap the band, then ask. Reports
+// the evidence — label tones present/missing, extra pitches, and what the
+// lasso namer would call the full stack. On request only; never volunteers,
+// never touches unlabeled spans. Extra tones are EVIDENCE, not verdicts: a
+// tonic pedal under a V7 shows up here as "extra", and that's correct.
+function chordEvidence(sec) {
+  const pitches = new Set();
+  song.tracks.forEach((tr, ti) => {
+    if (!trackAudible(ti) || trackIsDrums(ti)) return;
+    for (const n of tr.notes) {
+      if (!n.gone && n.t < sec.end && n.t + n.d > sec.start) pitches.add(n.p);
+    }
+  });
+  if (!pitches.size) return {err: "no notes sound in this span"};
+  const present = new Set([...pitches].map(p => p % 12));
+  const m = parseChordSym(sec.text);
+  let expected = null;
+  if (m) {
+    const rootPc = (LETTER_PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12;
+    const tmpl = CHORD_TEMPLATES.find(([suf]) => suf === (m[3] || ""));
+    if (tmpl) {
+      expected = new Set(tmpl[1].map(iv => (rootPc + iv) % 12));
+      if (m[4]) expected.add((LETTER_PC[m[4][0]] + (m[4][1] === "#" ? 1 : m[4][1] === "b" ? -1 : 0) + 12) % 12);
+    }
+  }
+  const missing = expected ? [...expected].filter(pc => !present.has(pc)) : null;
+  const extra = expected ? [...present].filter(pc => !expected.has(pc)) : null;
+  return {pitches: [...pitches].sort((a, b) => a - b), present, expected, missing, extra,
+          namer: nameChord([...pitches], sfDeclaredAt(sec.start))};
+}
 document.getElementById("chordbtn").addEventListener("click", () => {
+  if (challengeSec) {
+    const sec = challengeSec, ev = chordEvidence(sec);
+    if (ev.err) { setInfo("challenge " + sec.text + ": " + ev.err); return; }
+    const sf = sfDeclaredAt(sec.start);
+    const sp = pcs => pcs.map(pc => spellPc(pc, sf)).join(" ");
+    const sounds = "sounds: " + sp([...new Set(ev.pitches.map(p => p % 12))]);
+    const verdict = ev.expected === null
+      ? "label not in the chord vocabulary"
+      : (ev.missing.length ? "missing: " + sp(ev.missing) : "label tones: all sound") +
+        "  ·  " + (ev.extra.length ? "extra: " + sp(ev.extra) : "extra: none");
+    const line = "challenge " + sec.text + "  →  " + sounds + "  ·  " + verdict + "  ·  namer: " + ev.namer;
+    setInfo(line, line);
+    return;
+  }
   if (!multiSel.length) return;
   const pitches = multiSel.map(s => song.tracks[s.ti].notes[s.ni].p);
   const names = [...new Set(pitches)].sort((a, b) => a - b).map(p => pitchName(p, multiSelSf));

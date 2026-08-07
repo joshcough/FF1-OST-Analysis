@@ -136,14 +136,16 @@ his downloads: `review-handoff-2026-08-07.md` (code/tool review) and
   exists); an audition mode playing a click in each candidate meter.
   **Needs Josh's design input before any code.** Related but distinct:
   the parked meter-judge v2 plan in reference/meter-detection-plan.md.
-- **Chord-band verification — check-on-request only?** The app knows the
-  notes under every chord band and never compares them to the label
-  (menu's chord 2 sat mislabeled as F7 for days with the disproof directly
-  underneath). Shape sketched: on request, report only that label and
-  pitches *disagree* and which pitches are unaccounted for — never name
-  the chord, never volunteer, never touch an unlabeled span. Open wrinkle:
-  pedal points (the B♭ under menu's F7) will trip a naive checker; needs a
-  way to mark a pitch as a separate structural layer or it cries wolf.
+- **Chord-band verification — SHIPPED v1 2026-08-07** as "Challenge?":
+  tap a chord band, then ask. Reports label tones present/missing, extra
+  pitches, and the namer's read of the full stack — Josh ruled the
+  sketch's disagree-only restriction out ("what does the system think?"),
+  so the namer's name is included, but only ever on request. The pedal
+  wrinkle is handled by framing, not filtering: extras are reported as
+  evidence (a pedal correctly shows as "extra"), never as a wrong-label
+  verdict. Possible v2: mark a pitch as a structural layer so it drops
+  out of "extra"; duration-weighting so passing tones read differently
+  from held tones.
 - **Horizontal / voice reading?** Channel identity survives the pipeline
   and is then used mostly for mute/solo. Nothing reads across time:
   isolate one channel's line, flag notes held across a harmonic change

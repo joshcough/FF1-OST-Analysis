@@ -387,3 +387,36 @@ test("guitar octave fold: off-the-neck pitches fold in, shift records the move",
   assert.deepEqual(val(`gtrFold(36)`), {p: 48, shift: 1});   // C2 → C3, true pitch below
   assert.deepEqual(val(`gtrFold(101)`), {p: 77, shift: -2}); // two octaves over
 });
+
+test("chord challenge: evidence report — present/missing/extra vs the label, pedal shows as extra", () => {
+  installSong();
+  run(`
+    trackState = [{muted: false, solo: false}];
+    song.tracks = [{name: "t", notes: [
+      {t: 0, d: 960, p: 65, v: 80},   // F4
+      {t: 0, d: 960, p: 69, v: 80},   // A4
+      {t: 0, d: 960, p: 72, v: 80},   // C5
+      {t: 0, d: 960, p: 75, v: 80},   // Eb5
+      {t: 0, d: 960, p: 58, v: 80},   // Bb3 — the tonic pedal
+    ]}];
+    keyRegions = [{start: 0, end: null, sf: -2, name: "Bb"}];
+  `);
+  const ev = val(`(() => { const e = chordEvidence({text: "F7", start: 0, end: 960});
+    return {missing: e.missing, extra: e.extra, namer: e.namer}; })()`);
+  assert.deepEqual(ev.missing, []);        // all four F7 tones sound
+  assert.deepEqual(ev.extra, [10]);        // the Bb pedal — evidence, not verdict
+  // wrong label: F named where the seventh sounds → Eb is "extra", nothing missing
+  const ev2 = val(`(() => { const e = chordEvidence({text: "F", start: 0, end: 960});
+    return {missing: e.missing, extra: e.extra}; })()`);
+  assert.deepEqual(ev2.missing, []);
+  assert.deepEqual(ev2.extra.sort((a, b) => a - b), [3, 10]); // Eb + the pedal
+  // label with a slash bass: bass pc joins the expected set
+  const ev3 = val(`(() => { const e = chordEvidence({text: "F7/A", start: 0, end: 960});
+    return {missing: e.missing}; })()`);
+  assert.deepEqual(ev3.missing, []);
+  // label outside the vocabulary → no tone check, namer still reports
+  assert.equal(val(`chordEvidence({text: "Fzzz", start: 0, end: 960}).expected`), null);
+  // empty span
+  assert.equal(run(`chordEvidence({text: "F7", start: 5000, end: 6000}).err`), "no notes sound in this span");
+  run(`keyRegions = [];`);
+});

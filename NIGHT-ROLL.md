@@ -54,7 +54,12 @@ rebuilds on toggle.
 1e&a counting, duration, velocity, track. Lasso mode (footer toggle):
 drag-select across notes; pitch list shown; chord name behind a "Chord?"
 reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
-inversions; missing-5th tolerance).
+inversions; missing-5th tolerance). Chord challenge (2026-08-07): tap a
+chord band in the ruler and the same footer button reads "Challenge?" —
+chordEvidence() compares the label's tones to every pitch sounding in
+the span and reports present/missing/extra plus the namer's read of the
+stack. Request-only, labeled bands only; extras are evidence, not
+verdicts (pedal points and passing tones land there by design).
 
 **Instrument panel** (2026-08-07, 🎹 in the footer): a piano-keyboard /
 guitar-fretboard strip above the footer, so Josh can think with the
