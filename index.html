@@ -1693,14 +1693,14 @@ function songPitchExtent() { // lowest..highest sounding pitch of the (trimmed) 
   }));
   return lo <= hi ? {lo: Math.max(PMIN, lo), hi: Math.min(PMAX, hi)} : {lo: 55, hi: 79};
 }
-function pxqFloor() { // px/quarter where bar 1..last bar exactly fill the width
+function pxqFloor() { // px/quarter where bar 1..last bar fill the width, less a ruler-width of right padding
   if (!song || !songEndTick) return 8;
-  return Math.min(400, Math.max(8, (wrap.clientWidth - RULER_W) / (songEndTick / song.ppq)));
+  return Math.min(400, Math.max(8, (wrap.clientWidth - 2 * RULER_W) / (songEndTick / song.ppq)));
 }
-function rowHFloor() { // row height where lowest..highest pitch exactly fill the height
+function rowHFloor() { // row height where the pitch range fills the height, less a ruler-height of bottom padding
   if (!song) return 6;
   const {lo, hi} = songPitchExtent();
-  return Math.min(32, Math.max(6, (wrap.clientHeight - RULER_H) / (hi - lo + 1)));
+  return Math.min(32, Math.max(6, (wrap.clientHeight - 2 * RULER_H) / (hi - lo + 1)));
 }
 function cursorHit(pos) {
   if (playing || !song || mode !== "select") return false;
