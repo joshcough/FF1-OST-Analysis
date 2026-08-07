@@ -539,7 +539,7 @@
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 15 frets.</dd>
-      <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
+      <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
     </dl>
 
     <h3>ANNOTATIONS (.rollnotes)</h3>
@@ -1445,9 +1445,29 @@ function finalizeLasso() {
   const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1);
   const y0 = Math.min(r.y0, r.y1), y1 = Math.max(r.y0, r.y1);
   const ppt = pxPerTick();
-  const t0 = (x0 - RULER_W + view.x) / ppt, t1 = (x1 - RULER_W + view.x) / ppt;
+  let t0 = (x0 - RULER_W + view.x) / ppt;
+  const t1 = (x1 - RULER_W + view.x) / ppt;
   multiSel = [];
-  if (viewMode === "score" && scoreModel) {
+  if (fallActive()) {
+    // fall geometry: x = key column, y = time (bottom edge = now, later above)
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    const nowSec = playing ? playSec() : tickToSec(song, playCursor);
+    const pps = H / FALL_WINDOW;
+    const sLo = nowSec + (H - y1) / pps, sHi = nowSec + (H - y0) / pps;
+    const g = pianoGeom(W);
+    const bw = g.wW * 0.6;
+    song.tracks.forEach((tr, ti) => {
+      if (!trackAudible(ti) || trackIsDrums(ti)) return;
+      tr.notes.forEach((n, ni) => {
+        if (n.gone) return;
+        const white = WHITE_PCS.includes(n.p % 12);
+        const nx0 = white ? g.wx[n.p] : g.wx[n.p - 1] + g.wW - bw / 2;
+        if (nx0 + (white ? g.wW : bw) < x0 || nx0 > x1) return;
+        if (tickToSec(song, n.t) < sHi && tickToSec(song, n.t + n.d) > sLo) multiSel.push({ti, ni});
+      });
+    });
+    t0 = secToTick(song, Math.max(0, sLo)); // key context for spelling comes from the box's start
+  } else if (viewMode === "score" && scoreModel) {
     // hit-test the engraved notehead boxes themselves — the roll's linear
     // x->tick map doesn't hold on a score (noteheads aren't engraved
     // proportionally), and selecting whole staff bands by time range grabbed
@@ -1672,7 +1692,7 @@ document.addEventListener("touchmove", e => {
 }, {passive: false});
 
 canvas.addEventListener("pointerdown", e => {
-  if (fallActive()) return; // fall view rides the playhead — no pan/zoom/lasso
+  if (fallActive() && !lassoMode) return; // fall rides the playhead — no pan/zoom; lasso still works
   canvas.setPointerCapture(e.pointerId);
   if (pinch) return; // third finger: ignore
   if (drag && drag.id !== e.pointerId) {
@@ -1685,7 +1705,7 @@ canvas.addEventListener("pointerdown", e => {
     return;
   }
   const p = evtPos(e);
-  const lasso = lassoMode && !!song && p.y >= RULER_H;
+  const lasso = lassoMode && !!song && (fallActive() || p.y >= RULER_H); // fall has no ruler band
   drag = {id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false,
           lasso, cursor: !lasso && cursorHit(p), ruler: !lasso && !!song && p.y < RULER_H, spos: p};
 });
@@ -3233,6 +3253,7 @@ function drawFall(W, H) {
   ctx.globalAlpha = 1;
   ctx.fillStyle = css("--accent"); // the "now" edge the notes land on
   ctx.fillRect(0, H - 2, W, 2);
+  drawLasso();
 }
 function instResize() {
   const dpr = window.devicePixelRatio || 1;

@@ -74,9 +74,11 @@ music fills the drop (FALL_WINDOW). Bar lines ride with numbers, chord
 changes ride gold lines with their symbol, black-key lanes are banded,
 lasso'd notes keep their gold stroke. Piano-only: enabling Fall forces
 the piano tab open; picking Guitar (or closing the panel) returns to
-whichever of roll/score was active. Roll gestures are disabled while
-falling — the view rides the playhead, or sits at the cursor when
-stopped.
+whichever of roll/score was active. Pan/pinch/cursor gestures are
+disabled while falling — the view rides the playhead, or sits at the
+cursor when stopped — but lasso mode works (finalizeLasso has a fall
+branch hit-testing key columns × seconds), so boxed notes light the
+keys below.
 
 **Annotations:** see format below. + Note editor is type-first (Text note /
 Section / Chord / Key change / Time signature / Loop point) with bar/beat
