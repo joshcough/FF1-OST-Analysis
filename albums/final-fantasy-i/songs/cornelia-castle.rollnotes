@@ -1,6 +1,4 @@
-# ff1corneliacastle.rollnotes — beat-anchored annotations
-# From the Cornelia Castle sessions (see cornelia-castle.md).
-# Anchors cover the first 8-bar pass; the MIDI repeats the loop.
+# cornelia-castle.rollnotes — beat-anchored annotations
 
 [1.1]
 key: D
@@ -8,38 +6,68 @@ key: D
 [1.1 - 4.4]
 section: A — the four-slot sentence
 
-[5.1 - 8.4]
-section: B — mixture + turnaround
-
 [1.1 - 1.4]
 D — I. Home.
+
+[1.1 - 1.4]
+chord: D/A
 
 [2.1 - 2.4]
 A — V. Dominant. Bass staircase D→C# underway.
 
+[2.1 - 2.4]
+chord: A
+
 [3.1 - 3.4]
 Bm — vi. Relative minor.
+
+[3.1 - 3.4]
+chord: Bm
 
 [4.1 - 4.4]
 F# — V/vi, aiming at Bm. The A# is the out-of-key giveaway.
 
+[4.1 - 4.4]
+chord: F#
+
+[5.1 - 8.4]
+section: B — mixture + turnaround
+
 [5.1 - 5.2]
 G — IV. Harmonic rhythm doubles: two chords per bar now.
+
+[5.1 - 5.2]
+chord: G
 
 [5.3 - 5.4]
 Gm — iv, borrowed from D minor. One voice slips a half step
 (B→Bb over a shared root) and the light dims. Dm never sounds:
 borrowing, not modulation.
 
+[5.3 - 5.4]
+chord: Gm
+
 [6.1 - 6.2]
 D — I. Home again, briefly.
+
+[6.1 - 6.2]
+chord: D
 
 [6.3 - 6.4]
 B7 — V7/ii, aiming at Em.
 
+[6.3 - 6.4]
+chord: B7
+
 [7.1 - 7.4]
 Em — ii. The target lands.
+
+[7.1 - 7.4]
+chord: Em
 
 [8.1 - 8.4]
 D/A → A — I6/4 → V turnaround. Arpeggio dissolves into scale
 runs; texture change marks the cadence, delivering the loop home.
+
+[8.1 - 8.4]
+chord: D/A
