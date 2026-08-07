@@ -7,16 +7,16 @@ timesig: 6/8
 key: Bb
 
 [1.1 - 1.2]
-section: Bb
+chord: Bb
 
 [1.3 - 1.4]
-section: F7
+chord: F7
 
 [2.1 - 2.2]
-section: Bb
+chord: Bb
 
 [2.3 - 2.4]
-section: Dm/A
+chord: Dm/A
 
 [3.1 - 3.2]
-section: E7
+chord: E7
