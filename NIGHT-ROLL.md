@@ -52,8 +52,14 @@ reveal (templates: triads, 6, 7s, 9s, sus, dim7, power-dyad "5"; slash
 inversions; missing-5th tolerance).
 
 **Annotations:** see format below. + Note editor is type-first (Text note /
-Section / Key change / Loop point) with bar/beat dropdowns and a 🎤 Speak
-dictation button (Web Speech API; hidden where unsupported). ☰ Notes lists everything,
+Section / Chord / Key change / Time signature / Loop point) with bar/beat
+dropdowns and a 🎤 Speak dictation button (Web Speech API; hidden where
+unsupported). Chord type gets a chip widget (root · ♭♮♯ · quality · /bass)
+composing into an editable symbol box, plus an optional attached-note text
+(✱ on the band). A ruler drag before + Note defaults the type to whichever
+of section/chord was saved from a drag last (chord-entry runs stay in chord
+mode). ☰ Notes lists everything grouped by type (Key / Meter / Sections /
+Chords / Loop / Text notes; each group's + pre-picks that type),
 rows open the editor, Delete works on synced notes too (permanent on Sync).
 Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
 highlights the active note's span (ambient range tints removed — on a
@@ -107,6 +113,20 @@ Range note. Tints its span; active for the subtitle across it.
 section: A — G home   ← "section:" prefix = arrangement band in the ruler.
                         Nesting inferred by range containment; same label
                         = same color.
+
+[5.1 - 5.2]
+chord: Gm          ← "chord:" prefix = chord band. Renders and nests exactly
+                     like a section band (containment = depth; same label =
+                     same color) but is a distinct type: grouped separately
+                     in the ☰ Notes list, entered via the chord widget.
+                     Symbol standard = the lasso chord namer's vocabulary:
+                     bare root = major (C), m = minor (Gm), then 7/maj7/m7/
+                     m7b5/dim/dim7/aug/6/m6/sus4/sus2/5/9/m9/maj9/add9/7b9,
+                     slash bass as /E, "(no 5th)" allowed as qualifier.
+
+[5.3 - 5.4]
+chord: G7/B        ← lines after the symbol = attached note (shows as ✱ on
+no 5th — bass has it   the band, previewed in the ☰ list, kept on round-trip).
 
 [9.1]
 key: Bb            ← "key:" prefix = key directive. Open-ended: applies

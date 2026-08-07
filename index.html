@@ -280,6 +280,46 @@
     text-overflow: ellipsis;
   }
   .noterow .unsynced { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+  .noterow .cnote { font-family: var(--mono); font-size: 10px; color: var(--gold); }
+
+  .chiprow { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+  .chiprow button {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 9px;
+    min-width: 34px;
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    background: var(--panel2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .chiprow button.active { border-color: var(--accent); color: var(--accent); }
+
+  .notegroup { margin-top: 10px; }
+  .notegroup:first-child { margin-top: 0; }
+  .notegroup .ghead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .notegroup .ghead .gadd {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 3px 10px;
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    background: var(--panel2);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .notegroup .grows { display: flex; flex-direction: column; gap: 7px; }
 </style>
 </head>
 <body>
@@ -344,6 +384,7 @@
       <select id="ntype">
         <option value="note">Text note</option>
         <option value="section">Section</option>
+        <option value="chord">Chord</option>
         <option value="key">Key change</option>
         <option value="timesig">Time signature</option>
         <option value="loop">Loop point</option>
@@ -356,6 +397,20 @@
     <div class="row" id="ntorow">
       <span class="lbl">to bar</span><select id="nb2"></select>
       <span class="lbl">beat</span><select id="nq2"></select>
+    </div>
+    <div id="nchordbox" style="display:none">
+      <div class="row">
+        <span class="lbl">chord</span>
+        <input id="nchordsym" type="text" autocapitalize="off" autocomplete="off"
+               placeholder="e.g. Gm, C7, G7/B" style="flex:1;min-width:0">
+      </div>
+      <div class="chiprow" id="nchordroot"></div>
+      <div class="chiprow" id="nchordacc"></div>
+      <div class="chiprow" id="nchordqual"></div>
+      <div class="row">
+        <span class="lbl">/bass</span>
+        <select id="nchordbass"></select>
+      </div>
     </div>
     <textarea id="ntext" placeholder="What's happening at this beat?"></textarea>
     <div class="row" id="nkeyrow" style="display:none">
@@ -442,9 +497,10 @@
       <dt>+ Note</dt><dd>Write a note anchored at the cursor's beat — or tap 🎤 Speak and dictate it. Fill "to bar/beat" to span a range. The ⊙ highlight toggle in the note strip shades the current note's span in the timeline.</dd>
       <dt>Ruler drag</dt><dd>Drag along the bar ruler to select a range first — + Note pre-fills it.</dd>
       <dt>Gold flags</dt><dd>Existing annotations. Tap one to jump there and read it in the strip above the footer. They also appear as subtitles during playback.</dd>
-      <dt>☰ Notes</dt><dd>Every annotation in the song — notes, sections, keys — in one list. Tap a row to edit or delete it; changes to synced notes need a Sync to become permanent.</dd>
+      <dt>☰ Notes</dt><dd>Every annotation in the song, grouped by type — key, meter, sections, chords, loop, text notes. Tap a row to edit or delete it; each group's + adds one of that type. Changes to synced notes need a Sync to become permanent.</dd>
       <dt>Loop points</dt><dd>Some songs loop back past an intro (not to bar 1). When you discover one, write a note whose text is <b>loop: B.Q</b> (e.g. "loop: 2.1") — the note's anchor is the jump point: when playback reaches it, it returns to B.Q. If the anchor sits at/before the target, the jump happens at the song end instead.</dd>
       <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
+      <dt>Chords</dt><dd>Chord bands — like sections, but typed. Select a range, + Note, "Chord", then tap chips (root · ♭♮♯ · quality · /bass) or type the symbol. Bare root = major, m = minor (Gm). Same label = same color, so a recurring chord is spottable at a glance. Add an optional text note to a chord — it shows as ✱ on the band.</dd>
     </dl>
 
     <h3>KEYS</h3>
@@ -710,6 +766,14 @@ function parseRollnotes(text) {
     n.text = n.text.trim();
     const m = n.text.match(/^section:\s*(.+)/s);
     if (m) { n.section = true; n.text = m[1].split("\n")[0].trim(); }
+    const cm = n.text.match(/^chord:\s*(.+)/s);
+    if (cm) { // first line = symbol; any further lines = attached note
+      n.chord = true;
+      const body = cm[1].split("\n");
+      n.text = body[0].trim();
+      const note = body.slice(1).join("\n").trim();
+      if (note) n.cnote = note;
+    }
     const km = n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i); // "Gm" or "D dorian"
     if (km) {
       const sf = keyNameToSf(km[1].trim());
@@ -774,7 +838,7 @@ function resolveNote(n) {
 function finalizeNotes() {
   rollnotes.sort((a, b) => a.start - b.start);
   const bt = barTicks();
-  const plain = rollnotes.filter(n => !n.section);
+  const plain = rollnotes.filter(n => !n.section && !n.chord);
   plain.forEach((n, i) => {
     if (n.end === null || n.end <= n.start) {
       const next = plain[i + 1];
@@ -803,8 +867,9 @@ function finalizeNotes() {
       ? "key: " + keyRegions.map(r => r.name + (r.b2 ? "(" + r.b1 + "–" + r.b2 + ")" : "")).join(", ") + " ✓"
       : "key: not set (C)";
   }
-  // sections: depth from containment; lane colors by label (same label = same color)
-  const secs = rollnotes.filter(n => n.section);
+  // sections + chords: depth from containment; lane colors by label (same
+  // label = same color, so a recurring chord keeps its color across the song)
+  const secs = rollnotes.filter(n => n.section || n.chord);
   secs.forEach(s => { if (s.end === null || s.end <= s.start) s.end = s.start + bt; });
   let maxDepth = -1;
   sectionColors = {};
@@ -853,7 +918,8 @@ function saveLocalNotes() {
   if (!notesStoreKey()) return;
   const local = rollnotes.filter(n => n.added).map(n =>
     ({b1: n.b1, q1: n.q1, b2: n.b2, q2: n.q2, text: n.text,
-      section: n.section || undefined, keydir: n.keydir}));
+      section: n.section || undefined, chord: n.chord || undefined,
+      cnote: n.cnote || undefined, keydir: n.keydir}));
   if (local.length) localStorage.setItem(notesStoreKey(), JSON.stringify(local));
   else localStorage.removeItem(notesStoreKey());
   updateSyncBtn();
@@ -872,7 +938,9 @@ function serializeNotesList(list, beatsPerBar, base) {
   for (const n of list) {
     const a = n.b1 + "." + n.q1;
     const b = n.b2 ? " - " + n.b2 + "." + (n.q2 || beatsPerBar) : "";
-    lines.push("[" + a + b + "]", (n.section ? "section: " : "") + n.text, "");
+    const body = n.chord ? "chord: " + n.text + (n.cnote ? "\n" + n.cnote : "")
+               : (n.section ? "section: " : "") + n.text;
+    lines.push("[" + a + b + "]", body, "");
   }
   return lines.join("\n");
 }
@@ -902,13 +970,13 @@ function dropLocalKeyAt(bar) { // a new key change replaces any local key marker
 function activeNoteAt(tick) {
   let best = null;
   for (const n of rollnotes) {
-    if (n.section || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
+    if (n.section || n.chord || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
     if (tick >= n.start && tick < n.end) best = n;
   }
   return best;
 }
 function sectionPathAt(tick) {
-  return rollnotes.filter(n => n.section && tick >= n.start && tick < n.end)
+  return rollnotes.filter(n => (n.section || n.chord) && tick >= n.start && tick < n.end)
                   .sort((a, b) => a.depth - b.depth).map(s => s.text).join(" › ");
 }
 function playSec() { // current position on the song timeline, seconds
@@ -1352,7 +1420,7 @@ function drawRuler(W, H) {
     ctx.globalAlpha = 1;
   }
   for (const n of rollnotes) {
-    if (!n.section) continue;
+    if (!n.section && !n.chord) continue;
     const x = RULER_W + n.start * ppt - view.x;
     const w = (n.end - n.start) * ppt;
     if (x + w < RULER_W || x > W) continue;
@@ -1368,11 +1436,11 @@ function drawRuler(W, H) {
     ctx.clip();
     ctx.fillStyle = css("--text");
     ctx.font = "10px " + css("--mono");
-    ctx.fillText(n.text, Math.max(x, RULER_W) + 5, y + 11);
+    ctx.fillText(n.text + (n.cnote ? " ✱" : ""), Math.max(x, RULER_W) + 5, y + 11);
     ctx.restore();
   }
   for (const n of rollnotes) {
-    if (n.section) continue;
+    if (n.section || n.chord) continue;
     const x = RULER_W + n.start * ppt - view.x;
     if (x < RULER_W - 8 || x > W) continue;
     ctx.fillStyle = css("--gold");
@@ -1591,11 +1659,12 @@ function tap(pos) {
     const ppt = pxPerTick();
     if (pos.y >= BASE_RULER_H) { // section lanes
       const lane = Math.floor((pos.y - BASE_RULER_H) / LANE_H);
-      const sec = rollnotes.find(n => n.section && n.depth === lane && tick >= n.start && tick < n.end);
+      const sec = rollnotes.find(n => (n.section || n.chord) && n.depth === lane && tick >= n.start && tick < n.end);
       if (sec) {
         rangeSel = {a: sec.start, b: sec.end};
         playCursor = sec.start;
-        setInfo("section " + sec.text + " · bar " + sec.b1 + "–" + (sec.b2 || sec.b1));
+        setInfo((sec.chord ? "chord " : "section ") + sec.text + " · bar " + sec.b1 + "–" + (sec.b2 || sec.b1) +
+                (sec.cnote ? " · ✱ " + sec.cnote.split("\n")[0] : ""));
         updateSubtitle(); draw();
         return;
       }
@@ -2526,6 +2595,16 @@ keysetBtn.addEventListener("click", () => {
 
 // ---------------------------------------------------------------- notes list
 const notelistSheet = document.getElementById("notelistsheet");
+// one group per annotation type, so working a single layer (all the chords,
+// all the keys) never means hunting through a mixed chronological pile
+const NOTE_GROUPS = [
+  {title: "KEY", type: "key", match: n => n.keydir !== undefined},
+  {title: "METER", type: "timesig", match: n => !!n.tsdir},
+  {title: "SECTIONS", type: "section", match: n => n.section},
+  {title: "CHORDS", type: "chord", match: n => n.chord},
+  {title: "LOOP", type: "loop", match: n => n.loopTo !== undefined},
+  {title: "TEXT NOTES", type: "note", match: () => true}, // catches the rest
+];
 function renderNoteList() {
   const rows = document.getElementById("notelistrows");
   rows.innerHTML = "";
@@ -2533,35 +2612,71 @@ function renderNoteList() {
   document.getElementById("notelistStatus").textContent = sorted.length
     ? sorted.length + " notes · tap one to edit or delete · synced-note changes need Sync to stick"
     : "No notes yet — add the first one.";
-  for (const n of sorted) {
-    const row = document.createElement("div");
-    row.className = "noterow";
-    row.setAttribute("role", "button");
-    const where = document.createElement("span");
-    where.className = "where";
-    where.textContent = "bar " + n.b1 + (n.b2 ? "–" + n.b2 : "");
-    const kind = document.createElement("span");
-    kind.className = "kind" + (n.section ? " sec" : n.keydir !== undefined || n.loopTo !== undefined ? " key" : "");
-    kind.textContent = n.section ? "section" : n.keydir !== undefined ? "key" : n.loopTo !== undefined ? "loop" : "note";
-    if (n.section && sectionColors[n.text]) kind.style.borderColor = sectionColors[n.text];
-    const body = document.createElement("span");
-    body.className = "body";
-    body.textContent = n.text;
-    row.append(where, kind, body);
-    if (n.added) {
-      const u = document.createElement("span");
-      u.className = "unsynced";
-      u.textContent = "unsynced";
-      row.append(u);
+  const remaining = [...sorted];
+  for (const g of NOTE_GROUPS) {
+    const mine = [];
+    for (let i = 0; i < remaining.length; i++) {
+      if (g.match(remaining[i])) { mine.push(remaining[i]); remaining.splice(i--, 1); }
     }
-    row.addEventListener("click", () => {
+    if (!mine.length && g.type !== "note") continue; // hide empty groups; Text notes always shows (its + adds one)
+    const box = document.createElement("div");
+    box.className = "notegroup";
+    const head = document.createElement("div");
+    head.className = "ghead";
+    head.textContent = g.title + (mine.length ? " · " + mine.length : "");
+    const add = document.createElement("button");
+    add.className = "gadd";
+    add.textContent = "+";
+    add.setAttribute("aria-label", "Add " + g.title.toLowerCase());
+    add.addEventListener("click", e => {
+      e.stopPropagation();
       notelistSheet.classList.remove("on");
-      playCursor = n.start;
-      updateSubtitle();
-      draw();
-      openEditor(n);
+      openEditor(null, g.type);
     });
-    rows.appendChild(row);
+    head.appendChild(add);
+    const grows = document.createElement("div");
+    grows.className = "grows";
+    for (const n of mine) {
+      const row = document.createElement("div");
+      row.className = "noterow";
+      row.setAttribute("role", "button");
+      const where = document.createElement("span");
+      where.className = "where";
+      where.textContent = n.b2 ? n.b1 + "." + n.q1 + "–" + n.b2 + "." + (n.q2 || beatsPerBarEff())
+                               : "bar " + n.b1 + (n.q1 !== 1 ? "." + n.q1 : "");
+      const body = document.createElement("span");
+      body.className = "body";
+      body.textContent = n.text;
+      if ((n.section || n.chord) && sectionColors[n.text]) {
+        const dot = document.createElement("span");
+        dot.textContent = "■ ";
+        dot.style.color = sectionColors[n.text];
+        body.prepend(dot);
+      }
+      row.append(where, body);
+      if (n.cnote) {
+        const c = document.createElement("span");
+        c.className = "cnote";
+        c.textContent = "✱ " + n.cnote.split("\n")[0];
+        row.append(c);
+      }
+      if (n.added) {
+        const u = document.createElement("span");
+        u.className = "unsynced";
+        u.textContent = "unsynced";
+        row.append(u);
+      }
+      row.addEventListener("click", () => {
+        notelistSheet.classList.remove("on");
+        playCursor = n.start;
+        updateSubtitle();
+        draw();
+        openEditor(n);
+      });
+      grows.appendChild(row);
+    }
+    box.append(head, grows);
+    rows.appendChild(box);
   }
 }
 document.getElementById("listbtn").addEventListener("click", () => {
@@ -2705,6 +2820,7 @@ function applyEditorType() {
   const t = editorType();
   document.getElementById("ntext").style.display = t === "key" || t === "loop" || t === "timesig" ? "none" : "";
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
+  document.getElementById("nchordbox").style.display = t === "chord" ? "" : "none";
   document.getElementById("ntsrow").style.display = t === "timesig" ? "" : "none";
   document.getElementById("nlooprow").style.display = t === "loop" ? "" : "none";
   document.getElementById("ntorow").style.display = t === "loop" || t === "timesig" ? "none" : "";
@@ -2712,14 +2828,105 @@ function applyEditorType() {
     SPEECH && t !== "key" && t !== "loop" && t !== "timesig" ? "" : "none"; // dictation targets the text box
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
+    : t === "chord" ? "Optional note about this chord (✱ in the ruler)"
                     : "What's happening at this beat?";
   document.getElementById("nstatus").textContent =
     t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
+    t === "chord" ? "Tap chips or type the symbol. Standard: bare root = major (C), m = minor (Gm), /X = bass note (G7/B)." :
     t === "loop" ? "When playback reaches the 'from' point (or the song end, if 'from' is at/before the target), it jumps back to the target bar/beat." :
     t === "timesig" ? "Until you declare a meter, the grid is a neutral 4/4 ruler. Declaring re-bars the song; existing annotations are converted to keep their musical positions." :
     document.getElementById("nstatus").textContent;
 }
 document.getElementById("ntype").addEventListener("change", applyEditorType);
+
+// chord widget: chips compose the symbol; typing in the box is equally valid
+// (chips re-highlight to match). Vocabulary = the lasso chord namer's, so
+// annotations and "Chord?" reveals always speak the same language.
+const CHORD_QUALITIES = ["maj", "m", "7", "maj7", "m7", "dim", "dim7", "m7b5", "aug",
+                         "6", "m6", "sus4", "sus2", "5", "9", "m9", "maj9", "add9", "7b9"];
+const BASS_SPELLINGS = ["C", "C#", "Db", "D", "D#", "Eb", "E", "F", "F#", "Gb",
+                        "G", "G#", "Ab", "A", "A#", "Bb", "B"];
+const chordSel = {root: null, acc: "", qual: "maj"};
+function refreshChordChips() {
+  for (const b of document.querySelectorAll("#nchordroot button"))
+    b.classList.toggle("active", b.dataset.v === chordSel.root);
+  for (const b of document.querySelectorAll("#nchordacc button"))
+    b.classList.toggle("active", chordSel.root !== null && b.dataset.v === chordSel.acc);
+  for (const b of document.querySelectorAll("#nchordqual button"))
+    b.classList.toggle("active", b.dataset.v === chordSel.qual);
+}
+function composeChord() {
+  if (!chordSel.root || chordSel.qual === null) return; // incomplete/unknown — leave the box alone
+  const bass = document.getElementById("nchordbass").value;
+  document.getElementById("nchordsym").value = chordSel.root + chordSel.acc +
+    (chordSel.qual === "maj" ? "" : chordSel.qual) + (bass ? "/" + bass : "");
+}
+function parseChordSym(sym) {
+  return (sym || "").trim().match(/^([A-G])([#b]?)([^/\s]*)(?:\/([A-G][#b]?))?(?:\s+\((.*)\))?$/);
+}
+function setChordWidget(sym) {
+  const m = parseChordSym(sym);
+  chordSel.root = m ? m[1] : null;
+  chordSel.acc = m ? m[2] : "";
+  chordSel.qual = !m || m[3] === "" ? (m ? "maj" : "maj")
+                : CHORD_QUALITIES.includes(m[3]) ? m[3] : null; // unknown quality: chips stand down
+  document.getElementById("nchordbass").value = m && m[4] ? m[4] : "";
+  document.getElementById("nchordsym").value = sym || "";
+  refreshChordChips();
+}
+(function buildChordWidget() {
+  const mkRow = (id, items) => {
+    const row = document.getElementById(id);
+    for (const [v, label] of items) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.v = v;
+      b.textContent = label;
+      row.appendChild(b);
+    }
+  };
+  mkRow("nchordroot", "CDEFGAB".split("").map(l => [l, l]));
+  mkRow("nchordacc", [["b", "♭"], ["", "♮"], ["#", "♯"]]);
+  mkRow("nchordqual", CHORD_QUALITIES.map(q => [q, q]));
+  const bass = document.getElementById("nchordbass");
+  const none = document.createElement("option");
+  none.value = ""; none.textContent = "—";
+  bass.appendChild(none);
+  for (const s of BASS_SPELLINGS) {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = s;
+    bass.appendChild(o);
+  }
+  document.getElementById("nchordroot").addEventListener("click", e => {
+    if (!e.target.dataset.v) return;
+    chordSel.root = e.target.dataset.v;
+    if (chordSel.qual === null) chordSel.qual = "maj";
+    refreshChordChips(); composeChord();
+  });
+  document.getElementById("nchordacc").addEventListener("click", e => {
+    if (e.target.dataset.v === undefined) return;
+    chordSel.acc = e.target.dataset.v;
+    refreshChordChips(); composeChord();
+  });
+  document.getElementById("nchordqual").addEventListener("click", e => {
+    if (!e.target.dataset.v) return;
+    chordSel.qual = e.target.dataset.v;
+    refreshChordChips(); composeChord();
+  });
+  bass.addEventListener("change", composeChord);
+  const sym = document.getElementById("nchordsym");
+  sym.addEventListener("input", () => { // follow hand-edits without rewriting them
+    const m = parseChordSym(sym.value);
+    chordSel.root = m ? m[1] : null;
+    chordSel.acc = m ? m[2] : "";
+    chordSel.qual = m ? (m[3] === "" ? "maj" : CHORD_QUALITIES.includes(m[3]) ? m[3] : null) : null;
+    if (m) bass.value = m[4] || "";
+    refreshChordChips();
+  });
+  sym.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("nsave").click(); }
+  });
+})();
 
 // dictation into the note text box (Web Speech API — easier on hands than
 // typing; falls back silently to the keyboard mic where unsupported)
@@ -2762,7 +2969,7 @@ nmic.addEventListener("click", () => {
 });
 
 function snapBeat(q) { return Math.round((q - 1) / 0.25) * 0.25 + 1; }
-function openEditor(note) {
+function openEditor(note, presetType) {
   micStop();
   editingNote = note || null;
   fillBarBeatSelects();
@@ -2779,10 +2986,13 @@ function openEditor(note) {
       q2 = snapBeat((last % bt) / song.ppq + 1);
     }
   }
-  const type = note ? (note.section ? "section" : note.keydir !== undefined ? "key"
+  const type = note ? (note.chord ? "chord" : note.section ? "section" : note.keydir !== undefined ? "key"
                        : note.tsdir ? "timesig"
                        : note.loopTo !== undefined ? "loop" : "note")
-             : rangeSel ? "section" // a drag before + Note almost always means "label this span"
+             : presetType ? presetType // a group's + button pre-picks its type
+             // a drag before + Note means "label this span" — as whichever of
+             // section/chord was dragged last (chord runs stay in chord mode)
+             : rangeSel ? (localStorage.getItem("ff1roll-dragtype") || "section")
              : "note";
   document.getElementById("ntype").value = type;
   if (type === "timesig" && note) {
@@ -2790,7 +3000,8 @@ function openEditor(note) {
     document.getElementById("ntsden").value = String(note.tsdir[1]);
   }
   rebarArmed = false; // any editor open resets the two-tap warning
-  if (!note && rangeSel) setTimeout(() => document.getElementById("ntext").focus(), 50);
+  if (!note && rangeSel) setTimeout(() =>
+    document.getElementById(type === "chord" ? "nchordsym" : "ntext").focus(), 50);
   if (type === "loop" && note) {
     const lbt = barTicks();
     document.getElementById("nlb").value = String(Math.floor(note.loopTo / lbt) + 1);
@@ -2800,7 +3011,9 @@ function openEditor(note) {
   document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
   document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : beatsPerBarEff()) : (q2 || beatsPerBarEff()));
-  document.getElementById("ntext").value = note && type !== "key" ? note.text : "";
+  document.getElementById("ntext").value =
+    type === "chord" ? (note && note.cnote || "") : note && type !== "key" ? note.text : "";
+  if (type === "chord") setChordWidget(note ? note.text : "");
   if (type === "key" && note) {
     document.getElementById("nkeysel").value = String(note.keydir);
     const nm = (note.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [])[1] || "";
@@ -2852,7 +3065,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   micStop();
   const type = editorType();
   const text = document.getElementById("ntext").value.trim();
-  if (type !== "key" && type !== "loop" && type !== "timesig" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  if (type !== "key" && type !== "loop" && type !== "timesig" && type !== "chord" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
   const b2raw = +document.getElementById("nb2").value || 0;
@@ -2888,7 +3101,14 @@ document.getElementById("nsave").addEventListener("click", () => {
     // one loop point per song: a new one replaces any local one
     rollnotes = rollnotes.filter(n => !(n.added && n.loopTo !== undefined));
     fresh = {b1, q1, b2: null, q2: null, text: "loop: " + lb + "." + lq, added: true};
+  } else if (type === "chord") {
+    const sym = document.getElementById("nchordsym").value.trim();
+    if (!sym) { document.getElementById("nstatus").textContent = "Chord symbol is empty — tap chips or type one."; return; }
+    localStorage.setItem("ff1roll-dragtype", "chord");
+    fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+             text: sym, chord: true, cnote: text || undefined, added: true};
   } else if (type === "section") {
+    localStorage.setItem("ff1roll-dragtype", "section");
     fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
              text: text.split("\n")[0], section: true, added: true};
   } else {

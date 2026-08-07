@@ -83,6 +83,33 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
   assert.equal(run(`rollnotes.find(n => n.text === "key: Gm").keydir`), -2); // Gm = 2 flats
 });
 
+test("chord directives: parse, attached note, round-trip", () => {
+  installSong();
+  const text = [
+    "[1.1 - 4.4]", "section: A", "",
+    "[1.1 - 1.2]", "chord: C", "",
+    "[1.3 - 1.4]", "chord: G7/B", "no 5th — the bass supplies it", "",
+    "[2.1]", "plain note", "",
+  ].join("\n");
+  run(`rollnotes = parseRollnotes(${JSON.stringify(text)}).map(resolveNote); finalizeNotes();`);
+  assert.equal(run(`rollnotes.filter(n => n.chord).length`), 2);
+  assert.equal(run(`rollnotes.find(n => n.chord && n.b1 === 1 && n.q1 === 1).text`), "C");
+  const g7 = val(`rollnotes.find(n => n.text === "G7/B")`);
+  assert.equal(g7.chord, true);
+  assert.equal(g7.cnote, "no 5th — the bass supplies it");
+  assert.equal(run(`rollnotes.find(n => n.text === "C").cnote`), undefined);
+  // chords band like sections: nested inside A, one level down
+  assert.equal(g7.depth, 1);
+  assert.equal(val(`rollnotes.find(n => n.section).depth`), 0);
+  // sections stay sections, chords stay chords
+  assert.ok(!g7.section);
+  const once = run(`serializeRollnotes()`);
+  assert.match(once, /\[1\.3 - 1\.4\]\nchord: G7\/B\nno 5th — the bass supplies it\n/);
+  assert.match(once, /chord: C\n/);
+  run(`rollnotes = parseRollnotes(${JSON.stringify(once)}).map(resolveNote); finalizeNotes();`);
+  assert.equal(run(`serializeRollnotes()`), once);
+});
+
 test("modal keys: tonic + mode names map to the relative major's signature", () => {
   installSong();
   assert.equal(run(`keyNameToSf("D dorian")`), 0);   // D dorian shares C major's signature
