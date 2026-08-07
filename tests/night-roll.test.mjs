@@ -83,6 +83,43 @@ test("rollnotes round-trip: parse → serialize → parse is stable", () => {
   assert.equal(run(`rollnotes.find(n => n.text === "key: Gm").keydir`), -2); // Gm = 2 flats
 });
 
+test("chop: start/end directives trim the displayed song and renumber", () => {
+  installSong();
+  run(`
+    song.tracks = [{name: "t", notes: []}];
+    song.rawNotes = [[
+      {t: 0,    d: 480, p: 60},   // bar 1 (chopped)
+      {t: 1920, d: 480, p: 62},   // bar 2 → displayed bar 1
+      {t: 1680, d: 480, p: 63},   // straddles the cut: clipped to start
+      {t: 5760, d: 480, p: 64},   // bar 4 (chopped by end)
+    ]];
+    chopS = 0; chopE = null; appliedChop = null;
+    declaredTs = null;
+    rollnotes = parseRollnotes("[2.1]\\nchop: start\\n\\n[4.1]\\nchop: end\\n\\n[1.1 - 1.4]\\nchord: C\\n").map(resolveNote);
+    finalizeNotes();
+  `);
+  assert.equal(run(`chopS`), 1920);
+  assert.equal(run(`chopE`), 5760);
+  const notes = val(`song.tracks[0].notes.map(n => ({t: n.t, d: n.d, p: n.p}))`);
+  assert.deepEqual(notes, [
+    {t: 0, d: 480, p: 62},        // slid left by one bar
+    {t: 0, d: 240, p: 63},        // straddler clipped at the cut
+  ]);
+  assert.equal(run(`songEndTick`), 1920); // one displayed bar survives
+  // the chord annotation stays in displayed coords: bar 1 as written
+  assert.equal(val(`rollnotes.find(n => n.chord)`).start, 0);
+  // round-trip: directives serialize verbatim in raw coords
+  const once = run(`serializeRollnotes()`);
+  assert.match(once, /\[2\.1\]\nchop: start\n/);
+  assert.match(once, /\[4\.1\]\nchop: end\n/);
+  // shiftAnchors: removing the start chop moves displayed anchors right one bar
+  run(`shiftAnchors(1920); rollnotes = rollnotes.filter(n => n.chopdir !== "start"); finalizeNotes();`);
+  const c = val(`rollnotes.find(n => n.chord)`);
+  assert.deepEqual([c.b1, c.b2], [2, 2]);
+  assert.equal(run(`chopS`), 0);
+  assert.equal(val(`song.tracks[0].notes.length`), 3); // bar-1 note restored
+});
+
 test("6/8: beats are eighths — anchors, defaults, re-bar conversion", () => {
   installSong();
   const text = [

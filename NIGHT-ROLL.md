@@ -59,8 +59,13 @@ composing into an editable symbol box, plus an optional attached-note text
 (✱ on the band). A ruler drag before + Note defaults the type to whichever
 of section/chord was saved from a drag last (chord-entry runs stay in chord
 mode). ☰ Notes lists everything grouped by type (Key / Meter / Sections /
-Chords / Loop / Text notes; each group's + pre-picks that type),
+Chords / Loop / Chop / Text notes; each group's + pre-picks that type),
 rows open the editor, Delete works on synced notes too (permanent on Sync).
+Chop (2026-08-06, Josh's import-fixup tool): a `chop:` directive
+non-destructively trims the displayed song from either end — see the
+format spec; implementation is a raw-notes snapshot (`song.rawNotes`)
+that applyChop() carves the visible tracks from, so roll, score,
+playback, and loop-at-end all follow for free.
 Gold ruler flags; subtitle strip follows playback, with a ⊙ toggle that
 highlights the active note's span (ambient range tints removed — on a
 fully-annotated song they covered everything).
@@ -153,6 +158,20 @@ timesig: 6/8       ← meter directive. Until one exists the app runs on a
                      One per song. Beats in anchors count the DENOMINATOR
                      note: under 6/8, [1.4] = the fourth eighth, and the
                      first half-bar chord is [1.1 - 1.3].
+
+[3.1]
+chop: start        ← non-destructive trim, RAW capture coordinates (the one
+                     annotation type that is): hides everything before raw
+                     3.1 and renumbers — raw 3.1 becomes displayed 1.1.
+                     At most one per song; "chop: end" likewise hides
+                     everything at/after its anchor. All OTHER annotations
+                     live in displayed coordinates; adding/removing a start
+                     chop shifts them through absolute time (two-tap
+                     warning), so chords stay glued to their music. The
+                     hidden material is gone entirely (no ghost); the .mid
+                     is untouched — delete the directive to restore.
+                     Editor prefills the cut from the cursor; ☰ list shows
+                     chop anchors with a "raw" tag.
 
 [25.1]
 loop: 2.1          ← "loop:" prefix = loop directive. The anchor is the

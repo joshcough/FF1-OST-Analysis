@@ -297,8 +297,13 @@ his behalf.
   shifted 2 beats): unshifted + trimmed to its 8-bar loop (2026-08-01) —
   Josh's existing cornelia rollnotes anchors may now sit 2 beats late;
   offer to auto-shift them if they look off.
-  Dungeon trimmed to 16 by Josh's ear (2026-08-01). Awaiting cut bars
-  for: elfland, epilogue, floatingcastle, prelude, ship, victory.
+  Dungeon trimmed to 16 by Josh's ear (2026-08-01). The old "awaiting
+  cut bars" list (elfland, epilogue, floatingcastle, prelude, ship,
+  victory) is STALE: elfland was deleted 2026-08-02 (not in the NSF),
+  and the chip migration auto-trimmed everything with an exact repeat —
+  epilogue is the real holdout (no exact repeat; varies per pass).
+  Superseded anyway by the in-app `chop:` annotation (built 2026-08-06):
+  Josh trims any song himself from the editor, non-destructively.
 - **Victory chip loop seam — RESOLVED 2026-08-02:** the "beat 3" reading
   was a trimmer artifact (it sliced mid-way through the loop-seam overlap
   cluster). Fixed detector puts the seam at bar 2 beat 4 — Josh's by-ear

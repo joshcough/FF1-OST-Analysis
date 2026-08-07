@@ -388,6 +388,7 @@
         <option value="key">Key change</option>
         <option value="timesig">Time signature</option>
         <option value="loop">Loop point</option>
+        <option value="chop">Chop</option>
       </select>
     </div>
     <div class="row">
@@ -435,6 +436,13 @@
     <div class="row" id="nlooprow" style="display:none">
       <span class="lbl">returns to bar</span><select id="nlb"></select>
       <span class="lbl">beat</span><select id="nlq"></select>
+    </div>
+    <div class="row" id="nchoprow" style="display:none">
+      <span class="lbl">chop</span>
+      <select id="nchopmode">
+        <option value="start">everything before this beat</option>
+        <option value="end">this beat to the end</option>
+      </select>
     </div>
     <div class="row">
       <button class="primary" id="nsave">Save</button>
@@ -501,6 +509,7 @@
       <dt>Loop points</dt><dd>Some songs loop back past an intro (not to bar 1). When you discover one, write a note whose text is <b>loop: B.Q</b> (e.g. "loop: 2.1") — the note's anchor is the jump point: when playback reaches it, it returns to B.Q. If the anchor sits at/before the target, the jump happens at the song end instead.</dd>
       <dt>Sections</dt><dd>Colored bands in the ruler (A, B…). Make one: select a range, + Note, tick "section", give it a short label. Nest them by containment. Tap a band to select its whole range.</dd>
       <dt>Chords</dt><dd>Chord bands — like sections, but typed. Select a range, + Note, "Chord", then tap chips (root · ♭♮♯ · quality · /bass) or type the symbol. Bare root = major, m = minor (Gm). Same label = same color, so a recurring chord is spottable at a glance. Add an optional text note to a chord — it shows as ✱ on the band.</dd>
+      <dt>Chop</dt><dd>Trim a song without touching the file: put the cursor at the cut, + Note, "Chop", pick "everything before this beat" or "this beat to the end". The chopped part vanishes entirely and bars renumber (chop a 2-bar intro and old bar 3 becomes bar 1 — your annotations shift with it). Delete the chop in ☰ Notes to restore. Made for cleaning up freshly imported captures.</dd>
     </dl>
 
     <h3>KEYS</h3>
@@ -728,8 +737,9 @@ function saveEdits() {
   if (!editsKey()) return;
   const removed = [], added = [];
   song.tracks.forEach((tr, ti) => tr.notes.forEach((n, ni) => {
-    if (n.added) { if (!n.gone) added.push({ti, t: n.t, d: n.d, p: n.p}); }
-    else if (n.gone) removed.push(ti + ":" + ni);
+    // ticks stored raw (chop is a view); ri keeps ids stable across chops
+    if (n.added) { if (!n.gone) added.push({ti, t: n.t + chopS, d: n.d, p: n.p}); }
+    else if (n.gone) removed.push(ti + ":" + (n.ri !== undefined ? n.ri : ni));
   }));
   if (removed.length || added.length)
     localStorage.setItem(editsKey(), JSON.stringify({removed, added}));
@@ -743,6 +753,30 @@ function updateClearBtn() {
 
 // ---------------------------------------------------------------- rollnotes
 function barTicks() { return beatsPerBarEff() * song.ppq; }
+// chop: a non-destructive trim. "chop: start" hides everything before its
+// anchor (the song slides left — raw 3.1 becomes displayed 1.1); "chop: end"
+// hides everything at/after its anchor. Chop anchors live in RAW capture
+// coordinates; every other annotation lives in the displayed (chopped) song.
+let chopS = 0, chopE = null, appliedChop = null;
+function applyChop(S, E) {
+  if (!song || !song.rawNotes) return false;
+  const sig = S + ":" + (E === null ? "" : E);
+  if (appliedChop === sig) return false;
+  appliedChop = sig; chopS = S; chopE = E;
+  song.tracks.forEach((tr, ti) => {
+    let notes = song.rawNotes[ti].map((n, ri) => ({...n, ri})); // ri: raw index, keeps edit ids stable
+    if (S || E !== null) {
+      notes = notes.filter(n => n.t + n.d > S && (E === null || n.t < E));
+      for (const n of notes) {
+        if (n.t < S) { n.d -= S - n.t; n.t = S; } // clip notes straddling the cut
+        n.t -= S;
+        if (E !== null && n.t + n.d > E - S) n.d = E - S - n.t;
+      }
+    }
+    tr.notes = notes;
+  });
+  return true;
+}
 function computeSongEnd() { // re-run whenever the effective meter changes
   let lastTick = 0;
   song.tracks.forEach(tr => tr.notes.forEach(n => { lastTick = Math.max(lastTick, n.t + n.d); }));
@@ -845,6 +879,20 @@ function finalizeNotes() {
   // seen, so 6/8 songs' anchors landed on wrong ticks (the old menu bug)
   const tsNote = rollnotes.find(n => n.tsdir);
   declaredTs = tsNote ? tsNote.tsdir : null;
+  // chop directives (raw-capture coordinates) carve the displayed song
+  let chopChanged = false;
+  if (song) {
+    for (const n of rollnotes) {
+      const cm = n.text.match(/^chop:\s*(start|end)\s*$/i);
+      if (cm) n.chopdir = cm[1].toLowerCase(); else delete n.chopdir;
+    }
+    const cs = rollnotes.find(n => n.chopdir === "start");
+    const ce = rollnotes.find(n => n.chopdir === "end");
+    const rawTick = n => Math.max(0, Math.round((n.b1 - 1) * barTicks() + (n.q1 - 1) * beatTicks()));
+    const S = cs ? rawTick(cs) : 0;
+    const E = ce && rawTick(ce) > S ? rawTick(ce) : null;
+    chopChanged = applyChop(S, E);
+  }
   rollnotes.forEach(resolveNote);
   rollnotes.sort((a, b) => a.start - b.start);
   const bt = barTicks();
@@ -863,6 +911,7 @@ function finalizeNotes() {
     else delete n.loopTo;
   }
   if (song) { updateSongMeta(); computeSongEnd(); } // grid may have changed
+  if (chopChanged) { playCursor = Math.min(playCursor, songEndTick); if (typeof fitView === "function") fitView(); }
   keyRegions = rollnotes.filter(n => n.keydir !== undefined)
     .map(n => ({start: n.start, sf: n.keydir,
                 name: (n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [, SF_MAJOR[n.keydir]])[1], // "Gm"/"D dorian" show as recorded
@@ -978,7 +1027,7 @@ function dropLocalKeyAt(bar) { // a new key change replaces any local key marker
 function activeNoteAt(tick) {
   let best = null;
   for (const n of rollnotes) {
-    if (n.section || n.chord || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
+    if (n.section || n.chord || n.chopdir || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
     if (tick >= n.start && tick < n.end) best = n;
   }
   return best;
@@ -1079,6 +1128,9 @@ function setSong(parsed, key) {
   trackState = song.tracks.map(() => ({muted: false, solo: false}));
   selTrack = 0;
   loadEdits();
+  // raw snapshot (post-edits) that chop directives carve a view out of
+  song.rawNotes = song.tracks.map(tr => tr.notes.map(n => ({...n})));
+  chopS = 0; chopE = null; appliedChop = null;
   updateSongMeta();
   if (songKey) // stash meter so Sync-all can serialize this song without reloading it
     localStorage.setItem("ff1roll-ts-" + songKey, effTs()[0] + "/" + effTs()[1]);
@@ -1451,7 +1503,7 @@ function drawRuler(W, H) {
     ctx.restore();
   }
   for (const n of rollnotes) {
-    if (n.section || n.chord) continue;
+    if (n.section || n.chord || n.chopdir) continue; // chop anchors are raw-space: no flag
     const x = RULER_W + n.start * ppt - view.x;
     if (x < RULER_W - 8 || x > W) continue;
     ctx.fillStyle = css("--gold");
@@ -1703,6 +1755,7 @@ function tap(pos) {
     const t = Math.round(tick / snap) * snap;
     const tr = song.tracks[selTrack];
     tr.notes.push({t, d: song.ppq * pencilDur, p: pitch, v: 80, added: true});
+    if (song.rawNotes) song.rawNotes[selTrack].push({t: t + chopS, d: song.ppq * pencilDur, p: pitch, v: 80, added: true});
     saveEdits();
     previewNote(selTrack, pitch);
     setInfo(noteLabel(selTrack, tr.notes.length - 1));
@@ -1712,7 +1765,9 @@ function tap(pos) {
   const hit = hitNote(pos);
   if (mode === "erase") {
     if (hit) {
-      song.tracks[hit.ti].notes[hit.ni].gone = true;
+      const en = song.tracks[hit.ti].notes[hit.ni];
+      en.gone = true;
+      if (song.rawNotes && en.ri !== undefined && song.rawNotes[hit.ti][en.ri]) song.rawNotes[hit.ti][en.ri].gone = true;
       if (selNote && selNote.ti === hit.ti && selNote.ni === hit.ni) selNote = null;
       saveEdits(); draw();
     }
@@ -2614,6 +2669,7 @@ const NOTE_GROUPS = [
   {title: "SECTIONS", type: "section", match: n => n.section},
   {title: "CHORDS", type: "chord", match: n => n.chord},
   {title: "LOOP", type: "loop", match: n => n.loopTo !== undefined},
+  {title: "CHOP", type: "chop", match: n => !!n.chopdir},
   {title: "TEXT NOTES", type: "note", match: () => true}, // catches the rest
 ];
 function renderNoteList() {
@@ -2653,8 +2709,9 @@ function renderNoteList() {
       row.setAttribute("role", "button");
       const where = document.createElement("span");
       where.className = "where";
-      where.textContent = n.b2 ? n.b1 + "." + n.q1 + "–" + n.b2 + "." + (n.q2 || beatsPerBarDisp())
-                               : "bar " + n.b1 + (n.q1 !== 1 ? "." + n.q1 : "");
+      where.textContent = (n.b2 ? n.b1 + "." + n.q1 + "–" + n.b2 + "." + (n.q2 || beatsPerBarDisp())
+                               : "bar " + n.b1 + (n.q1 !== 1 ? "." + n.q1 : "")) +
+                          (n.chopdir ? " raw" : ""); // chop anchors are pre-chop capture coordinates
       const body = document.createElement("span");
       body.className = "body";
       body.textContent = n.text;
@@ -2829,14 +2886,15 @@ function fillBarBeatSelects() {
 function editorType() { return document.getElementById("ntype").value; }
 function applyEditorType() {
   const t = editorType();
-  document.getElementById("ntext").style.display = t === "key" || t === "loop" || t === "timesig" ? "none" : "";
+  document.getElementById("ntext").style.display = t === "key" || t === "loop" || t === "timesig" || t === "chop" ? "none" : "";
   document.getElementById("nkeyrow").style.display = t === "key" ? "" : "none";
   document.getElementById("nchordbox").style.display = t === "chord" ? "" : "none";
   document.getElementById("ntsrow").style.display = t === "timesig" ? "" : "none";
   document.getElementById("nlooprow").style.display = t === "loop" ? "" : "none";
-  document.getElementById("ntorow").style.display = t === "loop" || t === "timesig" ? "none" : "";
+  document.getElementById("nchoprow").style.display = t === "chop" ? "" : "none";
+  document.getElementById("ntorow").style.display = t === "loop" || t === "timesig" || t === "chop" ? "none" : "";
   document.getElementById("nmic").style.display =
-    SPEECH && t !== "key" && t !== "loop" && t !== "timesig" ? "" : "none"; // dictation targets the text box
+    SPEECH && t !== "key" && t !== "loop" && t !== "timesig" && t !== "chop" ? "" : "none"; // dictation targets the text box
   document.getElementById("ntext").placeholder =
     t === "section" ? "Section label (shows in the ruler, e.g. A — G home)"
     : t === "chord" ? "Optional note about this chord (✱ in the ruler)"
@@ -2844,6 +2902,7 @@ function applyEditorType() {
   document.getElementById("nstatus").textContent =
     t === "key" ? "To bar '—' = until further notice; set it to make a temporary key that reverts after." :
     t === "chord" ? "Tap chips or type the symbol. Standard: bare root = major (C), m = minor (Gm), /X = bass note (G7/B)." :
+    t === "chop" ? "Non-destructive trim: the chopped part disappears entirely and bars renumber. Chopping the start shifts your annotations to match; delete the chop to restore." :
     t === "loop" ? "When playback reaches the 'from' point (or the song end, if 'from' is at/before the target), it jumps back to the target bar/beat." :
     t === "timesig" ? "Until you declare a meter, the grid is a neutral 4/4 ruler. Declaring re-bars the song; existing annotations are converted to keep their musical positions." :
     document.getElementById("nstatus").textContent;
@@ -2998,7 +3057,7 @@ function openEditor(note, presetType) {
     }
   }
   const type = note ? (note.chord ? "chord" : note.section ? "section" : note.keydir !== undefined ? "key"
-                       : note.tsdir ? "timesig"
+                       : note.tsdir ? "timesig" : note.chopdir ? "chop"
                        : note.loopTo !== undefined ? "loop" : "note")
              : presetType ? presetType // a group's + button pre-picks its type
              // a drag before + Note means "label this span" — as whichever of
@@ -3022,6 +3081,14 @@ function openEditor(note, presetType) {
   document.getElementById("nq1").value = String(note ? snapBeat(note.q1) : q1);
   document.getElementById("nb2").value = note ? (note.b2 ? String(note.b2) : "") : (b2 ? String(b2) : "");
   document.getElementById("nq2").value = String(note ? (note.q2 ? snapBeat(note.q2) : beatsPerBarDisp()) : (q2 || beatsPerBarDisp()));
+  if (type === "chop" && note) {
+    // show the cut in DISPLAYED coordinates (start chop = the current bar 1),
+    // overriding the raw-space b1/q1 the directive itself stores
+    document.getElementById("nchopmode").value = note.chopdir;
+    const dt = note.chopdir === "start" ? 0 : Math.max(0, (chopE !== null ? chopE : 0) - chopS);
+    document.getElementById("nb1").value = String(Math.floor(dt / barTicks()) + 1);
+    document.getElementById("nq1").value = String(snapBeat((dt % barTicks()) / beatTicks() + 1));
+  }
   document.getElementById("ntext").value =
     type === "chord" ? (note && note.cnote || "") : note && type !== "key" ? note.text : "";
   if (type === "chord") setChordWidget(note ? note.text : "");
@@ -3049,6 +3116,24 @@ document.getElementById("ncancel").addEventListener("click", () => { micStop(); 
 let rebarArmed = false; // two-tap confirmation for meter changes that move annotations
 // re-express every annotation's anchors under a new meter so they stay glued
 // to the MUSIC (bar.beat is a coordinate system; changing the meter re-bars)
+// shift every non-chop annotation in DISPLAYED space (start-chop add/remove)
+function shiftAnchors(deltaTicks) {
+  const bt = barTicks(), unit = beatTicks();
+  for (const n of rollnotes) {
+    if (n.chopdir) continue;
+    const conv = (b, q) => {
+      const tick = Math.max(0, (b - 1) * bt + (q - 1) * unit + deltaTicks);
+      return [Math.floor(tick / bt) + 1, (tick % bt) / unit + 1];
+    };
+    [n.b1, n.q1] = conv(n.b1, n.q1);
+    if (n.b2) [n.b2, n.q2] = conv(n.b2, n.q2 || beatsPerBarDisp());
+    const lm = n.text.match(/^loop:\s*(\d+)(?:\.(\d+(?:\.\d+)?))?/);
+    if (lm) {
+      const [lb, lq] = conv(+lm[1], lm[2] ? +lm[2] : 1);
+      n.text = "loop: " + lb + (lq === 1 ? "" : "." + (+lq.toFixed(2)));
+    }
+  }
+}
 function convertAnchors(oldTs, newTs) {
   const oldUnit = song.ppq * 4 / oldTs[1], newUnit = song.ppq * 4 / newTs[1];
   const oldBt = oldTs[0] * oldUnit, newBt = newTs[0] * newUnit;
@@ -3077,7 +3162,7 @@ document.getElementById("nsave").addEventListener("click", () => {
   micStop();
   const type = editorType();
   const text = document.getElementById("ntext").value.trim();
-  if (type !== "key" && type !== "loop" && type !== "timesig" && type !== "chord" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
+  if (type !== "key" && type !== "loop" && type !== "timesig" && type !== "chord" && type !== "chop" && !text) { document.getElementById("nstatus").textContent = "Note text is empty."; return; }
   const b1 = Math.max(1, +document.getElementById("nb1").value || 1);
   const q1 = Math.max(1, +document.getElementById("nq1").value || 1);
   const b2raw = +document.getElementById("nb2").value || 0;
@@ -3115,6 +3200,26 @@ document.getElementById("nsave").addEventListener("click", () => {
     // one loop point per song: a new one replaces any local one
     rollnotes = rollnotes.filter(n => !(n.added && n.loopTo !== undefined));
     fresh = {b1, q1, b2: null, q2: null, text: "loop: " + lb + "." + lq, added: true};
+  } else if (type === "chop") {
+    const cmode = document.getElementById("nchopmode").value;
+    const dispTick = (b1 - 1) * barTicks() + (q1 - 1) * beatTicks();
+    const raw = dispTick + chopS; // fields are displayed coords; the directive stores raw
+    const newS = cmode === "start" ? raw : chopS;
+    const delta = chopS - newS;
+    const others = rollnotes.filter(n => !n.chopdir).length;
+    if (cmode === "start" && delta !== 0 && others > 0 && !rebarArmed) {
+      rebarArmed = true;
+      document.getElementById("nstatus").textContent =
+        "⚠ Chop the song start here? Bars renumber and " + others +
+        " annotation(s) shift to keep their musical positions. Tap Save again to confirm.";
+      return;
+    }
+    rebarArmed = false;
+    if (cmode === "start" && delta !== 0) shiftAnchors(delta);
+    rollnotes = rollnotes.filter(n => n.chopdir !== cmode); // one chop per side
+    const cbt = barTicks();
+    fresh = {b1: Math.floor(raw / cbt) + 1, q1: snapBeat((raw % cbt) / beatTicks() + 1),
+             b2: null, q2: null, text: "chop: " + cmode, added: true};
   } else if (type === "chord") {
     const sym = document.getElementById("nchordsym").value.trim();
     if (!sym) { document.getElementById("nstatus").textContent = "Chord symbol is empty — tap chips or type one."; return; }
@@ -3154,6 +3259,20 @@ document.getElementById("ndelete").addEventListener("click", () => {
     }
     rebarArmed = false;
     if (tsChanged) convertAnchors(oldTs, [4, 4]);
+  }
+  // removing a start chop restores hidden bars: annotations shift right to stay
+  // glued to their music, with the same two-tap warning as re-barring
+  if (editingNote && editingNote.chopdir === "start" && chopS) {
+    const others = rollnotes.filter(n => !n.chopdir).length;
+    if (others > 0 && !rebarArmed) {
+      rebarArmed = true;
+      document.getElementById("nstatus").textContent =
+        "⚠ Removing the start chop restores the hidden bars; " + others +
+        " annotation(s) will shift to keep their musical positions. Tap Delete again to confirm.";
+      return;
+    }
+    rebarArmed = false;
+    shiftAnchors(chopS);
   }
   rollnotes = rollnotes.filter(n => n !== editingNote);
   finalizeNotes();
