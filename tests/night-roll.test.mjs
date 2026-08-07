@@ -185,10 +185,16 @@ test("modal keys: tonic + mode names map to the relative major's signature", () 
   assert.equal(run(`keyNameToSf("E phrygian")`), 0);
   assert.equal(run(`keyNameToSf("G mixolydian")`), 0);
   assert.equal(run(`keyNameToSf("Gm")`), -2);        // legacy minor suffix still works
-  assert.equal(run(`chosenKeyName(0, "dorian")`), "D dorian");
-  assert.equal(run(`chosenKeyName(-3, "dorian")`), "F dorian");
-  assert.equal(run(`chosenKeyName(-2, "minor")`), "Gm");
-  assert.equal(run(`chosenKeyName(1, "major")`), "G");
+  // tonic-first naming (2026-08-07 rework): pc + mode -> spelled name + true signature
+  assert.deepEqual(val(`keyNameFor(2, "dorian")`), {name: "D dorian", sf: 0, tonic: "D"});
+  assert.deepEqual(val(`keyNameFor(5, "dorian")`), {name: "F dorian", sf: -3, tonic: "F"});
+  assert.deepEqual(val(`keyNameFor(7, "minor")`), {name: "Gm", sf: -2, tonic: "G"});
+  assert.deepEqual(val(`keyNameFor(7, "major")`), {name: "G", sf: 1, tonic: "G"});
+  // enharmonic choice lands on the real signature: G#m (5#) not Abm (7b), Db (5b) not C# (7#)
+  assert.deepEqual(val(`keyNameFor(8, "minor")`), {name: "G#m", sf: 5, tonic: "G#"});
+  assert.deepEqual(val(`keyNameFor(1, "major")`), {name: "Db", sf: -5, tonic: "Db"});
+  assert.deepEqual(val(`keyNameFor(10, "major")`), {name: "Bb", sf: -2, tonic: "Bb"});
+  assert.equal(val(`keyNameFor(6, "major")`).name, "F#"); // 6#/6b tie: sharp side wins
   // round-trip through rollnotes: the modal name survives and carries its signature
   run(`rollnotes = parseRollnotes("[1.1]\\nkey: D dorian\\n").map(resolveNote); finalizeNotes();`);
   assert.equal(run(`rollnotes[0].keydir`), 0);
@@ -464,4 +470,15 @@ test("lasso toggle: tap adds, tap again removes, empty selection hides Chord?", 
   assert.equal(run(`multiSelKey.has("0:0")`), false);
   run(`toggleSel({ti: 0, ni: 1});`);
   assert.equal(run(`multiSel.length`), 0);
+});
+
+test("partial keys: tonic stored, never applied — round-trips with the ? marker", () => {
+  installSong();
+  run(`rollnotes = parseRollnotes("[1.1]\\nkey: G#/Ab?\\n").map(resolveNote); finalizeNotes();`);
+  assert.equal(run(`rollnotes[0].keypartial`), "G#/Ab");
+  assert.equal(run(`rollnotes[0].keydir`), undefined); // not applied:
+  assert.equal(run(`keyRegions.length`), 0);           // no region, no signature
+  assert.equal(run(`sfDeclaredAt(0)`), null);          // staff renders as unkeyed
+  assert.match(run(`serializeRollnotes()`), /key: G#\/Ab\?\n/); // survives Sync
+  run(`rollnotes = []; finalizeNotes();`);
 });

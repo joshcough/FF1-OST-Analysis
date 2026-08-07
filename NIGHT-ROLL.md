@@ -150,9 +150,21 @@ dropdowns, loop targets, and the info strip all use this unit; meter
 changes convert anchors across unit changes through absolute time.
 
 **Keys:** display defaults to C until a `key:` annotation exists — key
-discovery is Josh's job, by design (the dial previews signatures live; a
-major/minor toggle picks the recorded TONIC — "key: Gm", never Bb standing
-in for it — and "Set Gm @ bar N" writes the directive at the cursor's bar).
+discovery is Josh's job, by design. Picker reworked 2026-08-07 (Josh's
+handoff design, after the old signature-paired list wrote a silent wrong
+`key: D`): FIRST dropdown = tonic pitch class only (enharmonic pairs
+labeled "G♯/A♭"; keyNameFor picks the spelling landing on a real
+signature — G♯m over A♭m, D♭ over C♯), SECOND = mode (major/minor +
+church modes). Tonic-without-mode is a first-class PARTIAL: "mode?"
+stores `key: G#/Ab?` — round-trips, shows in the ☰ KEY group and the
+dropdown label ("tonic stored, NOT applied") — but creates no keyRegion:
+no signature, no respelling, nothing downstream until the mode lands.
+"Set Gm @ bar N" writes full directives at the cursor's bar.
+**◯5 Circle of fifths** (footer button): live canvas chart — majors /
+relative minors / vii° rings, signature counts, the movable degree
+window (IV·I·V / ii·vi·iii / vii°), gold rim on the song's governing
+key. Tap a wedge to recenter, ⟲ ⟳ rotate by fifths; detail block gives
+the center key's accidentals, scale, all seven triads, and neighbors.
 Ranged keys revert automatically. The dropdown label reports the recorded
 names: "key: not set (C)" vs "key: Gm ✓". Minor names map to the relative
 major's signature for engraving (keyNameToSf). MIDI files carry true key signatures (via

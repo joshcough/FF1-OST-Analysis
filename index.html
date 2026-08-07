@@ -187,6 +187,9 @@
   }
   #instwrap { position: relative; height: 168px; }
 
+  #cofdetail { font-family: var(--mono); font-size: 12px; line-height: 1.7; margin-top: 8px; white-space: pre-wrap; }
+  #cofdetail b { color: var(--gold); }
+
   .chline { font-family: var(--mono); font-size: 13px; padding: 3px 0; }
   .chline.chhead { color: var(--dim); font-size: 11px; letter-spacing: 0.09em; margin-top: 12px; text-transform: uppercase; }
   .chline.ok { color: var(--gold); }
@@ -413,11 +416,21 @@
     <option value="">find: off</option>
   </select>
   <button id="chordbtn" style="display:none">Chord?</button>
-  <select id="keysel" aria-label="Key">
+  <select id="keysel" aria-label="Key tonic">
     <option value="" id="keyunset">key: not set (C)</option>
   </select>
-  <button id="keymode" style="display:none">major</button>
+  <select id="keymode" aria-label="Key mode" style="display:none">
+    <option value="">mode?</option>
+    <option value="major">major</option>
+    <option value="minor">minor</option>
+    <option value="dorian">dorian</option>
+    <option value="phrygian">phrygian</option>
+    <option value="lydian">lydian</option>
+    <option value="mixolydian">mixolydian</option>
+    <option value="locrian">locrian</option>
+  </select>
   <button id="keyset" style="display:none">Set</button>
+  <button id="cofbtn" aria-label="Circle of fifths">◯5</button>
   <div id="noteinfo">tap a note</div>
   <button id="listbtn">☰ Notes</button>
   <button id="notebtn">+ Note</button>
@@ -475,6 +488,7 @@
       <span class="lbl">new key</span>
       <select id="nkeysel"></select>
       <select id="nkeymode">
+        <option value="">mode? (tonic only — stored, not applied)</option>
         <option value="major">major</option>
         <option value="minor">minor</option>
         <option value="dorian">dorian</option>
@@ -556,6 +570,8 @@
       <dt>Tap a note</dt><dd>Inspector shows pitch, bar &amp; beat (counted 1e&amp;a), length, velocity, track — and plays it.</dd>
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in all views). Boxes ADD to the selection — draw as many as you need. Tap any note to toggle it in or out (surgical removal of a pedal or neighbor); tap empty space to clear. Shows all the pitch names, low to high.</dd>
+      <dt>key: picker</dt><dd>First dropdown is the tonic pitch only; the second is the mode. Setting both writes the key. Choosing "mode?" stores just the tonic ("key: G♯/A♭?") — recorded but NOT applied: no key signature, no respelling, the staff stays as-is until you come back with the mode. The dropdown label always says which state you're in.</dd>
+      <dt>◯5 Circle of fifths</dt><dd>The classic chart, live: majors outside with their signatures, relative minors inside, diminished chords at the center, and the movable degree window (IV·I·V over ii·vi·iii over vii°). Opens centered on the song's key; tap any wedge to jump there, ⟲ ⟳ to rotate a fifth at a time. Below the wheel: the center key's signature accidentals, full scale, all seven triads, and its IV/V neighbors.</dd>
       <dt>find: (pitch finder)</dt><dd>Pick a pitch class in the footer dropdown and every occurrence lights up across all visible channels — everything else dims, so nothing lit means a confident zero. Works by pitch class (find B♭ catches A#), shows the count and channels in the strip, and labels the degree when a key is set. Made for mode-hunting: chasing the one accidental that separates two candidate modes.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — opens the evidence dialog: each label tone with its role and whether it sounds (and where), extra pitches present, the per-channel note lists, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
@@ -595,6 +611,19 @@
     </dl>
 
     <div class="row"><button class="primary" id="helpclose">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="cofsheet">
+  <div class="sheet">
+    <h2>CIRCLE OF FIFTHS</h2>
+    <canvas id="cofcanvas" style="position:static;display:block;margin:0 auto;touch-action:manipulation"></canvas>
+    <div id="cofdetail"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="cofccw">⟲</button>
+      <button id="cofcw">⟳</button>
+      <button id="cofclose" style="margin-left:auto">Close</button>
+    </div>
   </div>
 </div>
 
@@ -892,10 +921,16 @@ function parseRollnotes(text) {
       const note = body.slice(1).join("\n").trim();
       if (note) n.cnote = note;
     }
-    const km = n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i); // "Gm" or "D dorian"
-    if (km) {
-      const sf = keyNameToSf(km[1].trim());
-      if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1].trim(); }
+    const kp = n.text.match(/^key:\s*([A-G][#b]?(?:\/[A-G][#b]?)?)\s*\?\s*$/i);
+    if (kp) { // partial: tonic stored, mode pending — never applied to the staff
+      n.keypartial = kp[1];
+      n.text = "key: " + kp[1] + "?";
+    } else {
+      const km = n.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i); // "Gm" or "D dorian"
+      if (km) {
+        const sf = keyNameToSf(km[1].trim());
+        if (sf !== null) { n.keydir = sf; n.text = "key: " + km[1].trim(); }
+      }
     }
     const tm = n.text.match(/^timesig:\s*(\d+)\s*\/\s*(\d+)/i);
     if (tm) { n.tsdir = [+tm[1], +tm[2]]; n.text = "timesig: " + tm[1] + "/" + tm[2]; }
@@ -1000,8 +1035,11 @@ function finalizeNotes() {
     .sort((a, b) => a.start - b.start);
   const unsetOpt = document.getElementById("keyunset");
   if (unsetOpt) {
+    const partials = rollnotes.filter(n => n.keypartial).map(n => n.keypartial + "?");
     unsetOpt.textContent = keyRegions.length
       ? "key: " + keyRegions.map(r => r.name + (r.b2 ? "(" + r.b1 + "–" + r.b2 + ")" : "")).join(", ") + " ✓"
+      : partials.length
+      ? "key: " + partials.join(", ") + " — tonic stored, NOT applied"
       : "key: not set (C)";
   }
   // sections + chords: depth from containment; lane colors by label (same
@@ -1106,7 +1144,7 @@ function dropLocalKeyAt(bar) { // a new key change replaces any local key marker
 }
 function isDirective(n) { // anything that isn't a plain text note
   return !!(n.section || n.chord || n.chopdir || n.keydir !== undefined ||
-            n.loopTo !== undefined || /^timesig:/i.test(n.text));
+            n.loopTo !== undefined || /^(timesig|key):/i.test(n.text));
 }
 function activeNoteAt(tick) {
   let best = null;
@@ -2858,76 +2896,211 @@ speedreset.addEventListener("click", () => applySpeed(100));
 // A signature is mode-ambiguous (Bb major and G minor share two flats), so a
 // major/minor toggle picks which TONIC gets recorded — "key: Gm", never the
 // relative major standing in for it.
+// Key picker (reworked 2026-08-07, Josh's design from the sweep handoff):
+// FIRST dropdown = tonic pitch only, SECOND = mode. The old signature list
+// ("D / B minor") let a missed mode write a silent wrong key. Tonic without
+// mode is a normal mid-derivation state (floating castle), so it's STORABLE
+// ("key: G#/Ab?") but never APPLIED — no signature, no respelling, nothing
+// downstream until the mode lands. Stored vs applied is always visible.
 const keysel = document.getElementById("keysel");
 const keysetBtn = document.getElementById("keyset");
-const keymodeBtn = document.getElementById("keymode");
-const MODE_ORDER = ["major", "minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian"];
-let keyModeIdx = 0; // index into MODE_ORDER, cycled by the footer button
-function minorNameOf(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf); }
-function modalNameOf(sf, mode) { // tonic of `mode` within signature sf, spelled for sf
-  return spellPc((((sf * 7) % 12 + 12) % 12 + MODE_OFFSET[mode]) % 12, sf);
+const keymodeSel = document.getElementById("keymode");
+const TONIC_SPELL = [["C"], ["C#", "Db"], ["D"], ["D#", "Eb"], ["E"], ["F"],
+                     ["F#", "Gb"], ["G"], ["G#", "Ab"], ["A"], ["A#", "Bb"], ["B"]];
+const FIFTHS_POS = {F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5};
+const MODE_FIFTHS = {major: 0, ionian: 0, dorian: 2, phrygian: 4, lydian: -1,
+                     mixolydian: 1, minor: 3, aeolian: 3, locrian: 5};
+function trueSf(spelling, mode) { // real signature for this exact spelling (no enharmonic folding)
+  const pos = FIFTHS_POS[spelling[0]] + (spelling[1] === "#" ? 7 : spelling[1] === "b" ? -7 : 0);
+  const sf = pos - MODE_FIFTHS[mode];
+  return Math.abs(sf) <= 6 ? sf : null; // beyond 6 accidentals the enharmonic twin always wins
 }
-function chosenKeyName(sf, mode) {
-  if (mode === "major") return SF_MAJOR[sf] || "C";
-  if (mode === "minor") return minorNameOf(sf) + "m";
-  return modalNameOf(sf, mode) + " " + mode;
+function keyNameFor(pc, mode) { // pick the spelling that lands on a real signature
+  const suffix = mode === "major" ? "" : mode === "minor" ? "m" : " " + mode;
+  let best = null;
+  for (const sp of TONIC_SPELL[pc]) {
+    const sf = trueSf(sp, mode);
+    if (sf !== null && (!best || Math.abs(sf) < Math.abs(best.sf))) best = {name: sp + suffix, sf, tonic: sp};
+  }
+  return best;
+}
+function tonicLabel(pc) { return TONIC_SPELL[pc].join("/"); }
+function tonicPcOfName(name) { // "G#m" / "D dorian" / "Bb" -> pc
+  const m = (name || "").match(/^([A-G])([#b]?)/);
+  return m ? (LETTER_PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12 : null;
+}
+function modeOfName(name) {
+  const mm = (name || "").match(/\s([a-z]+)$/i);
+  if (mm && mm[1].toLowerCase() in MODE_OFFSET) return mm[1].toLowerCase();
+  return /m$/.test(name) && name.length > 1 ? "minor" : "major";
 }
 {
-  const SIGS = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6];
-  const o0 = document.createElement("option");
-  o0.value = "0"; o0.textContent = "0 — C / Am";
-  keysel.appendChild(o0);
-  for (const sf of SIGS) {
+  for (let pc = 0; pc < 12; pc++) {
     const o = document.createElement("option");
-    o.value = String(sf);
-    o.textContent = Math.abs(sf) + (sf > 0 ? "♯" : "♭") + " — " + SF_MAJOR[sf] + " / " + minorNameOf(sf) + "m";
+    o.value = String(pc);
+    o.textContent = tonicLabel(pc);
     keysel.appendChild(o);
   }
-  // the annotation editor's key picker gets the same signatures (no "unset" row)
-  const nk = document.getElementById("nkeysel");
+  const nk = document.getElementById("nkeysel"); // editor picker: same tonic list
   for (const opt of keysel.querySelectorAll("option")) {
     if (opt.value === "") continue;
     nk.appendChild(opt.cloneNode(true));
   }
 }
-function refreshKeysetLabel() {
-  if (previewSf === null || !song) return;
-  keymodeBtn.textContent = MODE_ORDER[keyModeIdx];
-  keysetBtn.textContent = "Set " + chosenKeyName(previewSf, MODE_ORDER[keyModeIdx]) +
-                          " @ bar " + (Math.floor(playCursor / barTicks()) + 1);
-}
-keysel.addEventListener("change", () => {
-  previewSf = keysel.value === "" ? null : parseInt(keysel.value, 10);
-  keysetBtn.style.display = previewSf === null ? "none" : "";
-  keymodeBtn.style.display = previewSf === null ? "none" : "";
+function chosenTonicPc() { return keysel.value === "" ? null : +keysel.value; }
+function refreshKeyPreview() { // preview applies only when tonic AND mode are chosen
+  const pc = chosenTonicPc(), mode = keymodeSel.value;
+  const full = pc !== null && mode ? keyNameFor(pc, mode) : null;
+  previewSf = full ? full.sf : null;
+  keymodeSel.style.display = pc === null ? "none" : "";
+  keysetBtn.style.display = pc === null ? "none" : "";
   refreshKeysetLabel();
   buildScoreModel();
   clampView();
   draw();
-});
-keymodeBtn.addEventListener("click", () => {
-  keyModeIdx = (keyModeIdx + 1) % MODE_ORDER.length;
-  refreshKeysetLabel();
-});
+}
+function refreshKeysetLabel() {
+  if (!song || chosenTonicPc() === null) return;
+  const pc = chosenTonicPc(), mode = keymodeSel.value;
+  const bar = Math.floor(playCursor / barTicks()) + 1;
+  keysetBtn.textContent = mode
+    ? "Set " + keyNameFor(pc, mode).name + " @ bar " + bar
+    : "Store " + tonicLabel(pc) + "? @ bar " + bar;
+}
+keysel.addEventListener("change", refreshKeyPreview);
+keymodeSel.addEventListener("change", refreshKeyPreview);
 keysetBtn.addEventListener("click", () => {
-  if (previewSf === null || !song || !songKey) return;
-  const bt = barTicks();
-  const bar = Math.floor(playCursor / bt) + 1;
-  const name = chosenKeyName(previewSf, MODE_ORDER[keyModeIdx]);
+  const pc = chosenTonicPc(), mode = keymodeSel.value;
+  if (pc === null || !song || !songKey) return;
+  const bar = Math.floor(playCursor / barTicks()) + 1;
   dropLocalKeyAt(bar);
-  rollnotes.push(resolveNote({b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name,
-                              keydir: previewSf, added: true}));
+  let name, fresh;
+  if (mode) {
+    const full = keyNameFor(pc, mode);
+    name = full.name;
+    fresh = {b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name, keydir: full.sf, added: true};
+  } else { // tonic only: stored, NOT applied
+    name = tonicLabel(pc) + "?";
+    fresh = {b1: bar, q1: 1, b2: null, q2: null, text: "key: " + name, keypartial: tonicLabel(pc), added: true};
+  }
+  rollnotes.push(resolveNote(fresh));
   previewSf = null;
   keysel.value = "";
+  keymodeSel.value = "";
   keysetBtn.style.display = "none";
-  keymodeBtn.style.display = "none";
+  keymodeSel.style.display = "none";
   finalizeNotes();
   saveLocalNotes();
   buildScoreModel();
   lastSubtitle = undefined;
   updateSubtitle();
   draw();
-  setInfo("key set to " + name + " at bar " + bar + " (unsynced — Sync to commit)");
+  setInfo(mode ? "key set to " + name + " at bar " + bar + " (unsynced — Sync to commit)"
+               : "tonic " + name + " stored at bar " + bar + " — NOT applied until a mode is set");
+});
+
+// ------------------------------------------- circle of fifths (◯5 in the footer)
+// Live version of the classic chart: outer ring majors, middle relative
+// minors, inner diminished (vii°) — with the rotatable degree window
+// (IV I V / ii vi iii / vii°) centered on any wedge. Opens centered on the
+// song's governing key; tap a wedge to jump, ⟲ ⟳ to rotate a fifth at a time.
+let cofSf = 0; // signature the degree window is centered on (-6..6 wraps)
+const cofCanvas = document.getElementById("cofcanvas");
+const cofCtx = cofCanvas.getContext("2d");
+function cofMinor(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf) + "m"; }
+function cofDim(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 11) % 12, sf) + "dim"; }
+function cofSigLabel(sf) { return sf === 0 ? "♮" : Math.abs(sf) + (sf > 0 ? "♯" : "♭"); }
+function cofMajorName(sf) { return sf === 6 ? "F♯/G♭" : SF_MAJOR[sf]; }
+const wrapSf = sf => { let s = ((sf + 6) % 12 + 12) % 12 - 6; return s === -6 ? 6 : s; }; // -6 shows as F#/Gb
+function drawCof() {
+  const size = Math.min(window.innerWidth * 0.84, 380);
+  const dpr = window.devicePixelRatio || 1;
+  cofCanvas.width = size * dpr;
+  cofCanvas.height = size * dpr;
+  cofCanvas.style.width = size + "px";
+  cofCanvas.style.height = size + "px";
+  const c = cofCtx;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2, R = size / 2 - 2;
+  const rings = [[0.74, 1.0], [0.50, 0.74], [0.30, 0.50]]; // major / minor / dim (fractions of R)
+  const win = off => wrapSf(cofSf + off); // degree window: -1=IV, 0=I, +1=V
+  const govern = song ? sfDeclaredAt(curTick()) : null;
+  for (let i = 0; i < 12; i++) {
+    const sf = wrapSf(i > 6 ? i - 12 : i);
+    const a0 = (i - 0.5) * Math.PI / 6 - Math.PI / 2, a1 = a0 + Math.PI / 6;
+    const inWin = [win(-1), win(0), win(1)].includes(sf);
+    for (let ring = 0; ring < 3; ring++) {
+      const [rIn, rOut] = rings[ring];
+      // window shading: majors light for IV I V, minors for ii vi iii, dim only under I
+      const lit = ring < 2 ? inWin : sf === win(0);
+      c.beginPath();
+      c.arc(cx, cy, R * rOut, a0, a1);
+      c.arc(cx, cy, R * rIn, a1, a0, true);
+      c.closePath();
+      c.fillStyle = lit ? "rgba(212,175,55,0.16)" : css("--panel2");
+      c.fill();
+      c.strokeStyle = css("--grid");
+      c.stroke();
+    }
+    if (govern !== null && sf === wrapSf(govern)) { // song's key: gold rim on its major wedge
+      c.beginPath();
+      c.arc(cx, cy, R * 0.995, a0, a1);
+      c.strokeStyle = css("--gold");
+      c.lineWidth = 3;
+      c.stroke();
+      c.lineWidth = 1;
+    }
+    const mid = (a0 + a1) / 2;
+    const put = (txt, rFrac, font, color) => {
+      c.font = font;
+      c.fillStyle = color;
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(txt, cx + Math.cos(mid) * R * rFrac, cy + Math.sin(mid) * R * rFrac);
+    };
+    put(cofMajorName(sf), 0.90, "bold 15px " + css("--mono"), css("--text"));
+    put(cofSigLabel(sf), 0.79, "10px " + css("--mono"), css("--dim"));
+    put(cofMinor(sf), 0.62, "12px " + css("--mono"), css("--text"));
+    put(cofDim(sf), 0.40, "9px " + css("--mono"), css("--dim"));
+    // degree labels ride the window
+    if (sf === win(0)) { put("I", 0.955, "bold 10px " + css("--mono"), css("--gold")); put("vi", 0.545, "bold 9px " + css("--mono"), css("--gold")); put("vii°", 0.325, "bold 8px " + css("--mono"), css("--gold")); }
+    if (sf === win(-1)) { put("IV", 0.955, "bold 10px " + css("--mono"), css("--gold")); put("ii", 0.545, "bold 9px " + css("--mono"), css("--gold")); }
+    if (sf === win(1)) { put("V", 0.955, "bold 10px " + css("--mono"), css("--gold")); put("iii", 0.545, "bold 9px " + css("--mono"), css("--gold")); }
+  }
+  // detail: everything about the window's center key
+  const sf = win(0);
+  const sp = spellFor(sf);
+  const tonicPc = (((sf * 7) % 12) + 12) % 12;
+  const scale = [0, 2, 4, 5, 7, 9, 11].map(iv => { const s = sp[(tonicPc + iv) % 12]; return s.letter + (s.acc || ""); });
+  const triads = [scale[0], scale[1] + "m", scale[2] + "m", scale[3], scale[4], scale[5] + "m", scale[6] + "°"];
+  const DEGS = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+  const accs = sf === 0 ? "no accidentals"
+    : sf > 0 ? ["F♯", "C♯", "G♯", "D♯", "A♯", "E♯"].slice(0, sf).join(" ")
+    : ["B♭", "E♭", "A♭", "D♭", "G♭", "C♭"].slice(0, -sf).join(" ");
+  document.getElementById("cofdetail").innerHTML =
+    "<b>" + cofMajorName(sf) + " major</b> · " + cofSigLabel(sf) + " (" + accs + ") · relative " + cofMinor(sf) + "\n" +
+    "scale: " + scale.join(" ") + "\n" +
+    DEGS.map((d, i) => d + " " + triads[i]).join("  ·  ") + "\n" +
+    "V of " + cofMajorName(sf) + " is " + cofMajorName(wrapSf(sf + 1)) + " · IV is " + cofMajorName(wrapSf(sf - 1));
+}
+document.getElementById("cofbtn").addEventListener("click", () => {
+  const g = song ? sfDeclaredAt(curTick()) : null;
+  cofSf = g !== null ? wrapSf(g) : 0;
+  document.getElementById("cofsheet").classList.add("on");
+  drawCof();
+});
+document.getElementById("cofclose").addEventListener("click", () =>
+  document.getElementById("cofsheet").classList.remove("on"));
+document.getElementById("cofcw").addEventListener("click", () => { cofSf = wrapSf(cofSf + 1); drawCof(); });
+document.getElementById("cofccw").addEventListener("click", () => { cofSf = wrapSf(cofSf - 1); drawCof(); });
+cofCanvas.addEventListener("pointerdown", e => {
+  const r = cofCanvas.getBoundingClientRect();
+  const dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
+  let i = Math.round((Math.atan2(dy, dx) + Math.PI / 2) / (Math.PI / 6));
+  i = ((i % 12) + 12) % 12;
+  cofSf = wrapSf(i > 6 ? i - 12 : i);
+  drawCof();
 });
 
 // ---------------------------------------------------------------- notes list
@@ -2935,7 +3108,7 @@ const notelistSheet = document.getElementById("notelistsheet");
 // one group per annotation type, so working a single layer (all the chords,
 // all the keys) never means hunting through a mixed chronological pile
 const NOTE_GROUPS = [
-  {title: "KEY", type: "key", match: n => n.keydir !== undefined},
+  {title: "KEY", type: "key", match: n => n.keydir !== undefined || n.keypartial},
   {title: "METER", type: "timesig", match: n => !!n.tsdir},
   {title: "SECTIONS", type: "section", match: n => n.section},
   {title: "CHORDS", type: "chord", match: n => n.chord},
@@ -3901,12 +4074,14 @@ function openEditor(note, presetType) {
     type === "chord" ? (note && note.cnote || "") : note && type !== "key" ? note.text : "";
   if (type === "chord") setChordWidget(note ? note.text : "");
   if (type === "key" && note) {
-    document.getElementById("nkeysel").value = String(note.keydir);
     const nm = (note.text.match(/^key:\s*(\S+(?:\s+[a-z]+)?)/i) || [])[1] || "";
-    const modeMatch = nm.match(/\s([a-z]+)$/i);
-    document.getElementById("nkeymode").value =
-      modeMatch && modeMatch[1].toLowerCase() in MODE_OFFSET ? modeMatch[1].toLowerCase()
-      : /m$/.test(nm) && nm.length > 1 ? "minor" : "major";
+    if (note.keypartial) {
+      document.getElementById("nkeysel").value = String(tonicPcOfName(note.keypartial));
+      document.getElementById("nkeymode").value = ""; // tonic stored, mode pending
+    } else {
+      document.getElementById("nkeysel").value = String(tonicPcOfName(nm));
+      document.getElementById("nkeymode").value = modeOfName(nm);
+    }
   }
   document.getElementById("ndelete").style.display = note ? "" : "none";
   document.getElementById("nstatus").textContent = note && !note.added
@@ -3978,11 +4153,17 @@ document.getElementById("nsave").addEventListener("click", () => {
   if (editingNote) rollnotes = rollnotes.filter(n => n !== editingNote);
   let fresh;
   if (type === "key") {
-    const sf = parseInt(document.getElementById("nkeysel").value, 10);
+    const pc = parseInt(document.getElementById("nkeysel").value, 10);
     const mode = document.getElementById("nkeymode").value;
     dropLocalKeyAt(b1);
-    fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
-             text: "key: " + chosenKeyName(sf, mode), keydir: sf, added: true};
+    if (mode) {
+      const full = keyNameFor(pc, mode);
+      fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+               text: "key: " + full.name, keydir: full.sf, added: true};
+    } else { // tonic only: stored, not applied
+      fresh = {b1, q1, b2: b2raw || null, q2: b2raw ? (q2raw || null) : null,
+               text: "key: " + tonicLabel(pc) + "?", keypartial: tonicLabel(pc), added: true};
+    }
   } else if (type === "timesig") {
     const num = +document.getElementById("ntsnum").value, den = +document.getElementById("ntsden").value;
     const oldTs = effTs();

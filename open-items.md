@@ -148,15 +148,17 @@ his behalf.
 
 ### Tooling requests — 08-07 sweep handoff (proposed; Josh signs off)
 
-- **Key picker: tonic-only first dropdown + stored-vs-applied keys.**
-  Design decided in the handoff: first dropdown lists 12 pitch classes
-  only (no "D / B minor" pairings — that pairing wrote a silent wrong
-  `key: D` on matoyas-cave); mode comes entirely from the second
-  control. Tonic-without-mode must be ENTERABLE (finding tonic and mode
-  separately is normal method — floating castle is live) but must not
-  REGISTER: no key signature, no respelling, nothing downstream until
-  mode lands. UI must show which state an entry is in — a partial can't
-  read as a verdict.
+- **Key picker: tonic-only first dropdown + stored-vs-applied keys —
+  SHIPPED 2026-08-07** exactly per the handoff design: 12 tonic pitch
+  classes (enharmonics labeled "G♯/A♭", spelling auto-picked to land on
+  a real signature), mode entirely in the second dropdown incl. "mode?".
+  Partials write `key: G#/Ab?` — stored, listed, round-tripped, and
+  clearly labeled NOT applied; no signature or respelling until the mode
+  lands. Existing annotations needed no changes (format unchanged for
+  full keys — all 14 distinct key lines verified parsing identically).
+  Bonus same day: **◯5 circle-of-fifths modal** (Josh's request) — live
+  chart with the rotatable degree window, tap-to-recenter, ⟲ ⟳, opens
+  on the song's governing key.
 - **Lasso: beyond one rectangle — SHIPPED 2026-08-07** (CC's touch-first
   design, per Josh's "build whatever you think appropriate"): boxes
   union into the selection, tapping a note toggles it in/out (works in
