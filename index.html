@@ -186,6 +186,13 @@
     transition: opacity 1.5s ease;
   }
   #instwrap { position: relative; height: 168px; }
+
+  .chline { font-family: var(--mono); font-size: 13px; padding: 3px 0; }
+  .chline.chhead { color: var(--dim); font-size: 11px; letter-spacing: 0.09em; margin-top: 12px; text-transform: uppercase; }
+  .chline.ok { color: var(--gold); }
+  .chline.bad { color: #e66767; }
+  .chline.warn { color: var(--accent); }
+  .chline.dim { color: var(--dim); }
   .seg button { border: none; border-radius: 0; min-height: 36px; padding: 6px 11px; }
   .hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
 
@@ -546,7 +553,7 @@
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
-      <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — the evidence report: which label tones actually sound in the span, which are missing, what extra pitches are present, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
+      <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — opens the evidence dialog: each label tone with its role and whether it sounds (and where), extra pitches present, the per-channel note lists, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
       <dt>💬</dt><dd>Show/hide the text-note strip (the fixed slot that shows your notes as the playhead crosses them). Off frees the vertical space; setting sticks.</dd>
       <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 24 frets; a pitch that doesn't fit the neck shows octave-folded with a dashed ring and a tiny ▴/▾ pointing at its true octave.</dd>
       <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
@@ -583,6 +590,17 @@
     </dl>
 
     <div class="row"><button class="primary" id="helpclose">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="challengesheet">
+  <div class="sheet">
+    <h2 id="chtitle">CHALLENGE</h2>
+    <div id="chbody"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="chcopy">Copy</button>
+      <button id="chclose">Close</button>
+    </div>
   </div>
 </div>
 
@@ -2936,11 +2954,14 @@ lassobtn.addEventListener("click", () => {
 // tonic pedal under a V7 shows up here as "extra", and that's correct.
 function chordEvidence(sec) {
   const pitches = new Set();
+  const byTrack = [];
   song.tracks.forEach((tr, ti) => {
     if (!trackAudible(ti) || trackIsDrums(ti)) return;
+    const ps = new Set();
     for (const n of tr.notes) {
-      if (!n.gone && n.t < sec.end && n.t + n.d > sec.start) pitches.add(n.p);
+      if (!n.gone && n.t < sec.end && n.t + n.d > sec.start) { pitches.add(n.p); ps.add(n.p); }
     }
+    if (ps.size) byTrack.push({name: tr.name || "track " + (ti + 1), pitches: [...ps].sort((a, b) => a - b)});
   });
   if (!pitches.size) return {err: "no notes sound in this span"};
   const present = new Set([...pitches].map(p => p % 12));
@@ -2968,28 +2989,67 @@ function chordEvidence(sec) {
   }
   const missing = expected ? [...expected].filter(pc => !present.has(pc)) : null;
   const extra = expected ? [...present].filter(pc => !expected.has(pc)) : null;
-  return {pitches: [...pitches].sort((a, b) => a - b), present, expected, missing, extra, roles,
+  return {pitches: [...pitches].sort((a, b) => a - b), present, expected, missing, extra, roles, byTrack,
           namer: nameChord([...pitches], sfDeclaredAt(sec.start))};
 }
-document.getElementById("chordbtn").addEventListener("click", () => {
-  if (challengeSec) {
-    const sec = challengeSec, ev = chordEvidence(sec);
-    if (ev.err) { setInfo("challenge " + sec.text + ": " + ev.err); return; }
-    const sf = sfDeclaredAt(sec.start);
-    const sp = pcs => pcs.map(pc => spellPc(pc, sf)).join(" ");
-    const role = pcs => pcs.map(pc => spellPc(pc, sf) + "(" + ev.roles[pc] + ")").join(" ");
-    const sounds = "sounds: " + sp([...new Set(ev.pitches.map(p => p % 12))]);
-    const verdict = ev.expected === null
-      ? "label not in the chord vocabulary"
-      : (ev.missing.length
-          ? "has: " + role([...ev.expected].filter(pc => ev.present.has(pc))) +
-            "  ·  missing: " + role(ev.missing)
-          : "label tones: all sound") +
-        "  ·  " + (ev.extra.length ? "extra: " + sp(ev.extra) : "extra: none");
-    const line = "challenge " + sec.text + "  →  " + sounds + "  ·  " + verdict + "  ·  namer: " + ev.namer;
-    setInfo(line, line);
-    return;
+let challengeCopy = "";
+function openChallenge(sec) {
+  const ev = chordEvidence(sec);
+  const sf = sfDeclaredAt(sec.start);
+  const body = document.getElementById("chbody");
+  body.innerHTML = "";
+  const copyLines = [];
+  const line = (text, cls) => {
+    const d = document.createElement("div");
+    d.className = "chline" + (cls ? " " + cls : "");
+    d.textContent = text;
+    body.appendChild(d);
+    copyLines.push(text);
+  };
+  const title = "CHALLENGE — " + sec.text + " · bar " + sec.b1 +
+                (sec.b2 && sec.b2 !== sec.b1 ? "–" + sec.b2 : "");
+  document.getElementById("chtitle").textContent = title;
+  copyLines.push(title);
+  if (ev.err) {
+    line(ev.err, "dim");
+  } else {
+    const occ = pc => ev.pitches.filter(p => p % 12 === pc).map(p => pitchName(p, sf)).join(" ");
+    line("label tones", "chhead");
+    if (ev.expected === null) {
+      line("label not in the chord vocabulary — tone check skipped", "dim");
+    } else {
+      for (const pc of ev.expected) {
+        const has = ev.present.has(pc);
+        line(spellPc(pc, sf) + " — " + ev.roles[pc] + (has ? " · sounds as " + occ(pc) : " · MISSING"),
+             has ? "ok" : "bad");
+      }
+    }
+    line("also sounding — evidence, not verdict (pedals and passing tones land here)", "chhead");
+    if (ev.extra === null) {
+      const all = [...new Set(ev.pitches.map(p => p % 12))];
+      line(all.map(pc => spellPc(pc, sf)).join(" "), "warn");
+    } else if (ev.extra.length) {
+      for (const pc of ev.extra) line(spellPc(pc, sf) + " · sounds as " + occ(pc), "warn");
+    } else {
+      line("nothing outside the label", "dim");
+    }
+    line("by channel", "chhead");
+    for (const t of ev.byTrack) line(t.name + ":  " + t.pitches.map(p => pitchName(p, sf)).join(" "), "dim");
+    line("namer's read of the full stack", "chhead");
+    line(ev.namer);
   }
+  challengeCopy = copyLines.join("\n");
+  document.getElementById("challengesheet").classList.add("on");
+}
+document.getElementById("chclose").addEventListener("click", () =>
+  document.getElementById("challengesheet").classList.remove("on"));
+document.getElementById("chcopy").addEventListener("click", async e => {
+  try { await navigator.clipboard.writeText(challengeCopy); e.target.textContent = "✓ copied"; }
+  catch { e.target.textContent = "✗ copy failed"; }
+  setTimeout(() => { e.target.textContent = "Copy"; }, 1200);
+});
+document.getElementById("chordbtn").addEventListener("click", () => {
+  if (challengeSec) { openChallenge(challengeSec); return; }
   if (!multiSel.length) return;
   const pitches = multiSel.map(s => song.tracks[s.ti].notes[s.ni].p);
   const names = [...new Set(pitches)].sort((a, b) => a - b).map(p => pitchName(p, multiSelSf));
