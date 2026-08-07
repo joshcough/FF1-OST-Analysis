@@ -1,4 +1,11 @@
-# ff1ship.rollnotes — beat-anchored annotations
+# ship.rollnotes — beat-anchored annotations
+
+[1.1]
+key: F
+
+[1.3 - 2.2]
+chord: F
+E’s are on-beat sixteenths, unresolved whether they color it as maj7.
 
 [25.3]
 loop: 1.3
