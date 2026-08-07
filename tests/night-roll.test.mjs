@@ -420,3 +420,28 @@ test("chord challenge: evidence report — present/missing/extra vs the label, p
   assert.equal(run(`chordEvidence({text: "F7", start: 5000, end: 6000}).err`), "no notes sound in this span");
   run(`keyRegions = [];`);
 });
+
+test("chord challenge roles: menu's F7 case — guide tones present, root/5th missing, pedal extra", () => {
+  installSong();
+  run(`
+    trackState = [{muted: false, solo: false}];
+    song.tracks = [{name: "t", notes: [
+      {t: 0, d: 960, p: 58, v: 80},   // Bb3 — tonic pedal
+      {t: 0, d: 960, p: 63, v: 80},   // Eb4 — the 7th
+      {t: 0, d: 960, p: 69, v: 80},   // A4  — the 3rd
+      {t: 0, d: 960, p: 75, v: 80},   // Eb5
+      {t: 0, d: 960, p: 81, v: 80},   // A5
+    ]}];
+    keyRegions = [{start: 0, end: null, sf: -2, name: "Bb"}];
+  `);
+  const ev = val(`(() => { const e = chordEvidence({text: "F7", start: 0, end: 960});
+    return {missing: e.missing.sort((a,b)=>a-b), extra: e.extra, roles: e.roles, namer: e.namer}; })()`);
+  assert.deepEqual(ev.missing, [0, 5]);              // C (5th) and F (root) never sound
+  assert.deepEqual(ev.extra, [10]);                  // the Bb pedal
+  assert.equal(ev.roles[9], "3rd");                  // A
+  assert.equal(ev.roles[3], "7th");                  // Eb
+  assert.equal(ev.roles[5], "root");
+  assert.equal(ev.roles[0], "5th");
+  assert.equal(ev.namer, "no standard chord match"); // honest: a bare tritone + pedal names nothing
+  run(`keyRegions = [];`);
+});

@@ -2943,18 +2943,30 @@ function chordEvidence(sec) {
   if (!pitches.size) return {err: "no notes sound in this span"};
   const present = new Set([...pitches].map(p => p % 12));
   const m = parseChordSym(sec.text);
-  let expected = null;
+  let expected = null, roles = null;
   if (m) {
     const rootPc = (LETTER_PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12;
     const tmpl = CHORD_TEMPLATES.find(([suf]) => suf === (m[3] || ""));
     if (tmpl) {
       expected = new Set(tmpl[1].map(iv => (rootPc + iv) % 12));
-      if (m[4]) expected.add((LETTER_PC[m[4][0]] + (m[4][1] === "#" ? 1 : m[4][1] === "b" ? -1 : 0) + 12) % 12);
+      // pc -> role in the LABELED chord, so a partial match reads as
+      // "has the 3rd and 7th, missing root and 5th" — the guide-tone story
+      roles = {};
+      for (const iv of tmpl[1]) {
+        roles[(rootPc + iv) % 12] =
+          iv === 0 ? "root" : iv <= 2 ? "9th" : iv <= 4 ? "3rd" : iv === 5 ? "4th"
+          : iv <= 8 ? "5th" : iv === 9 ? (m[3].includes("6") ? "6th" : "7th") : "7th";
+      }
+      if (m[4]) {
+        const bpc = (LETTER_PC[m[4][0]] + (m[4][1] === "#" ? 1 : m[4][1] === "b" ? -1 : 0) + 12) % 12;
+        expected.add(bpc);
+        if (!(bpc in roles)) roles[bpc] = "bass";
+      }
     }
   }
   const missing = expected ? [...expected].filter(pc => !present.has(pc)) : null;
   const extra = expected ? [...present].filter(pc => !expected.has(pc)) : null;
-  return {pitches: [...pitches].sort((a, b) => a - b), present, expected, missing, extra,
+  return {pitches: [...pitches].sort((a, b) => a - b), present, expected, missing, extra, roles,
           namer: nameChord([...pitches], sfDeclaredAt(sec.start))};
 }
 document.getElementById("chordbtn").addEventListener("click", () => {
@@ -2963,10 +2975,14 @@ document.getElementById("chordbtn").addEventListener("click", () => {
     if (ev.err) { setInfo("challenge " + sec.text + ": " + ev.err); return; }
     const sf = sfDeclaredAt(sec.start);
     const sp = pcs => pcs.map(pc => spellPc(pc, sf)).join(" ");
+    const role = pcs => pcs.map(pc => spellPc(pc, sf) + "(" + ev.roles[pc] + ")").join(" ");
     const sounds = "sounds: " + sp([...new Set(ev.pitches.map(p => p % 12))]);
     const verdict = ev.expected === null
       ? "label not in the chord vocabulary"
-      : (ev.missing.length ? "missing: " + sp(ev.missing) : "label tones: all sound") +
+      : (ev.missing.length
+          ? "has: " + role([...ev.expected].filter(pc => ev.present.has(pc))) +
+            "  ·  missing: " + role(ev.missing)
+          : "label tones: all sound") +
         "  ·  " + (ev.extra.length ? "extra: " + sp(ev.extra) : "extra: none");
     const line = "challenge " + sec.text + "  →  " + sounds + "  ·  " + verdict + "  ·  namer: " + ev.namer;
     setInfo(line, line);
