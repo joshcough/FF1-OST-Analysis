@@ -102,11 +102,11 @@ his behalf.
 
 ## Tooling to-do
 
-- **Full Synthesia-style piano view (Josh, 2026-08-07):** third view mode,
-  time vertical, notes falling onto the keyboard. Milestone 1 (the 🎹
-  instrument panel: piano + fretboard, lasso lighting, tap-to-play)
-  shipped 2026-08-07; the falling-note view reuses that keyboard as its
-  bottom half. Josh wants this — panel-first was sequencing, not scope.
+- **Full Synthesia-style piano view — SHIPPED 2026-08-07** (▼ Fall in the
+  instrument panel): notes fall down the main canvas into the panel's
+  keys, chord symbols and bar numbers ride their lines. Possible later
+  polish: pinch to change the 4.5 s drop window; scrub-by-drag while
+  stopped (gestures currently disabled in Fall).
 - **Instrument-panel piano zoom (Josh, 2026-08-07):** wide-range songs
   stretch the auto-fit keyboard thin on the iPad — keys may get too
   narrow to tap. Wanted: a way to zoom the piano in, maybe just a button

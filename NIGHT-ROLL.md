@@ -62,9 +62,21 @@ directive governs the cursor (degrees never shown for undeclared keys —
 key discovery stays the analyst's job). Piano range = the song's own
 extent, octave-aligned. Guitar: standard tuning EADGBE, high-e on top
 (tab convention), 15 frets, inlay dots, a lit pitch appears at every
-playable position. Open state and tab persist in localStorage. This is
-milestone 1 of the full Synthesia-style falling-note view (parked in
-open-items.md) — that view reuses this keyboard as its bottom half.
+playable position. Open state, tab, and Fall persist in localStorage.
+
+**Fall view** (2026-08-07, ▼ Fall in the panel's tab bar — which sits
+BELOW the keys so nothing blocks the landing): Synthesia-style — the
+main canvas becomes a vertical drop and notes fall down into the panel's
+piano keys, landing on the accent "now" edge the moment they sound (the
+keys light via the same live-pitch set). Time maps through seconds
+(tickToSec), so tempo maps and the speed slider stay truthful; ~4.5 s of
+music fills the drop (FALL_WINDOW). Bar lines ride with numbers, chord
+changes ride gold lines with their symbol, black-key lanes are banded,
+lasso'd notes keep their gold stroke. Piano-only: enabling Fall forces
+the piano tab open; picking Guitar (or closing the panel) returns to
+whichever of roll/score was active. Roll gestures are disabled while
+falling — the view rides the playhead, or sits at the cursor when
+stopped.
 
 **Annotations:** see format below. + Note editor is type-first (Text note /
 Section / Chord / Key change / Time signature / Loop point) with bar/beat

@@ -170,8 +170,9 @@
 
   #instpanel { display: none; flex-shrink: 0; background: var(--panel); border-top: 1px solid var(--grid); }
   #instpanel.on { display: block; }
-  #instbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px 4px; }
+  #instbar { display: flex; align-items: center; gap: 8px; padding: 4px 12px 6px; }
   #instbar .seg button { border: 0; min-height: 32px; padding: 5px 14px; }
+  #instfall { min-height: 32px; padding: 5px 12px; }
   #instinfo {
     font-family: var(--mono);
     font-size: 12px;
@@ -366,17 +367,18 @@
 </header>
 <div id="trackbar"></div>
 <div id="rollwrap"><canvas id="roll"></canvas></div>
-<div id="subtitle"></div>
 <div id="instpanel">
+  <div id="instwrap"><canvas id="instcanvas"></canvas></div>
   <div id="instbar">
     <div class="seg">
       <button id="insttab-piano" class="active">Piano</button>
       <button id="insttab-guitar">Guitar</button>
     </div>
+    <button id="instfall">▼ Fall</button>
     <div id="instinfo">tap a key</div>
   </div>
-  <div id="instwrap"><canvas id="instcanvas"></canvas></div>
 </div>
+<div id="subtitle"></div>
 <footer>
   <button id="editbtn">Edit</button>
   <div class="seg" id="modeseg" style="display:none">
@@ -537,6 +539,7 @@
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 15 frets.</dd>
+      <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
     </dl>
 
     <h3>ANNOTATIONS (.rollnotes)</h3>
@@ -732,6 +735,7 @@ let editingNote = null;  // rollnote being edited, or null for new
 let rangeSel = null;     // {a, b} ticks — ruler-drag selection for + Note
 let lassoMode = false;   // one-finger drag selects notes instead of panning
 let instOpen = false;    // instrument panel (set from localStorage once its section wires up)
+let fallOn = false;      // Synthesia fall view: main canvas drops notes into the panel's keys
 let lassoRect = null;    // live drag rect {x0,y0,x1,y1} in canvas coords
 let multiSel = [];       // [{ti,ni}] lasso-selected notes
 let multiSelKey = new Set();
@@ -1275,6 +1279,7 @@ function draw() {
   const W = wrap.clientWidth, H = wrap.clientHeight;
   ctx.fillStyle = css("--bg");
   ctx.fillRect(0, 0, W, H);
+  if (fallActive()) { drawFall(W, H); return; }
   if (viewMode === "score" && VF && scoreModel) {
     drawScore(W, H);
     drawRuler(W, H);
@@ -1667,6 +1672,7 @@ document.addEventListener("touchmove", e => {
 }, {passive: false});
 
 canvas.addEventListener("pointerdown", e => {
+  if (fallActive()) return; // fall view rides the playhead — no pan/zoom/lasso
   canvas.setPointerCapture(e.pointerId);
   if (pinch) return; // third finger: ignore
   if (drag && drag.id !== e.pointerId) {
@@ -3157,6 +3163,77 @@ instCanvas.addEventListener("pointerdown", e => {
 instCanvas.addEventListener("pointermove", e => { if (instPtrOn) instTap(e, true); });
 instCanvas.addEventListener("pointerup", () => { instPtrOn = false; instLastP = null; });
 instCanvas.addEventListener("pointercancel", () => { instPtrOn = false; instLastP = null; });
+// Fall view (Synthesia-style): the MAIN canvas turns into a vertical drop —
+// notes fall down and land on the panel's piano keys the instant they sound
+// (the keys light via the live-pitch set). Time maps through seconds, so
+// tempo changes and the speed slider read truthfully. The view rides the
+// playhead (or sits at the cursor when stopped); roll gestures are disabled
+// while it's active. Piano-only: picking Guitar drops back to the roll/score.
+function fallActive() { return fallOn && instOpen && instTab === "piano" && !!song; }
+const FALL_WINDOW = 4.5; // seconds of upcoming music filling the drop
+function drawFall(W, H) {
+  const nowSec = playing ? playSec() : tickToSec(song, playCursor);
+  const pps = H / FALL_WINDOW;
+  const secY = s => H - (s - nowSec) * pps;
+  const g = pianoGeom(W);
+  const bw = g.wW * 0.6;
+  ctx.fillStyle = css("--grid-soft"); // black-key lanes banded like the roll
+  for (let p = g.lo; p <= g.hi; p++) {
+    if (WHITE_PCS.includes(p % 12)) continue;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(g.wx[p - 1] + g.wW - bw / 2, 0, bw, H);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = "left";
+  const bt = barTicks();
+  for (let b = 0, last = Math.ceil(songEndTick / bt); b <= last; b++) {
+    const y = secY(tickToSec(song, b * bt));
+    if (y < -2 || y > H + 14) continue;
+    ctx.fillStyle = css("--grid");
+    ctx.fillRect(0, y, W, 1);
+    ctx.fillStyle = css("--dim");
+    ctx.font = "10px " + css("--mono");
+    ctx.fillText(String(b + 1), 4, y - 4);
+  }
+  for (const n of rollnotes) { // chord changes ride gold lines with their symbol
+    if (!n.chord) continue;
+    const y = secY(tickToSec(song, n.start));
+    if (y < -2 || y > H + 14) continue;
+    ctx.fillStyle = css("--gold");
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect(0, y, W, 1);
+    ctx.globalAlpha = 1;
+    ctx.font = "bold 11px " + css("--mono");
+    ctx.fillText(n.text, 24, y - 4);
+  }
+  song.tracks.forEach((tr, ti) => {
+    if (!trackAudible(ti) || trackIsDrums(ti)) return;
+    const color = TRACK_COLORS[ti % TRACK_COLORS.length];
+    tr.notes.forEach((n, ni) => {
+      if (n.gone) return;
+      const yB = secY(tickToSec(song, n.t));       // bottom edge = note-on
+      const yT = secY(tickToSec(song, n.t + n.d));
+      if (yT > H || yB < 0) return;                // fully past / not yet in view
+      const white = WHITE_PCS.includes(n.p % 12);
+      const x = white ? g.wx[n.p] + 1 : g.wx[n.p - 1] + g.wW - bw / 2;
+      const w = (white ? g.wW : bw) - 2;
+      const sounding = yB >= H && yT < H;          // remainder sinks into the keys
+      ctx.globalAlpha = 0.55 + 0.45 * (n.v / 127);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, yT, w, Math.max(3, Math.min(yB, H) - yT - 1), 3);
+      ctx.fill();
+      if (sounding || multiSelKey.has(ti + ":" + ni)) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = sounding ? "#fff" : css("--gold");
+        ctx.stroke();
+      }
+    });
+  });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = css("--accent"); // the "now" edge the notes land on
+  ctx.fillRect(0, H - 2, W, 2);
+}
 function instResize() {
   const dpr = window.devicePixelRatio || 1;
   instCanvas.width = instWrap.clientWidth * dpr;
@@ -3166,27 +3243,47 @@ function instResize() {
 }
 new ResizeObserver(instResize).observe(instWrap);
 const instbtn = document.getElementById("instbtn");
+const instFallBtn = document.getElementById("instfall");
 function applyInst() {
   document.getElementById("instpanel").classList.toggle("on", instOpen);
   instbtn.classList.toggle("active", instOpen);
   document.getElementById("insttab-piano").classList.toggle("active", instTab === "piano");
   document.getElementById("insttab-guitar").classList.toggle("active", instTab === "guitar");
+  instFallBtn.classList.toggle("active", fallOn);
   if (instOpen) instResize(); // canvas had zero size while display:none
 }
 instbtn.addEventListener("click", () => {
   instOpen = !instOpen;
   localStorage.setItem("ff1roll-inst-open", instOpen ? "1" : "0");
   applyInst();
+  draw(); // closing the panel while Fall is active must restore the roll
+});
+instFallBtn.addEventListener("click", () => {
+  fallOn = !fallOn;
+  if (fallOn) { // fall is piano-only and needs the keys visible
+    instTab = "piano";
+    localStorage.setItem("ff1roll-inst-tab", "piano");
+    if (!instOpen) { instOpen = true; localStorage.setItem("ff1roll-inst-open", "1"); }
+  }
+  localStorage.setItem("ff1roll-inst-fall", fallOn ? "1" : "0");
+  applyInst();
+  draw();
 });
 for (const tab of ["piano", "guitar"]) {
   document.getElementById("insttab-" + tab).addEventListener("click", () => {
     instTab = tab;
     localStorage.setItem("ff1roll-inst-tab", instTab);
+    if (tab === "guitar" && fallOn) { // notes can only fall into piano keys
+      fallOn = false;
+      localStorage.setItem("ff1roll-inst-fall", "0");
+    }
     applyInst();
+    draw();
   });
 }
 instTab = localStorage.getItem("ff1roll-inst-tab") || "piano";
 instOpen = localStorage.getItem("ff1roll-inst-open") === "1";
+fallOn = localStorage.getItem("ff1roll-inst-fall") === "1" && instTab === "piano";
 applyInst();
 
 // ---------------------------------------------------------------- note editor
