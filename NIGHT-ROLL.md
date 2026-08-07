@@ -67,8 +67,10 @@ name spelled per the governing key plus the scale degree when a `key:`
 directive governs the cursor (degrees never shown for undeclared keys —
 key discovery stays the analyst's job). Piano range = the song's own
 extent, octave-aligned. Guitar: standard tuning EADGBE, high-e on top
-(tab convention), 15 frets, inlay dots, a lit pitch appears at every
-playable position. Open state, tab, and Fall persist in localStorage.
+(tab convention), 24 frets, inlay dots, a lit pitch appears at every
+playable position; a pitch off the neck octave-folds in (gtrFold),
+drawn with a dashed ring + tiny ▴/▾ toward its true octave — seeing it
+in the wrong octave beats not seeing it (Josh, 2026-08-07). Open state, tab, and Fall persist in localStorage.
 
 **Fall view** (2026-08-07, ▼ Fall in the panel's tab bar — which sits
 BELOW the keys so nothing blocks the landing): Synthesia-style — the

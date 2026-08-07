@@ -347,7 +347,7 @@ test("instrument panel: degrees vs the recorded tonic, guitar/piano hit maps", (
   // guitar: y rows are strings high-e→low-E, x left of the nut = open string
   assert.deepEqual(val(`guitarHit(10, 14, 800, 168)`), {p: 64, si: 0, f: 0});   // open high e
   assert.deepEqual(val(`guitarHit(10, 168, 800, 168)`), {p: 40, si: 5, f: 0});  // open low E
-  const g5 = val(`guitarHit(44 + ((800 - 50) / 15) * 2.5, 14, 800, 168)`);      // 3rd fret, high e
+  const g5 = val(`guitarHit(44 + ((800 - 50) / 24) * 2.5, 14, 800, 168)`);      // 3rd fret, high e
   assert.deepEqual(g5, {p: 67, si: 0, f: 3});
   // piano: no song range set here → default C4..B4 octave-aligned keyboard
   run(`song = null;`);
@@ -378,4 +378,12 @@ test("roll zoom-out clamp: floors flush to song extents, fitView lands on them",
   run(`song = null;`);
   assert.equal(run(`pxqFloor()`), 8); // no song: permissive defaults
   assert.equal(run(`rowHFloor()`), 6);
+});
+
+test("guitar octave fold: off-the-neck pitches fold in, shift records the move", () => {
+  // 24-fret neck: E2 (40) .. E6 (88)
+  assert.deepEqual(val(`gtrFold(60)`), {p: 60, shift: 0});   // middle C: on the neck
+  assert.deepEqual(val(`gtrFold(93)`), {p: 81, shift: -1});  // A6 → A5, true pitch above
+  assert.deepEqual(val(`gtrFold(36)`), {p: 48, shift: 1});   // C2 → C3, true pitch below
+  assert.deepEqual(val(`gtrFold(101)`), {p: 77, shift: -2}); // two octaves over
 });

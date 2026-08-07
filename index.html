@@ -546,7 +546,7 @@
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>💬</dt><dd>Show/hide the text-note strip (the fixed slot that shows your notes as the playhead crosses them). Off frees the vertical space; setting sticks.</dd>
-      <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 15 frets.</dd>
+      <dt>🎹 Instrument panel</dt><dd>Opens a piano / guitar fretboard strip above the footer. Lasso'd notes light gold on it; sounding notes light live during playback. Tap any key or fret to hear it and see its name — plus its scale degree once a key is declared. Guitar is standard tuning, 24 frets; a pitch that doesn't fit the neck shows octave-folded with a dashed ring and a tiny ▴/▾ pointing at its true octave.</dd>
       <dt>▼ Fall</dt><dd>Synthesia-style view: the whole timeline turns into a vertical drop and the notes fall down into the piano keys, landing the moment they sound. Bar numbers and chord symbols ride along their lines. Lasso works here too — box the falling notes and they light up on the keys. Piano-only; tap ▼ Fall again (or the Guitar tab) to return to the roll/score.</dd>
     </dl>
 
@@ -1077,10 +1077,14 @@ async function buildRollnotesFor(key) {
 function dropLocalKeyAt(bar) { // a new key change replaces any local key marker at the same bar
   rollnotes = rollnotes.filter(n => !(n.added && n.keydir !== undefined && n.b1 === bar));
 }
+function isDirective(n) { // anything that isn't a plain text note
+  return !!(n.section || n.chord || n.chopdir || n.keydir !== undefined ||
+            n.loopTo !== undefined || /^timesig:/i.test(n.text));
+}
 function activeNoteAt(tick) {
   let best = null;
   for (const n of rollnotes) {
-    if (n.section || n.chord || n.chopdir || n.keydir !== undefined || n.loopTo !== undefined) continue; // directives aren't subtitles
+    if (isDirective(n)) continue; // directives aren't subtitles
     if (tick >= n.start && tick < n.end) best = n;
   }
   return best;
@@ -1145,8 +1149,7 @@ function updateSubtitle() {
   const el = document.getElementById("subtitle");
   // the slot exists for the whole song (constant height, no layout bounce);
   // only its CONTENT follows the playhead
-  const hasNotes = !!song && rollnotes.some(n =>
-    !(n.section || n.chord || n.chopdir || n.keydir !== undefined || n.loopTo !== undefined));
+  const hasNotes = !!song && rollnotes.some(n => !isDirective(n));
   el.classList.toggle("on", hasNotes && subOn);
   const n = song ? activeNoteAt(curTick()) : null;
   if (n === lastSubtitle) return;
@@ -2995,7 +2998,7 @@ const ictx = instCanvas.getContext("2d");
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 const GTR_TUNING = [64, 59, 55, 50, 45, 40]; // high e on top — tab convention
 const GTR_NAMES = ["e", "B", "G", "D", "A", "E"];
-const GTR_FRETS = 15;
+const GTR_FRETS = 24;
 const DEGREE_LABEL = ["1", "♭2", "2", "♭3", "3", "4", "♭5", "5", "♭6", "6", "♭7", "7"];
 function keyNameAt(tick) { // recorded key name governing this tick, or null
   let ranged = null, open = null;
@@ -3128,12 +3131,12 @@ function drawGuitar(W, H, lit) {
   }
   ictx.font = "9px " + css("--mono");
   ictx.textAlign = "center";
-  for (const f of [3, 5, 7, 9, 12, 15]) { // inlay dots + fret numbers
+  for (const f of [3, 5, 7, 9, 12, 15, 17, 19, 21, 24]) { // inlay dots + fret numbers
     const cx = g.nutX + (f - 0.5) * g.fw, cy = g.top + (H - g.top - g.bot) / 2;
     ictx.fillStyle = css("--dim");
     ictx.globalAlpha = 0.35;
     ictx.beginPath();
-    if (f === 12) { ictx.arc(cx, cy - g.sh, 4, 0, 7); ictx.arc(cx, cy + g.sh, 4, 0, 7); }
+    if (f % 12 === 0) { ictx.arc(cx, cy - g.sh, 4, 0, 7); ictx.arc(cx, cy + g.sh, 4, 0, 7); }
     else ictx.arc(cx, cy, 4, 0, 7);
     ictx.fill();
     ictx.globalAlpha = 1;
@@ -3149,10 +3152,13 @@ function drawGuitar(W, H, lit) {
     ictx.textAlign = "center";
   });
   const dots = [];
-  const add = (p, color) => GTR_TUNING.forEach((open, si) => {
-    const f = p - open;
-    if (f >= 0 && f <= GTR_FRETS) dots.push({si, f, p, color});
-  });
+  const add = (p0, color) => {
+    const {p, shift} = gtrFold(p0); // off-the-neck pitches fold to a playable octave
+    GTR_TUNING.forEach((open, si) => {
+      const f = p - open;
+      if (f >= 0 && f <= GTR_FRETS) dots.push({si, f, p, shift, color});
+    });
+  };
   lit.live.forEach((ti, p) => add(p, TRACK_COLORS[ti % TRACK_COLORS.length]));
   lit.sel.forEach(p => add(p, css("--gold"))); // lasso wins where both apply
   if (instFlash && instFlash.si !== undefined) dots.push({...instFlash, color: css("--accent")});
@@ -3162,12 +3168,29 @@ function drawGuitar(W, H, lit) {
     ictx.beginPath();
     ictx.arc(cx, cy, 11, 0, 7);
     ictx.fill();
+    if (d.shift) { // folded octave: dashed ring + arrow toward the true pitch
+      ictx.setLineDash([3, 2.5]);
+      ictx.strokeStyle = d.color;
+      ictx.beginPath();
+      ictx.arc(cx, cy, 14, 0, 7);
+      ictx.stroke();
+      ictx.setLineDash([]);
+      ictx.font = "8px " + css("--mono");
+      ictx.fillText(d.shift < 0 ? "▴" : "▾", cx + 17, cy + 3);
+    }
     ictx.fillStyle = "#111";
     ictx.font = "bold 9px " + css("--mono");
     ictx.fillText(spellPc(d.p % 12, sf), cx, cy - 1);
     const deg = degreeOf(d.p % 12, kn);
     if (deg) { ictx.font = "8px " + css("--mono"); ictx.fillText(deg, cx, cy + 8); }
   }
+}
+function gtrFold(p) { // octave-fold a pitch into the fretboard's range; shift = octaves moved
+  const lo = GTR_TUNING[GTR_TUNING.length - 1], hi = GTR_TUNING[0] + GTR_FRETS;
+  let shift = 0;
+  while (p > hi) { p -= 12; shift--; }
+  while (p < lo) { p += 12; shift++; }
+  return {p, shift};
 }
 function guitarHit(x, y, W, H) {
   const g = guitarGeom(W, H);
