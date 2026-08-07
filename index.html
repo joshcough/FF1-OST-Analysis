@@ -157,6 +157,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  #noteinfo.copyable { cursor: pointer; }
+  #noteinfo .copychip {
+    font-size: 10px;
+    color: var(--dim);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    padding: 1px 7px;
+    margin-left: 8px;
+  }
   .seg { display: flex; border: 1px solid var(--grid); border-radius: 6px; overflow: hidden; }
   .seg button { border: none; border-radius: 0; min-height: 36px; padding: 6px 11px; }
   .hint { font-size: 11px; color: var(--dim); font-family: var(--mono); }
@@ -496,6 +505,7 @@
     <h3>NOTES &amp; CHORDS</h3>
     <dl>
       <dt>Tap a note</dt><dd>Inspector shows pitch, bar &amp; beat (counted 1e&amp;a), length, velocity, track — and plays it.</dd>
+      <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in both views; in the score you can box just one staff). Shows all the pitch names, low to high.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
     </dl>
@@ -1442,7 +1452,8 @@ function finalizeLasso() {
   const pitches = [...new Set(multiSel.map(s => song.tracks[s.ti].notes[s.ni].p))].sort((a, b) => a - b);
   const selSf = sfDeclaredAt(Math.max(0, t0));
   multiSelSf = selSf;
-  setInfo(pitches.map(p => pitchName(p, selSf)).join(" · ") + "  (" + multiSel.length + " notes)");
+  const names = pitches.map(p => pitchName(p, selSf));
+  setInfo(names.join(" · ") + "  (" + multiSel.length + " notes)", names.join(", "));
   document.getElementById("chordbtn").style.display = "";
   draw();
 }
@@ -1557,7 +1568,36 @@ function noteLabel(ti, ni) {
   return name + " · bar " + bar + " beat " + beatLabel(beat) + " · " +
          (n.d / song.ppq).toFixed(2) + "q · vel " + n.v + " · " + tname + (n.added ? " · added" : "");
 }
-function setInfo(s) { document.getElementById("noteinfo").textContent = s; }
+let infoCopyText = null; // when set, tapping the info strip copies this
+function setInfo(s, copyText) {
+  const el = document.getElementById("noteinfo");
+  el.textContent = s;
+  infoCopyText = copyText || null;
+  el.classList.toggle("copyable", !!infoCopyText);
+  if (infoCopyText) {
+    const chip = document.createElement("span");
+    chip.className = "copychip";
+    chip.textContent = "⧉ copy";
+    el.appendChild(chip);
+  }
+}
+document.getElementById("noteinfo").addEventListener("click", async () => {
+  if (!infoCopyText) return;
+  let ok = true;
+  try { await navigator.clipboard.writeText(infoCopyText); }
+  catch (err) { // clipboard API denied: fall back to a hidden textarea
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = infoCopyText;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select(); ok = document.execCommand("copy");
+      ta.remove();
+    } catch (err2) { ok = false; }
+  }
+  const chip = document.querySelector("#noteinfo .copychip");
+  if (chip) chip.textContent = ok ? "✓ copied" : "✗ copy failed";
+});
 
 // ---------------------------------------------------------------- gestures
 let drag = null, pinch = null;
@@ -2779,8 +2819,9 @@ lassobtn.addEventListener("click", () => {
 document.getElementById("chordbtn").addEventListener("click", () => {
   if (!multiSel.length) return;
   const pitches = multiSel.map(s => song.tracks[s.ti].notes[s.ni].p);
-  const names = [...new Set(pitches)].sort((a, b) => a - b).map(p => pitchName(p, multiSelSf)).join(" · ");
-  setInfo(names + "  →  " + nameChord(pitches, multiSelSf));
+  const names = [...new Set(pitches)].sort((a, b) => a - b).map(p => pitchName(p, multiSelSf));
+  const chordName = nameChord(pitches, multiSelSf);
+  setInfo(names.join(" · ") + "  →  " + chordName, names.join(", ") + " — " + chordName);
 });
 
 const viewbtn = document.getElementById("viewbtn");
