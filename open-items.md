@@ -121,6 +121,64 @@ his behalf.
   load view = the zoom-out limit. Revises the "unlimited roll zoom-out"
   note under the parked two-regime score item.
 
+### Backlog — from the 2026-08-07 web-session sketch (recorded, not approved)
+
+Josh hasn't read the design sketch these come from; he picks what gets
+built. Phrased as open questions. Source docs live outside the repo as
+his downloads: `review-handoff-2026-08-07.md` (code/tool review) and
+`tool-design-sketch-2026-08-07.md` (the sketch itself).
+
+- **Meter workbench?** Largest gap: every analytic feature works on
+  pitch; meter is declared to the app, never interrogated by it. Candidate
+  pieces: onset histogram folded into one bar at candidate bar lengths
+  (6/8 piles onsets on 1 and 4; 3/4 on 1, 3, 5); harmonic-change points as
+  downbeat evidence; duration weight; accent data (now that chip volume
+  exists); an audition mode playing a click in each candidate meter.
+  **Needs Josh's design input before any code.** Related but distinct:
+  the parked meter-judge v2 plan in reference/meter-detection-plan.md.
+- **Chord-band verification — check-on-request only?** The app knows the
+  notes under every chord band and never compares them to the label
+  (menu's chord 2 sat mislabeled as F7 for days with the disproof directly
+  underneath). Shape sketched: on request, report only that label and
+  pitches *disagree* and which pitches are unaccounted for — never name
+  the chord, never volunteer, never touch an unlabeled span. Open wrinkle:
+  pedal points (the B♭ under menu's F7) will trip a naive checker; needs a
+  way to mark a pitch as a separate structural layer or it cries wolf.
+- **Horizontal / voice reading?** Channel identity survives the pipeline
+  and is then used mostly for mute/solo. Nothing reads across time:
+  isolate one channel's line, flag notes held across a harmonic change
+  (pedal points, detectable without naming them), common tones between
+  adjacent chords, voice motion/direction. Josh found menu's tonic pedal
+  by eye and the E7→G semitone move by mental arithmetic; both are
+  computable from data already in the files.
+- **Claims as structured objects?** .rollnotes entries are strings. A
+  claim could carry its justifying note range, method, date, confidence,
+  dependencies. The method says record the path, not just the verdict —
+  but paths live in analysis/*.md prose and verdicts in .rollnotes, with
+  nothing linking them. Architectural; a format migration (round-trip
+  test exists; eleven songs is nothing to convert).
+- **Sealed predictions?** Lock a key prediction before derivation —
+  timestamped, hidden — unsealed only when an independent derivation is
+  recorded, self-scoring into the sweep tally. Non-circularity currently
+  rests on Josh's honesty plus tutor vigilance, not any mechanism.
+- **Key-dial caveat in the help text?** The dial minimizes visible
+  accidentals, which cannot distinguish a key from its relative and
+  cannot see modes — B♭ major and G minor look identical to it. It's a
+  hypothesis generator, not a verifier, and nothing in the app says so.
+  Small doc fix; matters because the method depends on not mistaking it
+  for a verdict.
+- **index.html split — flag only.** ~4,000 lines; the single-file
+  constraint still pays (no build step, git push deploys, vm harness).
+  Split *before* a large new view (e.g. the meter workbench) goes in,
+  not after.
+- **Concept delivery on demand? (speculative — recorded, not designed.)**
+  What unblocked Josh in-session was general concepts arriving at the
+  wall — tritone symmetry, pedal point, passing-tone tests — none
+  song-specific. Possible: offer a concept keyed to the current selection
+  (selected dyad six semitones apart → the tritone concept) while
+  withholding every per-song conclusion. Genuinely unclear if it's a good
+  idea.
+
 - **NSF pipeline** (scoped 2026-08-01, **built 2026-08-02**): extract
   analysis-grade note data from the actual chip — see
   [reference/nsf-pipeline-plan.md](albums/final-fantasy-i/reference/nsf-pipeline-plan.md).
