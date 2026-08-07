@@ -42,7 +42,15 @@ Status marks: `[ ]` not yet asked · `[x]` answered well · `[~]` shaky, re-ask.
       pivot chord have in both keys, and why does that property hide the
       seam from the listener? (Explained 2026-07-31 before Josh could
       generate it — re-ask fresh in a later session.)
-- [ ] Why does C7 signal "we're going to F" harder than a plain C triad?
+- [x] Why does C7 signal "we're going to F" harder than a plain C triad?
+      (Answered 2026-08-06, iPad session, unprompted: named E and Bb, both
+      half-step resolutions, and their contrary motion; follow-up — Bb is
+      foreign to C but native to F, so the chord commits to the target AND
+      pre-loads its collection. Claude added: the tritone is the unique
+      key-fixing interval, since degrees 4+7 coexist in exactly one major
+      key. Bank candidate from same session: one tritone belongs to TWO
+      dominant sevenths — names a target pair, not a chord — used correctly
+      in menu's F7-vs-B7 call.)
 - [ ] You resolve a V7 — can the landing be major, minor, or both? Why?
 - [ ] G→F is 2 key-signature steps; G→F minor is 5. What does that predict
       about writing a melody across each seam?
