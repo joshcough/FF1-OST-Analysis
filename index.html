@@ -1664,6 +1664,26 @@ let followFree = false; // manual scroll during playback suspends auto-follow
 function minPxq() {
   return viewMode === "score" ? (scoreModel ? scoreModel.pxqMin : 36) : 8;
 }
+// Roll zoom-out clamp (Josh, 2026-08-06): pinch-out stops once the whole song
+// is in view — per axis, flush to the song's own extents (chop-trimmed), no
+// padding. While time still overflows, both axes zoom; once every bar fits,
+// further pinch-out only reveals pitch; once every note is visible, nothing.
+function songPitchExtent() { // lowest..highest sounding pitch of the (trimmed) song
+  let lo = Infinity, hi = -Infinity;
+  song.tracks.forEach(tr => tr.notes.forEach(n => {
+    if (!n.gone) { if (n.p < lo) lo = n.p; if (n.p > hi) hi = n.p; }
+  }));
+  return lo <= hi ? {lo: Math.max(PMIN, lo), hi: Math.min(PMAX, hi)} : {lo: 55, hi: 79};
+}
+function pxqFloor() { // px/quarter where bar 1..last bar exactly fill the width
+  if (!song || !songEndTick) return 8;
+  return Math.min(400, Math.max(8, (wrap.clientWidth - RULER_W) / (songEndTick / song.ppq)));
+}
+function rowHFloor() { // row height where lowest..highest pitch exactly fill the height
+  if (!song) return 6;
+  const {lo, hi} = songPitchExtent();
+  return Math.min(32, Math.max(6, (wrap.clientHeight - RULER_H) / (hi - lo + 1)));
+}
 function cursorHit(pos) {
   if (playing || !song || mode !== "select") return false;
   if (pos.y < RULER_H) return false; // ruler drags select a range instead
@@ -1720,15 +1740,19 @@ canvas.addEventListener("pointermove", e => {
     const PAD = 40;
     const sx = (Math.abs(pinch.a.x - pinch.b.x) + PAD) / (pinch.dx0 + PAD);
     const midX = (pinch.a.x + pinch.b.x) / 2 - RULER_W;
-    const newPxq = Math.min(400, Math.max(minPxq(), pinch.pxq * sx));
+    const floorX = viewMode === "score" ? minPxq() : pxqFloor();
+    const newPxq = Math.min(400, Math.max(floorX, pinch.pxq * sx));
     view.x = (pinch.vx + midX) * (newPxq / pinch.pxq) - midX;
     view.pxq = newPxq;
+    if (viewMode !== "score" && newPxq === floorX) view.x = 0; // flush: bar 1 at the left edge
     if (viewMode !== "score") { // score staves are fixed-height
       const sy = (Math.abs(pinch.a.y - pinch.b.y) + PAD) / (pinch.dy0 + PAD);
       const midY = (pinch.a.y + pinch.b.y) / 2 - RULER_H;
-      const newRowH = Math.min(32, Math.max(6, pinch.rowH0 * sy));
+      const floorY = rowHFloor();
+      const newRowH = Math.min(32, Math.max(floorY, pinch.rowH0 * sy));
       view.y = (pinch.vy + midY) * (newRowH / pinch.rowH0) - midY;
       view.rowH = newRowH;
+      if (newRowH === floorY) view.y = (PMAX - songPitchExtent().hi) * newRowH; // flush to the top pitch
     }
     clampView(); draw();
     return;
@@ -1774,31 +1798,28 @@ canvas.addEventListener("wheel", e => {
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) {
     const mid = evtPos(e).x - RULER_W;
-    const newPxq = Math.min(400, Math.max(minPxq(), view.pxq * (e.deltaY < 0 ? 1.1 : 0.9)));
+    const floorX = viewMode === "score" ? minPxq() : pxqFloor();
+    const newPxq = Math.min(400, Math.max(floorX, view.pxq * (e.deltaY < 0 ? 1.1 : 0.9)));
     view.x = (view.x + mid) * (newPxq / view.pxq) - mid;
     view.pxq = newPxq;
+    if (viewMode !== "score" && newPxq === floorX) view.x = 0;
   } else { view.x += e.deltaX; view.y += e.deltaY; }
   followFree = true;
   clampView(); draw();
 }, {passive: false});
-function fitView() { // on song load: fit the whole song on screen (roll view)
+function fitView() { // on song load: the whole song flush on screen (= the zoom-out floor)
   if (viewMode === "score") { view.x = -SCORE_INTRO_W; view.y = 0; return; }
-  const W = Math.max(100, wrap.clientWidth - RULER_W);
-  const H = Math.max(100, wrap.clientHeight - RULER_H);
-  view.pxq = Math.min(56, Math.max(6, W / (songEndTick / song.ppq + 2)));
-  let lo = PMAX, hi = PMIN;
-  song.tracks.forEach(tr => tr.notes.forEach(n => {
-    if (!n.gone) { if (n.p < lo) lo = n.p; if (n.p > hi) hi = n.p; }
-  }));
-  if (lo > hi) { lo = 55; hi = 79; }
-  lo = Math.max(PMIN, lo - 1);
-  hi = Math.min(PMAX, hi + 1);
-  view.rowH = Math.min(20, Math.max(6, H / (hi - lo + 1)));
+  view.pxq = pxqFloor();
+  view.rowH = rowHFloor();
   view.x = 0;
-  view.y = (PMAX - hi) * view.rowH;
+  view.y = (PMAX - songPitchExtent().hi) * view.rowH;
 }
 function clampView() {
   if (song && view.pxq < minPxq()) view.pxq = minPxq(); // score floor tracks the model
+  if (song && viewMode !== "score") { // roll zoom-out clamp: whole song = the floor
+    if (view.pxq < pxqFloor()) view.pxq = pxqFloor();
+    if (view.rowH < rowHFloor()) view.rowH = rowHFloor();
+  }
   const minX = viewMode === "score" && scoreModel ? -SCORE_INTRO_W : 0;
   const maxX = song
     ? Math.max(minX, songEndTick * pxPerTick() + 2 * barTicks() * pxPerTick() - (wrap.clientWidth - RULER_W))

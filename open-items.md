@@ -112,13 +112,13 @@ his behalf.
   narrow to tap. Wanted: a way to zoom the piano in, maybe just a button
   that enables zoom. Parked at Josh's call — leave until fat-finger
   trouble actually shows up in use.
-- **Zoom-out clamp to song extents, roll view (Josh, 2026-08-06):**
-  pinch-out stops once the whole song fits; axes decouple near the limit
-  (time already fits → further pinch expands pitch only); clamp to the
-  chop-trimmed range, flush to the outermost notes, no padding (his
-  experiment — don't invent a margin). Spec final in the 08-06 handoff;
-  revises the "unlimited roll zoom-out" note under the parked two-regime
-  score item.
+- **Zoom-out clamp to song extents, roll view — SHIPPED 2026-08-07:**
+  pinch-out (and ctrl+wheel) stops once the whole song fits; per-axis
+  floors, so time stops while pitch keeps revealing; flush to the
+  chop-trimmed extents, no padding (Josh's experiment — revisit if tight
+  feels wrong in use). fitView now lands exactly on the floor, so the
+  load view = the zoom-out limit. Revises the "unlimited roll zoom-out"
+  note under the parked two-regime score item.
 
 - **NSF pipeline** (scoped 2026-08-01, **built 2026-08-02**): extract
   analysis-grade note data from the actual chip — see

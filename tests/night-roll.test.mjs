@@ -355,3 +355,27 @@ test("instrument panel: degrees vs the recorded tonic, guitar/piano hit maps", (
   assert.equal(run(`pianoHit(1, 160, 700, 168)`), 60);          // bottom-left = middle C
   assert.equal(run(`pianoHit(700 / 7 - 2, 10, 700, 168)`), 61); // black-key zone over the C/D seam = C#
 });
+
+test("roll zoom-out clamp: floors flush to song extents, fitView lands on them", () => {
+  installSong();
+  run(`
+    RULER_H = 24;
+    song.tracks = [{name: "t", notes: [{t: 0, d: 480, p: 60, v: 80},
+                                       {t: 7200, d: 480, p: 72, v: 80}]}];
+    songEndTick = 16 * 480;
+  `);
+  // stub viewport 800x600, RULER_W 46: 16 quarters flush = 754/16
+  assert.equal(run(`pxqFloor()`), (800 - 46) / 16);
+  // 13 pitch rows in 576px = 44.3 → capped at the 32 max row height
+  assert.equal(run(`rowHFloor()`), 32);
+  run(`fitView();`);
+  assert.equal(run(`view.pxq`), (800 - 46) / 16);
+  assert.equal(run(`view.x`), 0);
+  assert.equal(run(`view.y`), (96 - 72) * 32); // top pitch flush at the top
+  run(`view.pxq = 2; view.rowH = 3; clampView();`); // zoomed out too far → floors
+  assert.equal(run(`view.pxq`), (800 - 46) / 16);
+  assert.equal(run(`view.rowH`), 32);
+  run(`song = null;`);
+  assert.equal(run(`pxqFloor()`), 8); // no song: permissive defaults
+  assert.equal(run(`rowHFloor()`), 6);
+});

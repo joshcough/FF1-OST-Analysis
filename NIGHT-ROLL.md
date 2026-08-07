@@ -25,7 +25,12 @@ cached canvases), toggled in the header, persisted. On song load the roll
 auto-fits the whole song and its pitch range to the screen (fitView). Both share one
 time-linear x-axis, the bar ruler, sections, markers, cursor, playhead,
 subtitles, and gestures. Pinch zooms per axis (horizontal = time; vertical
-= pitch rows, roll only). Score extras: intro column (clef/key/time) left
+= pitch rows, roll only). Roll zoom-out clamps to the song's own extents
+(2026-08-07, Josh's spec): per-axis floors (pxqFloor/rowHFloor) flush to
+the chop-trimmed bars and sounding pitch range, no padding — once time
+fits, pinch-out only reveals pitch; once everything fits, it stops, and
+the view snaps flush. fitView lands on the same floors, so the load view
+IS the zoom-out limit. Score extras: intro column (clef/key/time) left
 of bar 1; signatures redraw at key changes with cancellation naturals;
 rests break beams; playhead/cursor interpolate notehead-to-notehead
 (scoreTickToX), hopping glyphs only at key changes; zoom-out floor
