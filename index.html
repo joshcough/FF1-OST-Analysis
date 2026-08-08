@@ -1882,6 +1882,19 @@ for (const ev of ["gesturestart", "gesturechange", "gestureend"]) {
 document.addEventListener("touchmove", e => {
   if (e.touches.length > 1) e.preventDefault();
 }, {passive: false});
+// double-tap page zoom: touch-action:manipulation SHOULD kill it, but Safari
+// still smart-zooms on non-interactive surfaces (Josh hit it on the ◯5 sheet).
+// Cancel the second tap of a double-tap everywhere except real controls, whose
+// rapid re-taps (⟲ ⟳ stepping, two-tap Save confirms) must keep clicking.
+// App canvases are unaffected: their logic rides pointer events, which have
+// already fired by touchend.
+let lastTapEnd = 0;
+document.addEventListener("touchend", e => {
+  const now = Date.now();
+  if (now - lastTapEnd < 350 && !e.target.closest("button, select, input, textarea, a"))
+    e.preventDefault();
+  lastTapEnd = now;
+}, {passive: false, capture: true});
 
 canvas.addEventListener("pointerdown", e => {
   if (fallActive() && !lassoMode) return; // fall rides the playhead — no pan/zoom; lasso still works
