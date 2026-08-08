@@ -571,7 +571,7 @@
       <dt>Copy the pitch list</dt><dd>When the lasso strip lists selected pitches, tap the text (or the ⧉ copy chip) to copy them comma-separated — after "Chord?", the chord name comes along too.</dd>
       <dt>⊞ Lasso</dt><dd>Toggle on, then drag a box over notes (works in all views). Boxes ADD to the selection — draw as many as you need. Tap any note to toggle it in or out (surgical removal of a pedal or neighbor); tap empty space to clear. Shows all the pitch names, low to high.</dd>
       <dt>key: picker</dt><dd>First dropdown is the tonic pitch only; the second is the mode. Setting both writes the key. Choosing "mode?" stores just the tonic ("key: G♯/A♭?") — recorded but NOT applied: no key signature, no respelling, the staff stays as-is until you come back with the mode. The dropdown label always says which state you're in.</dd>
-      <dt>◯5 Circle of fifths</dt><dd>The classic chart, live: majors outside with their signatures, relative minors inside, diminished chords at the center, and the movable degree window (IV·I·V over ii·vi·iii over vii°). Opens centered on the song's key; tap any wedge to jump there, ⟲ ⟳ to rotate a fifth at a time. Below the wheel: the center key's signature accidentals, full scale, all seven triads, and its IV/V neighbors.</dd>
+      <dt>◯5 Circle of fifths</dt><dd>The classic chart, live: majors outside with their signatures, relative minors inside, diminished chords at the center, and the movable degree window (IV·I·V over ii·vi·iii over vii°). Two independent motions: <b>drag the wheel</b> (or ⟲ ⟳) to spin it — put any key at 12 o'clock; <b>tap a wedge</b> to move the degree window there. Opens with the song's key on top and highlighted. Below the wheel: the window key's signature accidentals, full scale, all seven triads, and its IV/V neighbors.</dd>
       <dt>find: (pitch finder)</dt><dd>Pick a pitch class in the footer dropdown and every occurrence lights up across all visible channels — everything else dims, so nothing lit means a confident zero. Works by pitch class (find B♭ catches A#), shows the count and channels in the strip, and labels the degree when a key is set. Made for mode-hunting: chasing the one accidental that separates two candidate modes.</dd>
       <dt>Chord?</dt><dd>After a lasso: reveals what chord those notes make. Hidden by default so you can name it first.</dd>
       <dt>Challenge?</dt><dd>Tap one of your chord bands in the ruler, then tap Challenge? — opens the evidence dialog: each label tone with its role and whether it sounds (and where), extra pitches present, the per-channel note lists, and what the namer would call the whole stack. Only when you ask; extra tones are evidence, not verdicts (a pedal point shows as "extra" — correctly).</dd>
@@ -617,7 +617,7 @@
 <div class="overlay" id="cofsheet">
   <div class="sheet">
     <h2>CIRCLE OF FIFTHS</h2>
-    <canvas id="cofcanvas" style="position:static;display:block;margin:0 auto;touch-action:manipulation"></canvas>
+    <canvas id="cofcanvas" style="position:static;display:block;margin:0 auto;touch-action:none"></canvas>
     <div id="cofdetail"></div>
     <div class="row" style="margin-top:10px">
       <button id="cofccw">⟲</button>
@@ -3004,7 +3004,9 @@ keysetBtn.addEventListener("click", () => {
 // minors, inner diminished (vii°) — with the rotatable degree window
 // (IV I V / ii vi iii / vii°) centered on any wedge. Opens centered on the
 // song's governing key; tap a wedge to jump, ⟲ ⟳ to rotate a fifth at a time.
-let cofSf = 0; // signature the degree window is centered on (-6..6 wraps)
+let cofSf = 0;        // signature the degree window is centered on (-6..6 wraps)
+let cofRot = 0;       // signature whose wedge sits at 12 o'clock (the wheel's rotation)
+let cofDragRot = null; // fractional rotation while a finger is spinning the wheel
 const cofCanvas = document.getElementById("cofcanvas");
 const cofCtx = cofCanvas.getContext("2d");
 function cofMinor(sf) { return spellPc((((sf * 7) % 12 + 12) % 12 + 9) % 12, sf) + "m"; }
@@ -3026,9 +3028,11 @@ function drawCof() {
   const rings = [[0.74, 1.0], [0.50, 0.74], [0.30, 0.50]]; // major / minor / dim (fractions of R)
   const win = off => wrapSf(cofSf + off); // degree window: -1=IV, 0=I, +1=V
   const govern = song ? sfDeclaredAt(curTick()) : null;
+  const rotVal = cofDragRot !== null ? cofDragRot : cofRot; // wheel rotation (fractional mid-drag)
   for (let i = 0; i < 12; i++) {
     const sf = wrapSf(i > 6 ? i - 12 : i);
-    const a0 = (i - 0.5) * Math.PI / 6 - Math.PI / 2, a1 = a0 + Math.PI / 6;
+    const rel = (((sf - rotVal) % 12) + 12) % 12; // wedge position: rotVal sits at 12 o'clock
+    const a0 = (rel - 0.5) * Math.PI / 6 - Math.PI / 2, a1 = a0 + Math.PI / 6;
     const inWin = [win(-1), win(0), win(1)].includes(sf);
     for (let ring = 0; ring < 3; ring++) {
       const [rIn, rOut] = rings[ring];
@@ -3087,21 +3091,52 @@ function drawCof() {
 document.getElementById("cofbtn").addEventListener("click", () => {
   const g = song ? sfDeclaredAt(curTick()) : null;
   cofSf = g !== null ? wrapSf(g) : 0;
+  cofRot = cofSf; // the song's key rides at 12 o'clock
   document.getElementById("cofsheet").classList.add("on");
   drawCof();
 });
 document.getElementById("cofclose").addEventListener("click", () =>
   document.getElementById("cofsheet").classList.remove("on"));
-document.getElementById("cofcw").addEventListener("click", () => { cofSf = wrapSf(cofSf + 1); drawCof(); });
-document.getElementById("cofccw").addEventListener("click", () => { cofSf = wrapSf(cofSf - 1); drawCof(); });
-cofCanvas.addEventListener("pointerdown", e => {
+// ⟲ ⟳ spin the WHEEL a fifth at a time; the degree window moves by tapping wedges
+document.getElementById("cofcw").addEventListener("click", () => { cofRot = wrapSf(cofRot - 1); drawCof(); });
+document.getElementById("cofccw").addEventListener("click", () => { cofRot = wrapSf(cofRot + 1); drawCof(); });
+// drag anywhere on the wheel to spin it (snaps to wedges); a plain tap moves
+// the degree window to the tapped wedge instead
+let cofPtr = null;
+const cofAngle = e => {
   const r = cofCanvas.getBoundingClientRect();
-  const dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
-  let i = Math.round((Math.atan2(dy, dx) + Math.PI / 2) / (Math.PI / 6));
-  i = ((i % 12) + 12) % 12;
-  cofSf = wrapSf(i > 6 ? i - 12 : i);
-  drawCof();
+  return Math.atan2(e.clientY - r.top - r.height / 2, e.clientX - r.left - r.width / 2);
+};
+cofCanvas.addEventListener("pointerdown", e => {
+  cofCanvas.setPointerCapture(e.pointerId);
+  cofPtr = {id: e.pointerId, a0: cofAngle(e), rot0: cofRot, moved: false};
 });
+cofCanvas.addEventListener("pointermove", e => {
+  if (!cofPtr || cofPtr.id !== e.pointerId) return;
+  let d = cofAngle(e) - cofPtr.a0;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  if (Math.abs(d) > 0.06) cofPtr.moved = true;
+  if (cofPtr.moved) {
+    cofDragRot = cofPtr.rot0 - d / (Math.PI / 6); // wheel follows the finger
+    drawCof();
+  }
+});
+function cofRelease(e) {
+  if (!cofPtr || cofPtr.id !== e.pointerId) return;
+  if (cofPtr.moved) {
+    cofRot = wrapSf(Math.round(cofDragRot));
+    cofDragRot = null;
+  } else { // plain tap: center the degree window on the tapped wedge
+    let i = Math.round((cofAngle(e) + Math.PI / 2) / (Math.PI / 6));
+    i = ((i % 12) + 12) % 12;
+    cofSf = wrapSf(wrapSf(i > 6 ? i - 12 : i) + cofRot);
+  }
+  cofPtr = null;
+  drawCof();
+}
+cofCanvas.addEventListener("pointerup", cofRelease);
+cofCanvas.addEventListener("pointercancel", () => { cofPtr = null; cofDragRot = null; drawCof(); });
 
 // ---------------------------------------------------------------- notes list
 const notelistSheet = document.getElementById("notelistsheet");

@@ -163,8 +163,12 @@ no signature, no respelling, nothing downstream until the mode lands.
 **◯5 Circle of fifths** (footer button): live canvas chart — majors /
 relative minors / vii° rings, signature counts, the movable degree
 window (IV·I·V / ii·vi·iii / vii°), gold rim on the song's governing
-key. Tap a wedge to recenter, ⟲ ⟳ rotate by fifths; detail block gives
-the center key's accidentals, scale, all seven triads, and neighbors.
+key. Two independent motions (Josh, 2026-08-07): the WHEEL spins —
+drag it anywhere (fractional while dragging, snaps to wedges on
+release) or step it with ⟲ ⟳ — putting any key at 12 o'clock; the
+degree WINDOW moves separately by tapping a wedge. Opens with the
+song's key on top and windowed. Detail block gives the window key's
+accidentals, scale, all seven triads, and IV/V neighbors.
 Ranged keys revert automatically. The dropdown label reports the recorded
 names: "key: not set (C)" vs "key: Gm ✓". Minor names map to the relative
 major's signature for engraving (keyNameToSf). MIDI files carry true key signatures (via
