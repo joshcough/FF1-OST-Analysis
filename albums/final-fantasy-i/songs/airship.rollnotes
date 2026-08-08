@@ -1,4 +1,10 @@
-# ff1airship.rollnotes — beat-anchored annotations
+# airship.rollnotes — beat-anchored annotations
 
 [1.1]
 key: F
+
+[1.1 - 8.2]
+section: A
+
+[8.3 - 16.4]
+section: B
